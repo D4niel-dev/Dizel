@@ -13,8 +13,9 @@ The sidebar fires callbacks into ChatWindow; it owns no model state itself.
 
 import tkinter as tk
 import customtkinter as ctk
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Optional
 
+from dizel_ui.utils.icons import get_icon
 from ..theme.colors import (
     BG_SIDEBAR, ACCENT, ACCENT_HOVER, ACCENT_LIGHT,
     SIDEBAR_BTN_HOVER, SIDEBAR_BTN_ACTIVE, SIDEBAR_TEXT,
@@ -147,7 +148,7 @@ class Sidebar(ctk.CTkFrame):
 
         self._logo_lbl = ctk.CTkLabel(
             top_bar,
-            text="⬡  Zyricon",
+            text="⬡ Dizel",
             font=LOGO,
             text_color=TEXT_PRIMARY,
             anchor="w",
@@ -168,9 +169,11 @@ class Sidebar(ctk.CTkFrame):
         self._toggle_btn.pack(side="right", padx=12, pady=18)
 
         # ── New Chat button (Zyricon Pill Style) ─────────────────────────
+        plus_ico = get_icon("plus", size=(18, 18), color=TEXT_PRIMARY)
         self._new_btn = ctk.CTkButton(
             self,
-            text="⊕ New Chat",
+            text="  New Chat",
+            image=plus_ico,
             font=BTN_LABEL,
             fg_color=SIDEBAR_BTN_HOVER,
             hover_color=SIDEBAR_BTN_ACTIVE,
@@ -183,32 +186,53 @@ class Sidebar(ctk.CTkFrame):
         self._new_btn.pack(fill="x", padx=16, pady=(12, 24))
 
         # ── Features Section ──────────────────────────────────────────────
-        feat_lbl = ctk.CTkLabel(
+        self._feat_lbl = ctk.CTkLabel(
             self, text="Features", font=LABEL_DIM, text_color=SIDEBAR_TEXT_DIM, anchor="w"
         )
-        feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
+        self._feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
 
-        for text in ["💬 Chat", "📦 Archived", "📚 Library"]:
+        self._feat_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._feat_container.pack(fill="x", pady=2)
+
+        features = [
+            ("message-square", "Chat"),
+            ("archive", "Archived"),
+            ("book", "Library")
+        ]
+        
+        for icon_name, text in features:
+            ico = get_icon(icon_name, size=(18, 18), color=SIDEBAR_TEXT)
             btn = ctk.CTkButton(
-                self, text=text, font=NAV_ITEM, fg_color="transparent", hover_color=SIDEBAR_BTN_HOVER,
-                text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
+                self._feat_container, text=f"  {text}", image=ico, font=NAV_ITEM, fg_color="transparent", 
+                hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
             )
             btn.pack(fill="x", padx=12, pady=2)
 
         # ── Separator ─────────────────────────────────────────────────────
-        sep1 = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
-        sep1.pack(fill="x", padx=16, pady=16)
+        self._sep1 = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
+        self._sep1.pack(fill="x", padx=16, pady=16)
 
         # ── Workspaces Section ────────────────────────────────────────────
-        work_lbl = ctk.CTkLabel(
+        self._work_lbl = ctk.CTkLabel(
             self, text="Workspaces", font=LABEL_DIM, text_color=SIDEBAR_TEXT_DIM, anchor="w"
         )
-        work_lbl.pack(fill="x", padx=16, pady=(0, 6))
+        self._work_lbl.pack(fill="x", padx=16, pady=(0, 6))
 
-        for text in ["📝 New Project", "🖼 Image", "📊 Presentation", "🔬 Riset", "🖼 Image"]:
+        self._work_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._work_container.pack(fill="x", pady=2)
+
+        workspaces = [
+            ("folder-plus", "New Project"),
+            ("image", "Image"),
+            ("layout", "Presentation"),
+            ("search", "Riset"),
+        ]
+
+        for icon_name, text in workspaces:
+            ico = get_icon(icon_name, size=(18, 18), color=SIDEBAR_TEXT)
             btn = ctk.CTkButton(
-                self, text=text, font=NAV_ITEM, fg_color="transparent", hover_color=SIDEBAR_BTN_HOVER,
-                text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
+                self._work_container, text=f"  {text}", image=ico, font=NAV_ITEM, fg_color="transparent", 
+                hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
             )
             btn.pack(fill="x", padx=12, pady=2)
 
@@ -221,23 +245,24 @@ class Sidebar(ctk.CTkFrame):
         self._hist_frame.pack(fill="both", expand=True, padx=0, pady=4)
 
         # ── Premium Upgrade Card ──────────────────────────────────────────
-        premium_card = ctk.CTkFrame(self, fg_color=SIDEBAR_PREMIUM_BG, corner_radius=12)
-        premium_card.pack(fill="x", padx=16, pady=(8, 16))
+        self._premium_card = ctk.CTkFrame(self, fg_color=SIDEBAR_PREMIUM_BG, corner_radius=12)
+        self._premium_card.pack(fill="x", padx=16, pady=(8, 16))
         
-        crown_lbl = ctk.CTkLabel(premium_card, text="👑", font=("", 16))
+        star_ico = get_icon("star", size=(24, 24), color="#ffd700")  # Gold star
+        crown_lbl = ctk.CTkLabel(self._premium_card, text="", image=star_ico)
         crown_lbl.pack(pady=(12, 4))
         
-        title_lbl = ctk.CTkLabel(premium_card, text="Upgrade to premium", font=LABEL_SM, text_color=TEXT_PRIMARY)
+        title_lbl = ctk.CTkLabel(self._premium_card, text="Upgrade to premium", font=LABEL_SM, text_color=TEXT_PRIMARY)
         title_lbl.pack()
         
         desc_lbl = ctk.CTkLabel(
-            premium_card, text="Boost productivity with seamless automation and responsive AI, built to adapt to your needs.",
+            self._premium_card, text="Boost productivity with seamless automation and responsive AI, built to adapt to your needs.",
             font=("", 9), text_color=TEXT_DIM, wraplength=170
         )
         desc_lbl.pack(pady=(2, 12), padx=12)
 
         upg_btn = ctk.CTkButton(
-            premium_card, text="Upgrade", font=BTN_LABEL, fg_color=SIDEBAR_BTN_HOVER,
+            self._premium_card, text="Upgrade", font=BTN_LABEL, fg_color=SIDEBAR_BTN_HOVER,
             hover_color=SIDEBAR_BTN_ACTIVE, text_color=TEXT_PRIMARY, height=28, corner_radius=6
         )
         upg_btn.pack(fill="x", padx=12, pady=(0, 16))
@@ -276,14 +301,33 @@ class Sidebar(ctk.CTkFrame):
         self._anim_target = SIDEBAR_W_OPEN if self._is_open else SIDEBAR_W_CLOSED
         self._animate()
         # Flip toggle arrow
-        self._toggle_btn.configure(text="‹" if self._is_open else "›")
+        self._toggle_btn.configure(text="◫" if self._is_open else "◨")
         # Hide / show text elements
         if self._is_open:
             self._logo_lbl.pack(side="left", padx=16, pady=20)
-            self._new_btn.configure(text="⊕ New Chat")
+            self._new_btn.configure(text="  New Chat")
+            
+            # Repack sections
+            self._feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
+            self._feat_container.pack(fill="x", pady=2)
+            self._sep1.pack(fill="x", padx=16, pady=16)
+            self._work_lbl.pack(fill="x", padx=16, pady=(0, 6))
+            self._work_container.pack(fill="x", pady=2)
+            self._premium_card.pack(fill="x", padx=16, pady=(8, 16))
+            self._hist_frame.pack(fill="both", expand=True, padx=0, pady=4)
+
         else:
             self._logo_lbl.pack_forget()
-            self._new_btn.configure(text="⊕")
+            self._new_btn.configure(text="")
+            
+            # Hide sections
+            self._feat_lbl.pack_forget()
+            self._feat_container.pack_forget()
+            self._sep1.pack_forget()
+            self._work_lbl.pack_forget()
+            self._work_container.pack_forget()
+            self._premium_card.pack_forget()
+            self._hist_frame.pack_forget()
 
     def _animate(self) -> None:
         current = self.winfo_width()

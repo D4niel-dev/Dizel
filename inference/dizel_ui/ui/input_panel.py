@@ -13,6 +13,7 @@ import tkinter as tk
 import customtkinter as ctk
 from typing import Callable
 
+from dizel_ui.utils.icons import get_icon
 from ..theme.colors import (
     BG_INPUT, BG_INPUT_FIELD, SEND_BTN, SEND_BTN_HOVER,
     BORDER, BORDER_FOCUS, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
@@ -38,6 +39,10 @@ class InputPanel(ctk.CTkFrame):
         parent,
         on_send: Callable[[str], None],
         on_stop: Callable[[], None],
+        on_settings: Callable[[], None] = lambda: None,
+        on_attach: Callable[[], None] = lambda: None,
+        on_options: Callable[[], None] = lambda: None,
+        on_voice: Callable[[], None] = lambda: None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -48,6 +53,10 @@ class InputPanel(ctk.CTkFrame):
         )
         self._on_send    = on_send
         self._on_stop    = on_stop
+        self._on_settings = on_settings
+        self._on_attach   = on_attach
+        self._on_options  = on_options
+        self._on_voice    = on_voice
         self._generating = False
         self._placeholder_active = True
 
@@ -92,10 +101,16 @@ class InputPanel(ctk.CTkFrame):
         left_actions = ctk.CTkFrame(action_row, fg_color="transparent")
         left_actions.pack(side="left")
         
-        for lbl in ["🔗 Attach", "⚙ Settings", "⊞ Options"]:
+        for ico_name, lbl, cmd in [
+            ("link", "Attach", self._on_attach),
+            ("settings", "Settings", self._on_settings),
+            ("grid", "Options", self._on_options)
+        ]:
+            ico = get_icon(ico_name, size=(16, 16), color=TEXT_DIM)
             btn = ctk.CTkButton(
-                left_actions, text=lbl, font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM, 
-                hover_color=WELCOME_CARD_HOVER, width=60, height=28, corner_radius=14
+                left_actions, text=f"  {lbl}", image=ico, font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM, 
+                hover_color=WELCOME_CARD_HOVER, width=60, height=28, corner_radius=14,
+                command=cmd
             )
             btn.pack(side="left", padx=4)
 
@@ -103,15 +118,19 @@ class InputPanel(ctk.CTkFrame):
         right_actions = ctk.CTkFrame(action_row, fg_color="transparent")
         right_actions.pack(side="right")
 
+        mic_ico = get_icon("mic", size=(18, 18), color=TEXT_DIM)
         voice_btn = ctk.CTkButton(
-            right_actions, text="🎙", font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM,
-            hover_color=WELCOME_CARD_HOVER, width=32, height=32, corner_radius=16
+            right_actions, text="", image=mic_ico, font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM,
+            hover_color=WELCOME_CARD_HOVER, width=32, height=32, corner_radius=16,
+            command=self._on_voice
         )
         voice_btn.pack(side="left", padx=4)
 
+        send_ico = get_icon("arrow-up", size=(20, 20), color="#ffffff")
         self._send_btn = ctk.CTkButton(
             right_actions,
-            text="↑",
+            text="",
+            image=send_ico,
             font=BTN_LABEL,
             width=36,
             height=36,
@@ -123,9 +142,11 @@ class InputPanel(ctk.CTkFrame):
         )
         self._send_btn.pack(side="left", padx=(4, 0))
 
+        stop_ico = get_icon("square", size=(16, 16), color="#f87171")
         self._stop_btn = ctk.CTkButton(
             right_actions,
-            text="■",
+            text="",
+            image=stop_ico,
             font=BTN_LABEL,
             width=36,
             height=36,

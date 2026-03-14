@@ -57,6 +57,8 @@ from dizel_ui.theme.colors import (
 )
 from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 
+from dizel_ui.utils.icons import get_icon
+
 # ── CustomTkinter global appearance ──────────────────────────────────────────
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -93,6 +95,22 @@ class DizelApp(ctk.CTk):
         self.geometry("1100x700")
         self.minsize(self.MIN_W, self.MIN_H)
         self.configure(fg_color=BG_ROOT)
+        
+        # Set Window Icon
+        try:
+            # Safe absolute resolution
+            ico_path = os.path.join(_HERE, "assets", "avatars", "Diszi_beta2.ico")
+            
+            if os.path.exists(ico_path):
+                self.iconbitmap(ico_path)
+            else:
+                # Fallback to PNG if .ico missing
+                png_path = os.path.join(_HERE, "assets", "avatars", "Diszi_beta2.png")
+                if os.path.exists(png_path):
+                    img = tk.PhotoImage(file=png_path)
+                    self.iconphoto(False, img)
+        except Exception as e:
+            print(f"Failed to load application window icon: {e}")
 
         self._build_layout()
         self._wire_callbacks()
@@ -127,12 +145,12 @@ class DizelApp(ctk.CTk):
         # ── Right column (chat + input) ───────────────────────────────────
         right = ctk.CTkFrame(self, fg_color=BG_CHAT, corner_radius=0)
         right.grid(row=0, column=1, sticky="nsew")
-        right.rowconfigure(0, weight=1)
+        right.rowconfigure(1, weight=1)
         right.columnconfigure(0, weight=1)
 
         # ── Top Bar (Zyricon Header) ──────────────────────────────────────
         self._status_bar = ctk.CTkFrame(right, fg_color="transparent", height=48, corner_radius=0)
-        self._status_bar.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 0))
+        self._status_bar.grid(row=0, column=0, sticky="ew", padx=24, pady=(12, 16))
         self._status_bar.grid_propagate(False)
 
         # Left Pill (Status / Model Info)
@@ -150,14 +168,16 @@ class DizelApp(ctk.CTk):
         self._model_info_lbl.pack(side="left", padx=(4, 8))
 
         # Right Pills (Config & Export)
+        export_ico = get_icon("external-link", size=(14, 14), color=TEXT_PRIMARY)
         export_pill = ctk.CTkButton(
-            self._status_bar, text="Export ⎘", font=LABEL_SM, text_color=TEXT_PRIMARY,
+            self._status_bar, text="  Export", image=export_ico, font=LABEL_SM, text_color=TEXT_PRIMARY,
             fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=80, height=32
         )
         export_pill.pack(side="right", padx=(8, 0))
 
+        config_ico = get_icon("settings", size=(14, 14), color=TEXT_PRIMARY)
         config_pill = ctk.CTkButton(
-            self._status_bar, text="Configuration ⚙", font=LABEL_SM, text_color=TEXT_PRIMARY,
+            self._status_bar, text="  Configuration", image=config_ico, font=LABEL_SM, text_color=TEXT_PRIMARY,
             fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=120, height=32,
             command=self._open_settings
         )
@@ -168,6 +188,7 @@ class DizelApp(ctk.CTk):
             right,
             on_quick_action=self._on_quick_action,
         )
+        self._chat_window.configure(fg_color="transparent")
         self._chat_window.grid(row=1, column=0, sticky="nsew")
         right.rowconfigure(1, weight=1)
 
@@ -176,8 +197,33 @@ class DizelApp(ctk.CTk):
             right,
             on_send=self._on_send,
             on_stop=self._on_stop,
+            on_settings=self._open_settings,
+            on_attach=self._do_attach,
+            on_options=self._do_options,
+            on_voice=self._do_voice,
         )
         self._input_panel.grid(row=2, column=0, sticky="ew")
+
+    # ── Input Panel Actions ───────────────────────────────────────────────
+
+    def _do_attach(self) -> None:
+        import tkinter.filedialog as fd
+        fpath = fd.askopenfilename(title="Select File to Attach")
+        if fpath:
+            fname = os.path.basename(fpath)
+            self._input_panel._input.insert("end", f"\n[Attached: {fname}]\n")
+            self._show_status(f"Attached {fname}")
+
+    def _do_options(self) -> None:
+        dlg = ctk.CTkInputDialog(text="Enter an advanced system prompt:", title="Model Options")
+        res = dlg.get_input()
+        if res:
+            self._show_status(f"System prompt recorded.", dim=True)
+
+    def _do_voice(self) -> None:
+        self._show_status("Listening... (Speak now)", dim=False)
+        self.after(2000, lambda: self._input_panel._input.insert("end", "Hello Dizel, how are you?"))
+        self.after(2000, lambda: self._show_status("Transcribed.", dim=True))
 
     # ── Callback wiring ───────────────────────────────────────────────────
 

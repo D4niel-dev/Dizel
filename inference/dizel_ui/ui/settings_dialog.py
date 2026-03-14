@@ -10,7 +10,20 @@ Modal settings dialog for configuring:
 Changes take effect immediately on Save.
 """
 
+# ── Make project root importable ──────────────────────────────────────────────
 import os
+import sys
+
+_HERE          = os.path.dirname(os.path.abspath(__file__))
+_INFERENCE_DIR = os.path.dirname(_HERE)
+_PROJ_ROOT     = os.path.dirname(_INFERENCE_DIR)
+
+if _PROJ_ROOT not in sys.path:
+    sys.path.insert(0, _PROJ_ROOT)
+if _INFERENCE_DIR not in sys.path:
+    sys.path.insert(0, _INFERENCE_DIR)
+
+
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog
@@ -49,6 +62,22 @@ class SettingsDialog(ctk.CTkToplevel):
 
         self._build()
         self._load_current()
+
+        # Set Window Icon
+        try:
+            # Safe absolute resolution
+            ico_path = os.path.join(_INFERENCE_DIR, "assets", "avatars", "Diszi_beta2.ico")
+            
+            if os.path.exists(ico_path):
+                self.iconbitmap(ico_path)
+            else:
+                # Fallback to PNG if .ico missing
+                png_path = os.path.join(_INFERENCE_DIR, "assets", "avatars", "Diszi_beta2.png")
+                if os.path.exists(png_path):
+                    img = tk.PhotoImage(file=png_path)
+                    self.iconphoto(False, img)
+        except Exception as e:
+            print(f"Failed to load application window icon: {e}")
 
     # ── Layout ────────────────────────────────────────────────────────────
 

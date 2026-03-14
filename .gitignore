@@ -49,6 +49,7 @@ huggingface/
 # -----------------------
 .vscode/
 .idea/
+node_modules/
 
 # -----------------------
 # OS junk

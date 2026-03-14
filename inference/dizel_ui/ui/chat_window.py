@@ -11,6 +11,8 @@ This widget owns no model logic. It renders what ChatManager tells it
 to render via the callbacks wired up in main.py.
 """
 
+from __future__ import annotations
+
 import os
 import time
 import tkinter as tk
@@ -24,6 +26,7 @@ from ..theme.colors import (
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
     WELCOME_CARD, WELCOME_CARD_HOVER, TYPING_DOT, BUBBLE_ASST,
 )
+from dizel_ui.utils.icons import get_icon
 from ..theme.fonts import (
     WELCOME_TITLE, WELCOME_SUB, CARD_TITLE, CARD_BODY,
     MSG_TEXT, TYPING_TEXT, BTN_LABEL,
@@ -32,16 +35,16 @@ from ..theme.fonts import (
 
 # ── Action Pills ──────────────────────────────────────────────────────────────
 ACTION_PILLS = [
-    ("🖼 Create Image", "Generate an image of a futuristic city."),
-    ("💡 Brainstorm", "Give me 5 ideas for a new web project."),
-    ("📝 Make a plan", "Create a structured study plan for Python."),
+    ("image", "Create Image", "Generate an image of a futuristic city."),
+    ("zap", "Brainstorm", "Give me 5 ideas for a new web project."),
+    ("file-text", "Make a plan", "Create a structured study plan for Python."),
 ]
 
 # ── Feature Cards ─────────────────────────────────────────────────────────────
 FEATURE_CARDS = [
-    ("Image Generator", "High-quality, dynamic image creation tool."),
-    ("AI Presentation", "Generate professional slides in seconds."),
-    ("Dev Assistant", "Write, debug, and optimize your code."),
+    ("image", "Image Generator", "High-quality, dynamic image creation tool."),
+    ("layout", "AI Presentation", "Generate professional slides in seconds."),
+    ("code", "Dev Assistant", "Write, debug, and optimize your code."),
 ]
 
 
@@ -167,9 +170,10 @@ class ChatWindow(ctk.CTkFrame):
         pills_row = ctk.CTkFrame(self._welcome_frame, fg_color="transparent")
         pills_row.pack(pady=(0, 40))
 
-        for (label, prompt) in ACTION_PILLS:
+        for (icon_name, label, prompt) in ACTION_PILLS:
+            ico = get_icon(icon_name, size=(16, 16), color=TEXT_PRIMARY)
             btn = ctk.CTkButton(
-                pills_row, text=label, hover_color=WELCOME_CARD_HOVER, fg_color="transparent",
+                pills_row, text=f"  {label}", image=ico, hover_color=WELCOME_CARD_HOVER, fg_color="transparent",
                 border_color=TEXT_DIM, border_width=1, text_color=TEXT_PRIMARY, corner_radius=16,
                 command=lambda p=prompt: self._on_quick_action(p)
             )
@@ -182,11 +186,11 @@ class ChatWindow(ctk.CTkFrame):
         for c in range(3):
             cards_row.columnconfigure(c, weight=1)
 
-        for i, (title, desc) in enumerate(FEATURE_CARDS):
-            card = self._make_feature_card(cards_row, title, desc)
+        for i, (icon_name, title, desc) in enumerate(FEATURE_CARDS):
+            card = self._make_feature_card(cards_row, icon_name, title, desc)
             card.grid(row=0, column=i, padx=12, sticky="ew")
 
-    def _make_feature_card(self, parent, title: str, desc: str) -> ctk.CTkFrame:
+    def _make_feature_card(self, parent, icon_name: str, title: str, desc: str) -> ctk.CTkFrame:
         """A display card for the features section."""
         card = ctk.CTkFrame(
             parent,
@@ -209,7 +213,11 @@ class ChatWindow(ctk.CTkFrame):
         
         # Add visual sparkle / graphic hint
         img_placeholder = ctk.CTkFrame(card, fg_color="#322345", width=36, height=36, corner_radius=8)
-        img_placeholder.place(relx=0.8, rely=0.6, anchor="center")
+        img_placeholder.place(relx=0.85, rely=0.5, anchor="center")
+        
+        ico = get_icon(icon_name, size=(18, 18), color="#a366ff")
+        ico_lbl = ctk.CTkLabel(img_placeholder, text="", image=ico)
+        ico_lbl.place(relx=0.5, rely=0.5, anchor="center")
 
         def enter(_e): card.configure(fg_color=WELCOME_CARD_HOVER)
         def leave(_e): card.configure(fg_color=WELCOME_CARD)
