@@ -1,0 +1,71 @@
+# -----------------------
+# Python cache
+# -----------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc.*
+
+# -----------------------
+# Virtual environments
+# -----------------------
+venv/
+.env/
+.envrc
+.venv/
+
+# -----------------------
+# Training outputs
+# -----------------------
+checkpoints/
+outputs/
+runs/
+logs/
+
+# model weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# -----------------------
+# Dataset files
+# -----------------------
+data/
+datasets/
+*.csv
+*.jsonl
+*.parquet
+
+# -----------------------
+# HuggingFace cache
+# -----------------------
+.cache/
+huggingface/
+
+# -----------------------
+# IDE files
+# -----------------------
+.vscode/
+.idea/
+
+# -----------------------
+# OS junk
+# -----------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------
+# Build artifacts
+# -----------------------
+dist/
+build/
+*.egg-info/
+
+# -----------------------
+# Temporary files
+# -----------------------
+*.log
+*.tmp
+*.temp
