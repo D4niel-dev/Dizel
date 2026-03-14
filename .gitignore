@@ -18,7 +18,7 @@ venv/
 # -----------------------
 # Training outputs
 # -----------------------
-checkpoints/
+#checkpoints/
 outputs/
 runs/
 logs/
@@ -32,8 +32,9 @@ logs/
 # -----------------------
 # Dataset files
 # -----------------------
-data/
+#data/
 datasets/
+inference/dizel_ui/history/
 *.csv
 *.jsonl
 *.parquet

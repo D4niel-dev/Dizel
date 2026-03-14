@@ -147,7 +147,7 @@ class ChatWindow(ctk.CTkFrame):
             # Assuming main.py is in dizel_ui, so assets is at ./assets
             # Let's use the current file path to find the asset
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            avatar_path = os.path.join(base_dir, "assets", "avatars", "Diszi_beta1.png")
+            avatar_path = os.path.join(base_dir, "assets", "avatars", "Diszi_beta2.png")
             img = Image.open(avatar_path)
             avatar_ctk = ctk.CTkImage(light_image=img, dark_image=img, size=(80, 80))
             lbl_avatar = ctk.CTkLabel(self._welcome_frame, text="", image=avatar_ctk)
