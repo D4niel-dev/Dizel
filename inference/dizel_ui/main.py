@@ -99,13 +99,13 @@ class DizelApp(ctk.CTk):
         # Set Window Icon
         try:
             # Safe absolute resolution
-            ico_path = os.path.join(_HERE, "assets", "avatars", "Diszi_beta2.ico")
+            ico_path = os.path.join(_HERE, "assets", "icons", "Konnekt.ico")
             
             if os.path.exists(ico_path):
                 self.iconbitmap(ico_path)
             else:
                 # Fallback to PNG if .ico missing
-                png_path = os.path.join(_HERE, "assets", "avatars", "Diszi_beta2.png")
+                png_path = os.path.join(_HERE, "assets", "icons", "Konnekt.png")
                 if os.path.exists(png_path):
                     img = tk.PhotoImage(file=png_path)
                     self.iconphoto(False, img)

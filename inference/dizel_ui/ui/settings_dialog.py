@@ -63,21 +63,22 @@ class SettingsDialog(ctk.CTkToplevel):
         self._build()
         self._load_current()
 
-        # Set Window Icon
+        # Set Window Icon (deferred — CTkToplevel needs to be mapped first)
+        self.after(200, self._set_icon)
+
+    def _set_icon(self) -> None:
         try:
-            # Safe absolute resolution
-            ico_path = os.path.join(_INFERENCE_DIR, "assets", "avatars", "Diszi_beta2.ico")
-            
+            ico_path = os.path.join(_INFERENCE_DIR, "assets", "icons", "Konnekt.ico")
             if os.path.exists(ico_path):
                 self.iconbitmap(ico_path)
+                self.after(10, lambda: self.iconbitmap(ico_path))  # re-apply after CTk override
             else:
-                # Fallback to PNG if .ico missing
-                png_path = os.path.join(_INFERENCE_DIR, "assets", "avatars", "Diszi_beta2.png")
+                png_path = os.path.join(_INFERENCE_DIR, "assets", "icons", "Konnekt.png")
                 if os.path.exists(png_path):
                     img = tk.PhotoImage(file=png_path)
                     self.iconphoto(False, img)
         except Exception as e:
-            print(f"Failed to load application window icon: {e}")
+            print(f"Failed to load settings window icon: {e}")
 
     # ── Layout ────────────────────────────────────────────────────────────
 
