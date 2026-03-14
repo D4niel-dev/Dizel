@@ -19,13 +19,13 @@ class ModelConfig:
     vocab_size: int = 16000
 
     # Maximum sequence (context) length in tokens
-    context_length: int = 256
+    context_length: int = 512
 
     # Transformer hidden dimension
     d_model: int = 256
 
     # Number of transformer layers
-    n_layers: int = 6
+    n_layers: int = 8
 
     # Number of attention heads  (d_model must be divisible by n_heads)
     n_heads: int = 4
@@ -34,7 +34,7 @@ class ModelConfig:
     ffn_mult: int = 4
 
     # Dropout rate — higher helps regularise on tiny datasets
-    dropout: float = 0.15
+    dropout: float = 0.1
 
     # Tie embedding weights with LM head (saves ~3M params, aids generalisation)
     weight_tying: bool = True
