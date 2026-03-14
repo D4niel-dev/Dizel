@@ -95,20 +95,20 @@ class MessageBubble(ctk.CTkFrame):
         bg_color   = BUBBLE_USER  if self._is_user else BUBBLE_ASST
         txt_color  = BUBBLE_USER_TXT if self._is_user else BUBBLE_ASST_TXT
         align_side = "e" if self._is_user else "w"   # east = right, west = left
-        role_label = "You" if self._is_user else "Dizel"
+        role_label = "You" if self._is_user else "✦ Dizel"
 
         # ── Outer row frame (full width, anchored left or right) ──────────
         self.columnconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", padx=0, pady=2)
+        row.pack(fill="x", padx=0, pady=4)
 
         # ── Bubble container ──────────────────────────────────────────────
         bubble = ctk.CTkFrame(
             row,
             fg_color=bg_color,
-            corner_radius=14,
+            corner_radius=16,
         )
 
         # ── Role label ────────────────────────────────────────────────────
@@ -116,20 +116,20 @@ class MessageBubble(ctk.CTkFrame):
             bubble,
             text=role_label,
             font=LABEL_SM,
-            text_color=ACCENT_LIGHT if not self._is_user else "#a0a0ff",
+            text_color=ACCENT_LIGHT if not self._is_user else "#d5b8ff",
             anchor="w",
         )
-        role_lbl.pack(anchor="w", padx=12, pady=(10, 2))
+        role_lbl.pack(anchor="w", padx=16, pady=(12, 2))
 
         # ── Message text ──────────────────────────────────────────────────
         self._textbox = _make_textbox(
             bubble, content, bg_color, txt_color, bubble_width - 24
         )
-        self._textbox.pack(fill="x", padx=12, pady=(0, 4))
+        self._textbox.pack(fill="x", padx=14, pady=(0, 4))
 
         # ── Copy button ───────────────────────────────────────────────────
         bottom_row = ctk.CTkFrame(bubble, fg_color="transparent")
-        bottom_row.pack(fill="x", padx=8, pady=(0, 6))
+        bottom_row.pack(fill="x", padx=10, pady=(0, 8))
 
         self._copy_btn = ctk.CTkButton(
             bottom_row,
@@ -138,7 +138,7 @@ class MessageBubble(ctk.CTkFrame):
             width=60,
             height=22,
             fg_color="transparent",
-            hover_color=BUBBLE_USER if self._is_user else "#303040",
+            hover_color=BUBBLE_USER if self._is_user else "#241830",
             text_color=TEXT_SECONDARY,
             border_width=0,
             command=self._copy_text,

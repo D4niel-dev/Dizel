@@ -34,7 +34,7 @@ class ModelConfig:
     ffn_mult: int = 4
 
     # Dropout rate — higher helps regularise on tiny datasets
-    dropout: float = 0.30
+    dropout: float = 0.15
 
     # Tie embedding weights with LM head (saves ~3M params, aids generalisation)
     weight_tying: bool = True

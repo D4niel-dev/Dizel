@@ -1,54 +1,56 @@
 # dizel_ui/theme/colors.py
 # ──────────────────────────────────────────────────────────────────────────────
-# All colour constants for the Dizel desktop UI.
+# All colour constants for the Dizel desktop UI (Zyricon Theme).
 # Import this module anywhere instead of hard-coding hex values.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # ── Backgrounds ───────────────────────────────────────────────────────────────
-BG_ROOT         = "#0f0f14"   # deepest background (window, root)
-BG_SIDEBAR      = "#111118"   # sidebar panel
-BG_CHAT         = "#151520"   # main chat area
-BG_INPUT        = "#1a1a28"   # input field panel
-BG_INPUT_FIELD  = "#1e1e2e"   # actual CTkTextbox inside input panel
+BG_ROOT         = "#140f1a"   # deepest space background (window, root)
+BG_SIDEBAR      = "#100a14"   # solid dark sidebar panel
+BG_CHAT         = "#1b112c"   # gradient-like deep purple main area
+BG_INPUT        = "#22163b"   # floating input field panel
+BG_INPUT_FIELD  = "#1b112c"   # actual CTkTextbox inside input panel
 
 # ── Message bubbles ───────────────────────────────────────────────────────────
-BUBBLE_USER     = "#3a3af0"   # user message — vibrant indigo
-BUBBLE_ASST     = "#242430"   # assistant message — dark slate
+BUBBLE_USER     = "#281845"   # user message — solid purple
+BUBBLE_ASST     = "transparent" # assistant message blends into BG
 BUBBLE_USER_TXT = "#ffffff"
 BUBBLE_ASST_TXT = "#e2e2f0"
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-SIDEBAR_BTN_HOVER   = "#1e1e2e"
-SIDEBAR_BTN_ACTIVE  = "#2a2a40"
-SIDEBAR_TEXT        = "#c0c0d8"
-SIDEBAR_TEXT_DIM    = "#606078"
-SIDEBAR_BORDER      = "#2a2a3a"
+SIDEBAR_BTN_HOVER   = "#1f152b"
+SIDEBAR_BTN_ACTIVE  = "#2a1c3d"
+SIDEBAR_TEXT        = "#e0cce8"
+SIDEBAR_TEXT_DIM    = "#806d8a"
+SIDEBAR_BORDER      = "#241830"
+SIDEBAR_PREMIUM_BG  = "#1a1024"
 
 # ── Accent / interactive ──────────────────────────────────────────────────────
-ACCENT          = "#7c3aed"   # purple — primary accent
-ACCENT_HOVER    = "#6d28d9"   # darker purple on hover
-ACCENT_LIGHT    = "#a78bfa"   # light purple for text highlights
-SEND_BTN        = "#3a3af0"   # send button (matches user bubble)
-SEND_BTN_HOVER  = "#4a4aff"
+ACCENT          = "#a366ff"   # vibrant purple — primary accent
+ACCENT_HOVER    = "#8f4dfa"   # darker purple on hover
+ACCENT_LIGHT    = "#c8a1ff"   # light purple for highlights
+SEND_BTN        = "#7030a0"   # send button 
+SEND_BTN_HOVER  = "#8c4bc0"
 
 # ── Typography ────────────────────────────────────────────────────────────────
-TEXT_PRIMARY    = "#e8e8f8"
-TEXT_SECONDARY  = "#9090aa"
-TEXT_DIM        = "#606080"
-TEXT_ERROR      = "#f87171"
+TEXT_PRIMARY    = "#f6f0fa"
+TEXT_SECONDARY  = "#a693b5"
+TEXT_DIM        = "#756285"
+TEXT_ERROR      = "#ff6b8b"
 TEXT_SUCCESS    = "#4ade80"
 
 # ── Borders / separators ─────────────────────────────────────────────────────
-BORDER          = "#2a2a3a"
-BORDER_FOCUS    = "#7c3aed"
+BORDER          = "#322345"
+BORDER_FOCUS    = "#a366ff"
 
 # ── Typing indicator ─────────────────────────────────────────────────────────
-TYPING_DOT      = "#7c3aed"
+TYPING_DOT      = "#a366ff"
 
 # ── Welcome screen ───────────────────────────────────────────────────────────
-WELCOME_CARD    = "#1a1a28"
-WELCOME_CARD_HOVER = "#222236"
+WELCOME_CARD    = "#22163b"
+WELCOME_CARD_HOVER = "#2d1e4f"
+ACTION_PILL     = "#100a14"
 
 # ── Scrollbar ────────────────────────────────────────────────────────────────
-SCROLLBAR       = "#2a2a3a"
-SCROLLBAR_HOVER = "#3a3a50"
+SCROLLBAR       = "#241830"
+SCROLLBAR_HOVER = "#352347"

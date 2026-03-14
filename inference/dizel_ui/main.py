@@ -33,10 +33,14 @@ import tkinter as tk
 import customtkinter as ctk
 
 # ── Make project root importable ──────────────────────────────────────────────
-_HERE     = os.path.dirname(os.path.abspath(__file__))
-_PROJ_ROOT = os.path.dirname(os.path.dirname(_HERE))
+_HERE          = os.path.dirname(os.path.abspath(__file__))
+_INFERENCE_DIR = os.path.dirname(_HERE)
+_PROJ_ROOT     = os.path.dirname(_INFERENCE_DIR)
+
 if _PROJ_ROOT not in sys.path:
     sys.path.insert(0, _PROJ_ROOT)
+if _INFERENCE_DIR not in sys.path:
+    sys.path.insert(0, _INFERENCE_DIR)
 
 # ── UI sub-modules ────────────────────────────────────────────────────────────
 from dizel_ui.ui.chat_window     import ChatWindow
@@ -51,7 +55,7 @@ from dizel_ui.logic.history_manager import (
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, TEXT_PRIMARY, TEXT_DIM,
 )
-from dizel_ui.theme.fonts import LABEL, BTN_LABEL
+from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 
 # ── CustomTkinter global appearance ──────────────────────────────────────────
 ctk.set_appearance_mode("dark")
@@ -126,29 +130,38 @@ class DizelApp(ctk.CTk):
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
-        # Status bar at the very top of the right panel
-        self._status_bar = ctk.CTkFrame(right, fg_color="#0d0d18", height=28, corner_radius=0)
-        self._status_bar.grid(row=0, column=0, sticky="ew")
+        # ── Top Bar (Zyricon Header) ──────────────────────────────────────
+        self._status_bar = ctk.CTkFrame(right, fg_color="transparent", height=48, corner_radius=0)
+        self._status_bar.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 0))
         self._status_bar.grid_propagate(False)
 
+        # Left Pill (Status / Model Info)
+        left_pill = ctk.CTkFrame(self._status_bar, fg_color="#100a14", corner_radius=16, height=32)
+        left_pill.pack(side="left", ipadx=12, ipady=4)
+        
         self._status_lbl = ctk.CTkLabel(
-            self._status_bar,
-            text="",
-            font=LABEL,
-            text_color=TEXT_DIM,
-            anchor="w",
+            left_pill, text="Dizel v1.0 ⌵", font=LABEL_SM, text_color=TEXT_PRIMARY, anchor="w"
         )
-        self._status_lbl.pack(side="left", padx=14)
-
-        # Model info label (right side of status bar)
+        self._status_lbl.pack(side="left", padx=8)
+        
         self._model_info_lbl = ctk.CTkLabel(
-            self._status_bar,
-            text="",
-            font=LABEL,
-            text_color=TEXT_DIM,
-            anchor="e",
+            left_pill, text="", font=LABEL_SM, text_color=TEXT_DIM, anchor="e"
         )
-        self._model_info_lbl.pack(side="right", padx=14)
+        self._model_info_lbl.pack(side="left", padx=(4, 8))
+
+        # Right Pills (Config & Export)
+        export_pill = ctk.CTkButton(
+            self._status_bar, text="Export ⎘", font=LABEL_SM, text_color=TEXT_PRIMARY,
+            fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=80, height=32
+        )
+        export_pill.pack(side="right", padx=(8, 0))
+
+        config_pill = ctk.CTkButton(
+            self._status_bar, text="Configuration ⚙", font=LABEL_SM, text_color=TEXT_PRIMARY,
+            fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=120, height=32,
+            command=self._open_settings
+        )
+        config_pill.pack(side="right")
 
         # Chat area
         self._chat_window = ChatWindow(

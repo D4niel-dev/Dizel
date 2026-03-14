@@ -11,10 +11,12 @@ This widget owns no model logic. It renders what ChatManager tells it
 to render via the callbacks wired up in main.py.
 """
 
+import os
 import time
 import tkinter as tk
 import customtkinter as ctk
 from typing import Optional
+from PIL import Image
 
 from .message_bubble import MessageBubble
 from ..theme.colors import (
@@ -28,12 +30,18 @@ from ..theme.fonts import (
 )
 
 
-# ── Quick-action cards shown on the welcome screen ────────────────────────────
-WELCOME_CARDS = [
-    ("💡 Ask about coding",      "Explain how a for loop works in Python."),
-    ("⚡ Generate code",          "Write a Python function that reverses a string."),
-    ("🔬 Explain a concept",     "Explain photosynthesis in simple terms."),
-    ("📊 Structured output",     "List the planets in our solar system as JSON."),
+# ── Action Pills ──────────────────────────────────────────────────────────────
+ACTION_PILLS = [
+    ("🖼 Create Image", "Generate an image of a futuristic city."),
+    ("💡 Brainstorm", "Give me 5 ideas for a new web project."),
+    ("📝 Make a plan", "Create a structured study plan for Python."),
+]
+
+# ── Feature Cards ─────────────────────────────────────────────────────────────
+FEATURE_CARDS = [
+    ("Image Generator", "High-quality, dynamic image creation tool."),
+    ("AI Presentation", "Generate professional slides in seconds."),
+    ("Dev Assistant", "Write, debug, and optimize your code."),
 ]
 
 
@@ -129,75 +137,86 @@ class ChatWindow(ctk.CTkFrame):
         self._welcome_frame = ctk.CTkFrame(
             self._scroll, fg_color="transparent"
         )
-        self._welcome_frame.pack(fill="both", expand=True, pady=40)
+        self._welcome_frame.pack(fill="both", expand=True, pady=(60, 20))
 
-        # Logo / tagline
+        # Avatar Image
+        try:
+            # Assuming main.py is in dizel_ui, so assets is at ./assets
+            # Let's use the current file path to find the asset
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            avatar_path = os.path.join(base_dir, "assets", "avatars", "Diszi_beta1.png")
+            img = Image.open(avatar_path)
+            avatar_ctk = ctk.CTkImage(light_image=img, dark_image=img, size=(80, 80))
+            lbl_avatar = ctk.CTkLabel(self._welcome_frame, text="", image=avatar_ctk)
+            lbl_avatar.pack(pady=(0, 20))
+        except Exception as e:
+            # Fallback text if image missing
+            ctk.CTkLabel(
+                self._welcome_frame, text="⬡", font=("", 54), text_color=ACCENT_LIGHT,
+            ).pack(pady=(0, 20))
+
+        # Central Title
         ctk.CTkLabel(
             self._welcome_frame,
-            text="⬡",
-            font=("", 54),
-            text_color=ACCENT_LIGHT,
-        ).pack(pady=(30, 8))
-
-        ctk.CTkLabel(
-            self._welcome_frame,
-            text="Dizel AI",
+            text="Ready to Create Something New?",
             font=WELCOME_TITLE,
             text_color=TEXT_PRIMARY,
-        ).pack()
+        ).pack(pady=(0, 24))
 
-        ctk.CTkLabel(
-            self._welcome_frame,
-            text="A structured analytical language model running locally.",
-            font=WELCOME_SUB,
-            text_color=TEXT_SECONDARY,
-        ).pack(pady=(6, 30))
+        # Action Pills Row
+        pills_row = ctk.CTkFrame(self._welcome_frame, fg_color="transparent")
+        pills_row.pack(pady=(0, 40))
 
-        # Quick-action cards
+        for (label, prompt) in ACTION_PILLS:
+            btn = ctk.CTkButton(
+                pills_row, text=label, hover_color=WELCOME_CARD_HOVER, fg_color="transparent",
+                border_color=TEXT_DIM, border_width=1, text_color=TEXT_PRIMARY, corner_radius=16,
+                command=lambda p=prompt: self._on_quick_action(p)
+            )
+            btn.pack(side="left", padx=8)
+
+        # Feature Cards (Bottom row)
         cards_row = ctk.CTkFrame(self._welcome_frame, fg_color="transparent")
-        cards_row.pack(padx=40)
-
-        for i, (label, prompt) in enumerate(WELCOME_CARDS):
-            col = i % 2
-            row = i // 2
-            card = self._make_card(cards_row, label, prompt)
-            card.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
-
-        for c in range(2):
+        cards_row.pack(padx=20, fill="x")
+        
+        for c in range(3):
             cards_row.columnconfigure(c, weight=1)
 
-    def _make_card(self, parent, label: str, prompt: str) -> ctk.CTkFrame:
-        """A clickable quick-action card."""
+        for i, (title, desc) in enumerate(FEATURE_CARDS):
+            card = self._make_feature_card(cards_row, title, desc)
+            card.grid(row=0, column=i, padx=12, sticky="ew")
+
+    def _make_feature_card(self, parent, title: str, desc: str) -> ctk.CTkFrame:
+        """A display card for the features section."""
         card = ctk.CTkFrame(
             parent,
             fg_color=WELCOME_CARD,
-            corner_radius=12,
-            cursor="hand2",
-            width=220,
-            height=72,
+            corner_radius=16,
+            height=120,
         )
         card.pack_propagate(False)
 
         ctk.CTkLabel(
-            card, text=label,
+            card, text=title,
             font=CARD_TITLE, text_color=TEXT_PRIMARY, anchor="w",
-        ).pack(padx=14, pady=(12, 2), anchor="w")
+        ).pack(padx=16, pady=(16, 4), anchor="w")
 
         ctk.CTkLabel(
-            card, text=prompt[:48] + ("…" if len(prompt) > 48 else ""),
+            card, text=desc,
             font=CARD_BODY, text_color=TEXT_SECONDARY, anchor="w",
-            wraplength=190,
-        ).pack(padx=14, pady=(0, 10), anchor="w")
+            wraplength=180, justify="left"
+        ).pack(padx=16, anchor="nw")
+        
+        # Add visual sparkle / graphic hint
+        img_placeholder = ctk.CTkFrame(card, fg_color="#322345", width=36, height=36, corner_radius=8)
+        img_placeholder.place(relx=0.8, rely=0.6, anchor="center")
 
-        # Hover + click
         def enter(_e): card.configure(fg_color=WELCOME_CARD_HOVER)
         def leave(_e): card.configure(fg_color=WELCOME_CARD)
-        def click(_e): self._on_quick_action(prompt)
-
+        
         for w in card.winfo_children() + [card]:
             w.bind("<Enter>", enter)
             w.bind("<Leave>", leave)
-            w.bind("<Button-1>", click)
 
         return card
 

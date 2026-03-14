@@ -18,7 +18,7 @@ from typing import Callable, List, Dict
 from ..theme.colors import (
     BG_SIDEBAR, ACCENT, ACCENT_HOVER, ACCENT_LIGHT,
     SIDEBAR_BTN_HOVER, SIDEBAR_BTN_ACTIVE, SIDEBAR_TEXT,
-    SIDEBAR_TEXT_DIM, SIDEBAR_BORDER, TEXT_PRIMARY, TEXT_DIM, BG_ROOT,
+    SIDEBAR_TEXT_DIM, SIDEBAR_BORDER, TEXT_PRIMARY, TEXT_DIM, BG_ROOT, SIDEBAR_PREMIUM_BG
 )
 from ..theme.fonts import LOGO, NAV_ITEM, NAV_ITEM_SM, BTN_LABEL, LABEL_SM, LABEL_DIM
 
@@ -141,88 +141,106 @@ class Sidebar(ctk.CTkFrame):
 
     def _build(self) -> None:
         # ── Top bar: logo + collapse button ──────────────────────────────
-        top_bar = ctk.CTkFrame(self, fg_color="transparent", height=56)
+        top_bar = ctk.CTkFrame(self, fg_color="transparent", height=64)
         top_bar.pack(fill="x", padx=0, pady=0)
         top_bar.pack_propagate(False)
 
         self._logo_lbl = ctk.CTkLabel(
             top_bar,
-            text="⬡  Dizel AI",
+            text="⬡  Zyricon",
             font=LOGO,
-            text_color=ACCENT_LIGHT,
+            text_color=TEXT_PRIMARY,
             anchor="w",
         )
-        self._logo_lbl.pack(side="left", padx=14, pady=14)
+        self._logo_lbl.pack(side="left", padx=16, pady=20)
 
         self._toggle_btn = ctk.CTkButton(
             top_bar,
-            text="‹",
+            text="◫",
             width=28,
             height=28,
             fg_color="transparent",
             hover_color=SIDEBAR_BTN_HOVER,
-            text_color=SIDEBAR_TEXT,
+            text_color=SIDEBAR_TEXT_DIM,
             font=LOGO,
             command=self.toggle,
         )
-        self._toggle_btn.pack(side="right", padx=8)
+        self._toggle_btn.pack(side="right", padx=12, pady=18)
 
-        # ── Separator ─────────────────────────────────────────────────────
-        sep = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
-        sep.pack(fill="x", padx=0)
-
-        # ── New Chat button ───────────────────────────────────────────────
+        # ── New Chat button (Zyricon Pill Style) ─────────────────────────
         self._new_btn = ctk.CTkButton(
             self,
-            text="＋  New Chat",
+            text="⊕ New Chat",
             font=BTN_LABEL,
-            fg_color=ACCENT,
-            hover_color=ACCENT_HOVER,
-            text_color="#ffffff",
-            corner_radius=10,
-            height=38,
+            fg_color=SIDEBAR_BTN_HOVER,
+            hover_color=SIDEBAR_BTN_ACTIVE,
+            text_color=TEXT_PRIMARY,
+            corner_radius=8,
+            height=36,
+            anchor="w",
             command=self._on_new_chat,
         )
-        self._new_btn.pack(fill="x", padx=12, pady=(14, 8))
+        self._new_btn.pack(fill="x", padx=16, pady=(12, 24))
 
-        # ── History label ─────────────────────────────────────────────────
-        self._hist_lbl = ctk.CTkLabel(
-            self,
-            text="RECENT CHATS",
-            font=LABEL_DIM,
-            text_color=SIDEBAR_TEXT_DIM,
-            anchor="w",
+        # ── Features Section ──────────────────────────────────────────────
+        feat_lbl = ctk.CTkLabel(
+            self, text="Features", font=LABEL_DIM, text_color=SIDEBAR_TEXT_DIM, anchor="w"
         )
-        self._hist_lbl.pack(fill="x", padx=16, pady=(4, 2))
+        feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
 
-        # ── Scrollable history list ───────────────────────────────────────
+        for text in ["💬 Chat", "📦 Archived", "📚 Library"]:
+            btn = ctk.CTkButton(
+                self, text=text, font=NAV_ITEM, fg_color="transparent", hover_color=SIDEBAR_BTN_HOVER,
+                text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
+            )
+            btn.pack(fill="x", padx=12, pady=2)
+
+        # ── Separator ─────────────────────────────────────────────────────
+        sep1 = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
+        sep1.pack(fill="x", padx=16, pady=16)
+
+        # ── Workspaces Section ────────────────────────────────────────────
+        work_lbl = ctk.CTkLabel(
+            self, text="Workspaces", font=LABEL_DIM, text_color=SIDEBAR_TEXT_DIM, anchor="w"
+        )
+        work_lbl.pack(fill="x", padx=16, pady=(0, 6))
+
+        for text in ["📝 New Project", "🖼 Image", "📊 Presentation", "🔬 Riset", "🖼 Image"]:
+            btn = ctk.CTkButton(
+                self, text=text, font=NAV_ITEM, fg_color="transparent", hover_color=SIDEBAR_BTN_HOVER,
+                text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
+            )
+            btn.pack(fill="x", padx=12, pady=2)
+
+        # ── Scrollable history list (For Saved Chats if any) ──────────────
         self._hist_frame = ctk.CTkScrollableFrame(
-            self,
-            fg_color="transparent",
+            self, fg_color="transparent",
             scrollbar_button_color=SIDEBAR_BORDER,
             scrollbar_button_hover_color=ACCENT,
         )
         self._hist_frame.pack(fill="both", expand=True, padx=0, pady=4)
 
-        # ── Bottom: Settings ──────────────────────────────────────────────
-        bottom = ctk.CTkFrame(self, fg_color="transparent", height=52)
-        bottom.pack(fill="x", pady=0)
-        bottom.pack_propagate(False)
-
-        sep2 = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
-        sep2.pack(fill="x")
-
-        self._settings_btn = ctk.CTkButton(
-            bottom,
-            text="⚙  Settings",
-            font=BTN_LABEL,
-            fg_color="transparent",
-            hover_color=SIDEBAR_BTN_HOVER,
-            text_color=SIDEBAR_TEXT,
-            anchor="w",
-            command=self._on_settings,
+        # ── Premium Upgrade Card ──────────────────────────────────────────
+        premium_card = ctk.CTkFrame(self, fg_color=SIDEBAR_PREMIUM_BG, corner_radius=12)
+        premium_card.pack(fill="x", padx=16, pady=(8, 16))
+        
+        crown_lbl = ctk.CTkLabel(premium_card, text="👑", font=("", 16))
+        crown_lbl.pack(pady=(12, 4))
+        
+        title_lbl = ctk.CTkLabel(premium_card, text="Upgrade to premium", font=LABEL_SM, text_color=TEXT_PRIMARY)
+        title_lbl.pack()
+        
+        desc_lbl = ctk.CTkLabel(
+            premium_card, text="Boost productivity with seamless automation and responsive AI, built to adapt to your needs.",
+            font=("", 9), text_color=TEXT_DIM, wraplength=170
         )
-        self._settings_btn.pack(fill="x", padx=8, pady=8)
+        desc_lbl.pack(pady=(2, 12), padx=12)
+
+        upg_btn = ctk.CTkButton(
+            premium_card, text="Upgrade", font=BTN_LABEL, fg_color=SIDEBAR_BTN_HOVER,
+            hover_color=SIDEBAR_BTN_ACTIVE, text_color=TEXT_PRIMARY, height=28, corner_radius=6
+        )
+        upg_btn.pack(fill="x", padx=12, pady=(0, 16))
 
     # ── History management ────────────────────────────────────────────────
 
@@ -261,15 +279,11 @@ class Sidebar(ctk.CTkFrame):
         self._toggle_btn.configure(text="‹" if self._is_open else "›")
         # Hide / show text elements
         if self._is_open:
-            self._logo_lbl.pack(side="left", padx=14, pady=14)
-            self._new_btn.configure(text="＋  New Chat")
-            self._hist_lbl.pack(fill="x", padx=16, pady=(4, 2))
-            self._settings_btn.configure(text="⚙  Settings", anchor="w")
+            self._logo_lbl.pack(side="left", padx=16, pady=20)
+            self._new_btn.configure(text="⊕ New Chat")
         else:
             self._logo_lbl.pack_forget()
-            self._new_btn.configure(text="＋")
-            self._hist_lbl.pack_forget()
-            self._settings_btn.configure(text="⚙", anchor="center")
+            self._new_btn.configure(text="⊕")
 
     def _animate(self) -> None:
         current = self.winfo_width()
