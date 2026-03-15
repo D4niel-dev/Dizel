@@ -68,12 +68,12 @@ class SettingsDialog(ctk.CTkToplevel):
 
     def _set_icon(self) -> None:
         try:
-            ico_path = os.path.join(_INFERENCE_DIR, "assets", "icons", "Konnekt.ico")
+            ico_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.ico")
             if os.path.exists(ico_path):
                 self.iconbitmap(ico_path)
                 self.after(10, lambda: self.iconbitmap(ico_path))  # re-apply after CTk override
             else:
-                png_path = os.path.join(_INFERENCE_DIR, "assets", "icons", "Konnekt.png")
+                png_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
                 if os.path.exists(png_path):
                     img = tk.PhotoImage(file=png_path)
                     self.iconphoto(False, img)
