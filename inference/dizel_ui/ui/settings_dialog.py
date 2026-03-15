@@ -35,6 +35,7 @@ from ..theme.colors import (
     BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT
 )
 from ..theme.fonts import LOGO, BTN_LABEL, LABEL, LABEL_SM
+from ..logic.config_manager import ConfigManager
 
 
 class SettingsDialog(ctk.CTkToplevel):
@@ -195,7 +196,7 @@ class SettingsDialog(ctk.CTkToplevel):
             ("Temperature",        self._temp_var,  0.0,   2.0,  2),
             ("Top-K",              self._topk_var,  1,     200,  0),
             ("Top-P",              self._topp_var,  0.1,   1.0,  2),
-            ("Repetition penalty", self._rep_var,   1.0,   2.0,  1),
+            ("Repetition penalty", self._rep_var,   1.0,   2.0,  2),
             ("Max new tokens",     self._maxt_var,  32,    2048, 0),
         ]
         
@@ -281,23 +282,49 @@ class SettingsDialog(ctk.CTkToplevel):
         disp_card.pack(fill="x", pady=(0, 12))
         
         d1 = ctk.CTkFrame(disp_card, fg_color="transparent")
-        d1.pack(fill="x", padx=16, pady=(12, 12))
-        ctk.CTkSwitch(d1, text="Show message timestamps", font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
+        d1.pack(fill="x", padx=16, pady=(12, 8))
+        self._ts_var = ctk.BooleanVar(value=True)
+        ctk.CTkSwitch(d1, text="Show message timestamps", variable=self._ts_var, font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
+
+        d2 = ctk.CTkFrame(disp_card, fg_color="transparent")
+        d2.pack(fill="x", padx=16, pady=(4, 12))
+        self._anim_var = ctk.BooleanVar(value=True)
+        ctk.CTkSwitch(d2, text="Enable UI animations", variable=self._anim_var, font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
 
         # ── About Tab ──
         v_card = ctk.CTkFrame(t_abt, fg_color="transparent")
-        v_card.pack(fill="both", expand=True, pady=40)
+        v_card.pack(fill="both", expand=True, pady=30)
         
-        logo_ico = get_icon("box", size=(48, 48), color=ACCENT)
-        ctk.CTkLabel(v_card, text="", image=logo_ico).pack(pady=(0, 16))
+        # Load app logo for About tab
+        from PIL import Image
+        import os
+        logo_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.ico")
+            
+        try:
+            pil_img = Image.open(logo_path)
+            logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
+            ctk.CTkLabel(v_card, text="", image=logo_img).pack(pady=(0, 16))
+        except Exception:
+            # Fallback if image missing/corrupt
+            logo_ico = get_icon("box", size=(48, 48), color=ACCENT)
+            ctk.CTkLabel(v_card, text="", image=logo_ico).pack(pady=(0, 16))
         
         ctk.CTkLabel(v_card, text="Dizel AI", font=LOGO, text_color=TEXT_PRIMARY).pack(pady=4)
         ctk.CTkLabel(v_card, text="Version 1.0.0-beta", font=LABEL, text_color=TEXT_SECONDARY).pack()
         
         ctk.CTkLabel(v_card, text="A lightweight, localized LLM desktop interface.\nPowered by CustomTkinter.", font=LABEL, text_color=TEXT_DIM, justify="center").pack(pady=24)
         
-        link_btn = ctk.CTkButton(v_card, text="View on GitHub", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER)
-        link_btn.pack(pady=8)
+        def open_url(url="https://github.com/D4niel-dev/Dizel"): import webbrowser; webbrowser.open(url)
+
+        links_row = ctk.CTkFrame(v_card, fg_color="transparent")
+        links_row.pack(pady=8)
+        
+        ctk.CTkButton(links_row, text="GitHub Repo", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER, width=120, command=lambda: open_url("https://github.com/D4niel-dev/Dizel")).pack(side="left", padx=6)
+        ctk.CTkButton(links_row, text="Documentation", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER, width=120, command=lambda: open_url("https://github.com/D4niel-dev/Dizel/blob/main/README.md")).pack(side="left", padx=6)
+        
+        ctk.CTkButton(v_card, text="Report an Issue", fg_color="transparent", text_color=ACCENT, hover_color=BG_CARD, width=200, command=lambda: open_url("https://github.com/D4niel-dev/Dizel/issues")).pack(pady=8)
 
         # ── Buttons ──
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
@@ -329,8 +356,13 @@ class SettingsDialog(ctk.CTkToplevel):
             row, text=f"{var.get():{fmt}}", font=LABEL, text_color=TEXT_PRIMARY, width=40, anchor="e",
         )
 
-        def _update(_v=None):
-            val_lbl.configure(text=f"{var.get():{fmt}}")
+        def _update(*args):
+            try:
+                val_lbl.configure(text=f"{var.get():{fmt}}")
+            except Exception:
+                pass
+
+        var.trace_add("write", _update)
 
         ctk.CTkLabel(
             row, text=label, font=LABEL, text_color=TEXT_PRIMARY, anchor="w", width=140,
@@ -338,7 +370,7 @@ class SettingsDialog(ctk.CTkToplevel):
 
         ctk.CTkSlider(
             row, variable=var, from_=lo, to=hi, button_color=TEXT_PRIMARY,
-            button_hover_color="#ffffff", progress_color=ACCENT, command=_update,
+            button_hover_color="#ffffff", progress_color=ACCENT, command=lambda _: _update(),
             height=12,
         ).pack(side="left", fill="x", expand=True, padx=16)
 
@@ -347,9 +379,13 @@ class SettingsDialog(ctk.CTkToplevel):
     # ── Data helpers ─────────────────────────────────────────────────────
 
     def _load_current(self) -> None:
-        """Pre-populate fields from current ChatManager state."""
-        self._ckpt_var.set("")
-        self._device_var.set(self._mgr._device or "cpu")
+        """Pre-populate fields from current ChatManager state & persistent config."""
+        cfg = ConfigManager.load()
+        
+        # Checkpoint is an app-level thing, so we load it from config
+        self._ckpt_var.set(cfg.get("checkpoint", ""))
+        self._device_var.set(self._mgr._device or cfg.get("device", "cpu"))
+        
         self._temp_var.set(self._mgr.temperature)
         self._topk_var.set(self._mgr.top_k)
         self._topp_var.set(self._mgr.top_p)
@@ -359,8 +395,14 @@ class SettingsDialog(ctk.CTkToplevel):
         self._sys_box.delete("0.0", "end")
         self._sys_box.insert("0.0", self._mgr.system_prompt)
 
+        # Load appearance defaults
+        app_cfg = cfg.get("appearance", {})
+        self._mode_var.set(app_cfg.get("color_mode", "Dark"))
+        self._ts_var.set(app_cfg.get("show_timestamps", True))
+        self._anim_var.set(app_cfg.get("animations", True))
+
     def _apply_to_manager(self) -> None:
-        """Write UI values into the ChatManager."""
+        """Write UI values into the ChatManager and persist to disk via ConfigManager."""
         self._mgr.temperature        = round(self._temp_var.get(), 2)
         self._mgr.top_k              = int(self._topk_var.get())
         self._mgr.top_p              = round(self._topp_var.get(), 2)
@@ -368,6 +410,32 @@ class SettingsDialog(ctk.CTkToplevel):
         self._mgr.max_new_tokens     = int(self._maxt_var.get())
         self._mgr.system_prompt      = self._sys_box.get("0.0", "end").strip()
         self._mgr._device            = self._device_var.get()
+        
+        # Persist to disk
+        cfg = ConfigManager.load()
+        cfg["device"] = self._device_var.get()
+        
+        ckpt = self._ckpt_var.get().strip()
+        if ckpt:
+            cfg["checkpoint"] = ckpt
+            
+        cfg["system_prompt"] = self._mgr.system_prompt
+        cfg["sampling"] = {
+            "temperature": self._mgr.temperature,
+            "top_k": self._mgr.top_k,
+            "top_p": self._mgr.top_p,
+            "repetition_penalty": self._mgr.repetition_penalty,
+            "max_new_tokens": self._mgr.max_new_tokens,
+        }
+        cfg["appearance"] = {
+            "color_mode": self._mode_var.get(),
+            "show_timestamps": self._ts_var.get(),
+            "animations": self._anim_var.get(),
+        }
+        ConfigManager.save(cfg)
+        
+        # Apply appearance mode instantly
+        ctk.set_appearance_mode(self._mode_var.get())
 
     def _browse_checkpoint(self) -> None:
         path = filedialog.askopenfilename(

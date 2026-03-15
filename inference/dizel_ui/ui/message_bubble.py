@@ -19,9 +19,10 @@ from datetime import datetime
 
 from ..theme.colors import (
     BUBBLE_USER, BUBBLE_ASST, BUBBLE_USER_TXT, BUBBLE_ASST_TXT,
-    BG_CHAT, TEXT_SECONDARY, TEXT_DIM, ACCENT_LIGHT,
+    BG_CHAT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM, ACCENT_LIGHT,
 )
 from ..theme.fonts import MSG_TEXT, MSG_META, LABEL_SM
+from ..logic.config_manager import ConfigManager
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ class MessageBubble(ctk.CTkFrame):
             meta_lbl.pack(side="right", padx=6)
 
         # ── Timestamp (hover tooltip substitute) ──────────────────────────
+        app_cfg = ConfigManager.load().get("appearance", {})
         ts = datetime.now().strftime("%H:%M")
         ts_lbl = ctk.CTkLabel(
             bottom_row,
@@ -165,7 +167,8 @@ class MessageBubble(ctk.CTkFrame):
             font=MSG_META,
             text_color=TEXT_DIM,
         )
-        ts_lbl.pack(side="right")
+        if app_cfg.get("show_timestamps", True):
+            ts_lbl.pack(side="right")
 
         # Pack bubble aligned to correct side
         if self._is_user:

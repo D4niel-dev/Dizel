@@ -51,7 +51,7 @@ class InputPanel(ctk.CTkFrame):
             corner_radius=0,
             **kwargs,
         )
-        self._on_send    = on_send
+        self._on_send_msg = on_send
         self._on_stop    = on_stop
         self._on_settings = on_settings
         self._on_attach   = on_attach
@@ -106,7 +106,9 @@ class InputPanel(ctk.CTkFrame):
 
         self._input.bind("<FocusIn>",  self._on_focus_in)
         self._input.bind("<FocusOut>", self._on_focus_out)
+        self._input.bind("<Button-1>", self._on_click)
         self._input.bind("<Return>",   self._on_return)
+        self._input.bind("<Key>",       self._on_key_press)
         self._input.bind("<KeyRelease>", self._on_key_release)
 
         # ── Inline Action Row (Bottom half of box) ────────────────────────
@@ -154,7 +156,7 @@ class InputPanel(ctk.CTkFrame):
             hover_color=SEND_BTN_HOVER,
             text_color="#ffffff",
             corner_radius=18,
-            command=self._on_send,
+            command=self._do_submit,
         )
         self._send_btn.pack(side="left", padx=(4, 0))
 
@@ -189,12 +191,19 @@ class InputPanel(ctk.CTkFrame):
 
     # ── Placeholder logic ─────────────────────────────────────────────────
 
-    def _on_focus_in(self, _evt=None) -> None:
+    def _clear_placeholder(self) -> None:
+        """Clear the placeholder text if it's currently showing."""
         if self._placeholder_active:
             self._input.delete("0.0", "end")
             self._input.configure(text_color=TEXT_PRIMARY)
             self._placeholder_active = False
-            self._input.configure(border_color=BORDER_FOCUS)
+
+    def _on_focus_in(self, _evt=None) -> None:
+        self._clear_placeholder()
+        self._input.configure(border_color=BORDER_FOCUS)
+
+    def _on_click(self, _evt=None) -> None:
+        self._clear_placeholder()
 
     def _on_focus_out(self, _evt=None) -> None:
         text = self._input.get("0.0", "end").strip()
@@ -206,11 +215,19 @@ class InputPanel(ctk.CTkFrame):
 
     # ── Key handlers ─────────────────────────────────────────────────────
 
+    def _on_key_press(self, evt) -> None:
+        """Clear placeholder on any printable key press."""
+        if evt.keysym in ('Shift_L', 'Shift_R', 'Control_L', 'Control_R',
+                          'Alt_L', 'Alt_R', 'Caps_Lock', 'Tab',
+                          'Up', 'Down', 'Left', 'Right', 'Escape'):
+            return
+        self._clear_placeholder()
+
     def _on_return(self, evt) -> str:
         """Enter = send; Shift+Enter = newline."""
         if evt.state & 0x1:   # Shift held
             return              # allow default newline insertion
-        self._on_send()
+        self._do_submit()
         return "break"         # prevent default newline
 
     def _on_key_release(self, _evt=None) -> None:
@@ -229,7 +246,7 @@ class InputPanel(ctk.CTkFrame):
 
     # ── Submit / state control ────────────────────────────────────────────
 
-    def _on_send(self, _evt=None) -> None:
+    def _do_submit(self, _evt=None) -> None:
         if self._generating:
             return
 
@@ -243,24 +260,23 @@ class InputPanel(ctk.CTkFrame):
         if self._placeholder_active and not files:
             return
 
-        # Disable input while generating
-        self._set_ui_state(generating=True)
-
-        # Notify ChatWindow (via main app callback)
-        if self._on_send_msg:
-            self._on_send_msg(text, files)
-
-        # Clear input box
+        # Clear input box FIRST (before disabling it)
         self._input.delete("0.0", "end")
         self._input.insert("0.0", PLACEHOLDER)
         self._input.configure(text_color=TEXT_DIM)
         self._placeholder_active = True
+        self._counter_lbl.configure(text="")
+        self._input.configure(height=48)
         
         # Clear attachment previews
         self.clear_attachments()
-        self._input.insert("0.0", PLACEHOLDER)
-        self._counter_lbl.configure(text="")
-        self._input.configure(height=48)
+
+        # Disable input while generating
+        self.set_generating(True)
+
+        # Notify ChatWindow (via main app callback)
+        if self._on_send_msg:
+            self._on_send_msg(text)
 
     def clear(self) -> None:
         """Clear the input field and reset to placeholder."""
@@ -380,7 +396,14 @@ class InputPanel(ctk.CTkFrame):
             self._stop_btn.pack_forget()
             self._send_btn.pack()
             self._input.configure(state="normal")
-            self._input.focus_set()
+            
+            # Restore placeholder if empty
+            content = self._input.get("0.0", "end").strip()
+            if not content or content == PLACEHOLDER:
+                self._input.delete("0.0", "end")
+                self._input.insert("0.0", PLACEHOLDER)
+                self._input.configure(text_color=TEXT_DIM)
+                self._placeholder_active = True
 
     def focus_input(self) -> None:
         self._input.focus_set()

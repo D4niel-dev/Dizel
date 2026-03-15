@@ -16,14 +16,14 @@ required.
 | **Tokenizer** | SentencePiece BPE, 8 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation |
 | **SFT** | Basic chat format, prompt-loss masking |
-| **JSON output** | Structured output via special keyword |
-| **Inference** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty |
+| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty |
+| **Inference (GUI)** | Full Desktop App (CustomTkinter) with dark theme, history, and persistent settings |
 
 ---
 
 ## Folder Structure
 
-```
+```text
 dizel/
 ├── config.py                    ← All hyperparameters in one place
 ├── requirements.txt
@@ -49,9 +49,12 @@ dizel/
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   └── chat.py                  ← CLI chat / completion / JSON inference
-│
-├── utils/
+│   ├── chat.py                  ← CLI chat / completion / JSON inference
+│   └── dizel_ui/                ← Full Desktop GUI Application!
+│       ├── main.py              ← Run this to start the desktop app
+│       ├── ui/                  ← CustomTkinter UI components (Zyricon theme)
+│       ├── logic/               ← Async generation and config/history managers
+│       └── assets/              ← Logo and avatar images
 │   └── verify.py                ← Sanity checks (no GPU required)
 │
 ├── checkpoints/                 ← Saved model checkpoints (auto-created)
@@ -86,6 +89,25 @@ python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
 ---
 
 ## Execution Steps
+
+### Step 0 — Quick Start (If you already have a checkpoint)
+
+If you have downloaded a pre-trained Dizel checkpoint (e.g. `dizel-sft-best.pt`), you can skip the training steps and immediately launch the graphical Desktop Interface to chat with it.
+
+*(Or if there was a `dizel-sft-best.pt` in the `checkpoints` folder in the project directory, you can just use that file.)*
+
+1. Install the dependencies (see Setup above).
+2. Launch the Desktop App:
+   ```bash
+   python inference/dizel_ui/main.py
+   ```
+3. Click the **⚙ Settings** button in the UI.
+4. Use the **Checkpoint Loader** to select your `.pt` file.
+5. Click **Close** — the model will load in the background, and you're ready to chat!
+
+*If you do not have a checkpoint and want to build the model from scratch, continue with Step 1 below.*
+
+---
 
 ### Step 1 — Review and tune configuration (optional)
 
@@ -139,7 +161,8 @@ This reads `data/english.md`, trains a BPE SentencePiece model with 8 000
 vocabulary entries, and writes `tokenizer/dizel.model` and `tokenizer/dizel.vocab`.
 
 **Output:**
-```
+
+```text
 [tokenizer] Wrote plain text to tokenizer/corpus.txt (45,123 chars)
 [tokenizer] Training SentencePiece BPE (vocab=8,000) ...
 [tokenizer] Trained BPE model → tokenizer/dizel.model
@@ -172,12 +195,13 @@ python training/pretrain.py --max_steps 6000 --lr 5e-4 --d_model 256
 
 **What to expect:**
 
+
 | Step | Train Loss | Notes |
-|------|-----------|-------|
-| 0    | ~9.0      | Random initialisation (~ln(8000)) |
-| 200  | ~5.0–6.0  | Starting to learn common words |
-| 1000 | ~3.5–4.5  | Coherent word sequences |
-| 4000 | ~2.5–3.5  | Reasonable sentences on training data |
+|------|------------|-------|
+| 0    | ~9.0       | Random initialisation (~ln(8000)) |
+| 200  | ~5.0–6.0   | Starting to learn common words |
+| 1000 | ~3.5–4.5   | Coherent word sequences |
+| 4000 | ~2.5–3.5   | Reasonable sentences on training data |
 
 A good val loss for this corpus size is **≤ 3.0**. The model will overfit on
 tiny data — the dropout, weight decay, and window reshuffling all help mitigate
@@ -270,13 +294,35 @@ python inference/chat.py \
 ```
 
 **In-chat commands:**
-```
+
+```text
 /quit          Exit
 /new           Clear conversation history
 /system <text> Change the system prompt
 /info          Show model info and settings
 /temp 0.6      Adjust temperature on the fly
 ```
+
+---
+
+### Step 9 — Launch the Desktop UI (Recommended)
+
+Dizel now includes a fully localized, premium Desktop Interface built with CustomTkinter featuring the **Zyricon Dark Theme**. 
+
+```bash
+python inference/dizel_ui/main.py
+```
+
+**(Optional)** Pass a checkpoint right from the command line:
+```bash
+python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda
+```
+
+**Features of the Desktop App:**
+- **Persistent Settings:** Your temperature, top-p, checkpoints, and UI preferences are saved automatically bridging sessions.
+- **Chat History:** Seamlessly manage multiple conversations from the left sidebar.
+- **Attachment Previews:** Visually queue up reference items for your prompts.
+- **Hardware Info:** Live UI tracking of Generation Tokens/sec and Context windows.
 
 ---
 
@@ -298,7 +344,7 @@ python inference/chat.py \
 
 ### Causal Self-Attention
 
-```
+```text
 input x (B, T, d_model)
    │
    ├─ QKV = Linear(d_model → 3 × d_model)
@@ -314,7 +360,7 @@ input x (B, T, d_model)
 
 ### Transformer Block (Pre-LayerNorm)
 
-```
+```text
 x → LayerNorm → Attention → + → LayerNorm → MLP → +
 │                            ↑                     ↑
 └────────────────────────────┘─────────────────────┘

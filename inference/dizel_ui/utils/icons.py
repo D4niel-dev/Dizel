@@ -15,12 +15,25 @@ _FEATHER_DIR = os.path.join(_UI_DIR, "assets", "icons")
 
 _ICON_CACHE: Dict[str, ctk.CTkImage] = {}
 
-def get_icon(icon_name: str, size: Tuple[int, int] = (18, 18), color: str = "white") -> ctk.CTkImage:
+def _resolve_color(color) -> Tuple[str, str]:
+    """
+    Resolve a color value into (light_color, dark_color).
+    Accepts a plain string or a (light, dark) tuple.
+    """
+    if isinstance(color, tuple) and len(color) == 2:
+        return color
+    return (color, color)
+
+
+def get_icon(icon_name: str, size: Tuple[int, int] = (18, 18), color = "white") -> ctk.CTkImage:
     """
     Loads an SVG feather icon, recolors it, rasterizes to PNG in memory using svglib,
     and returns a fully compatible CTkImage scaled to the requested size.
+
+    `color` can be a plain hex string or a (light_hex, dark_hex) tuple.
     """
-    cache_key = f"{icon_name}_{size[0]}x{size[1]}_{color}"
+    light_color, dark_color = _resolve_color(color)
+    cache_key = f"{icon_name}_{size[0]}x{size[1]}_{light_color}_{dark_color}"
     if cache_key in _ICON_CACHE:
         return _ICON_CACHE[cache_key]
 
@@ -59,14 +72,15 @@ def get_icon(icon_name: str, size: Tuple[int, int] = (18, 18), color: str = "whi
         # Invert so stroke is 255 (opaque) and bg is 0 (transparent)
         alpha_channel = PIL.ImageOps.invert(mask_img)
         
-        # Create a solid color image of the requested color
-        final_img = Image.new("RGBA", mask_img.size, color=color)
+        # Create separate light and dark images for CTkImage
+        light_img = Image.new("RGBA", mask_img.size, color=light_color)
+        light_img.putalpha(alpha_channel)
         
-        # Apply the inverted stroke as the alpha channel!
-        final_img.putalpha(alpha_channel)
+        dark_img = Image.new("RGBA", mask_img.size, color=dark_color)
+        dark_img.putalpha(alpha_channel)
         
-        # CTkImage handles HighDPI scaling natively
-        ctk_img = ctk.CTkImage(light_image=final_img, dark_image=final_img, size=size)
+        # CTkImage handles HighDPI scaling and light/dark switching natively
+        ctk_img = ctk.CTkImage(light_image=light_img, dark_image=dark_img, size=size)
         _ICON_CACHE[cache_key] = ctk_img
         
         return ctk_img

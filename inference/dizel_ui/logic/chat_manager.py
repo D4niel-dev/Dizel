@@ -80,6 +80,8 @@ SYSTEM_PROMPT = (
 )
 
 
+from .config_manager import ConfigManager
+
 # ---------------------------------------------------------------------------
 # ChatManager
 # ---------------------------------------------------------------------------
@@ -103,17 +105,21 @@ class ChatManager:
         self._stop_requested = False
         self._lock           = threading.Lock()
 
+        # Load persistent settings
+        self._cfg = ConfigManager.load()
+
         # Conversation state
         self.history:         List[Dict] = []
-        self.system_prompt:   str        = SYSTEM_PROMPT
+        self.system_prompt:   str        = self._cfg.get("system_prompt", SYSTEM_PROMPT)
         self.session_id:      Optional[str] = None
 
-        # Sampling defaults (can be changed at runtime)
-        self.temperature         = 0.8
-        self.top_k               = 50
-        self.top_p               = 0.92
-        self.repetition_penalty  = 1.15
-        self.max_new_tokens      = 200
+        # Sampling defaults (from disk)
+        samp = self._cfg.get("sampling", {})
+        self.temperature         = samp.get("temperature", 0.8)
+        self.top_k               = samp.get("top_k", 50)
+        self.top_p               = samp.get("top_p", 0.92)
+        self.repetition_penalty  = samp.get("repetition_penalty", 1.15)
+        self.max_new_tokens      = samp.get("max_new_tokens", 200)
 
     # ── Model loading ──────────────────────────────────────────────────
 

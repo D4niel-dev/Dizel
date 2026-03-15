@@ -355,11 +355,12 @@ class Sidebar(ctk.CTkFrame):
             self._toggle_btn.pack_forget()
             self._toggle_btn.pack(side="right", padx=12, pady=18)
             
-            self._new_btn.configure(text="  New Chat", anchor="w")
-            self._new_btn.pack_configure(padx=16)
+            self._new_btn.configure(text="  New Chat", anchor="w", width=0, height=36, compound="left", fg_color=SIDEBAR_BTN_HOVER)
+            self._new_btn.pack_configure(padx=16, fill="x")
             
             # Show texts
-            self._chat_btn.configure(text="  Chats")
+            self._chat_btn.configure(text="  Chats", anchor="w", width=0, compound="left")
+            self._chat_btn.pack_configure(padx=12, fill="x")
             if self._hist_open:
                 self._hist_frame.pack(fill="x", padx=(28, 12), pady=0)
                 
@@ -369,7 +370,8 @@ class Sidebar(ctk.CTkFrame):
             # Re-pack the containers
             self._work_container.pack(fill="x", pady=2)
             for btn, text in self._workspace_btns:
-                btn.configure(text=f"  {text}")
+                btn.configure(text=f"  {text}", anchor="w", width=0, compound="left")
+                btn.pack_configure(padx=12, fill="x")
                 
             self._premium_card.pack(fill="x", padx=16, pady=(8, 16))
 
@@ -379,8 +381,8 @@ class Sidebar(ctk.CTkFrame):
             self._toggle_btn.pack_forget()
             self._toggle_btn.pack(side="top", pady=18)
             
-            self._new_btn.configure(text="", anchor="center")
-            self._new_btn.pack_configure(padx=(10, 10))
+            self._new_btn.configure(text="", anchor="center", width=28, height=28, compound="top", fg_color="transparent")
+            self._new_btn.pack_configure(padx=0, fill="none")
             
             # Hide texts but keep buttons (icons) visible
             self._work_lbl.pack_forget()
@@ -388,9 +390,11 @@ class Sidebar(ctk.CTkFrame):
             self._premium_card.pack_forget()
             self._hist_frame.pack_forget()
             
-            self._chat_btn.configure(text="")
+            self._chat_btn.configure(text="", anchor="center", width=36, compound="top")
+            self._chat_btn.pack_configure(padx=0, fill="none")
             for btn, _ in self._workspace_btns:
-                btn.configure(text="")
+                btn.configure(text="", anchor="center", width=36, compound="top")
+                btn.pack_configure(padx=0, fill="none")
 
     def _animate(self) -> None:
         """Instant toggle instead of animated."""

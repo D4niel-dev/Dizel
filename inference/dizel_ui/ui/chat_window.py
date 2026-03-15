@@ -32,6 +32,7 @@ from ..theme.fonts import (
     WELCOME_TITLE, WELCOME_SUB, CARD_TITLE, CARD_BODY,
     MSG_TEXT, TYPING_TEXT, BTN_LABEL,
 )
+from ..logic.config_manager import ConfigManager
 
 
 # ── Action Pills ──────────────────────────────────────────────────────────────
@@ -81,6 +82,16 @@ class TypingIndicator(ctk.CTkFrame):
     def _animate(self, frame: int) -> None:
         if not self._running:
             return
+            
+        app_cfg = ConfigManager.load().get("appearance", {})
+        if not app_cfg.get("animations", True):
+            # Static indicator if animations are disabled
+            try:
+                self._dot_lbl.configure(text="●  ●  ●")
+            except tk.TclError:
+                pass
+            return
+
         dots = ["●  ○  ○", "○  ●  ○", "○  ○  ●"][frame % 3]
         try:
             self._dot_lbl.configure(text=dots)

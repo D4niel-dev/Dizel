@@ -52,6 +52,7 @@ from dizel_ui.logic.history_manager import (
     save_session, load_session, list_sessions,
     delete_session, new_session_id,
 )
+from dizel_ui.logic.config_manager import ConfigManager
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, TEXT_PRIMARY, TEXT_DIM,
     ACTION_PILL, SIDEBAR_BTN_HOVER
@@ -61,8 +62,13 @@ from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 from dizel_ui.utils.icons import get_icon
 
 # ── CustomTkinter global appearance ──────────────────────────────────────────
-ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+try:
+    _boot_cfg = ConfigManager.load()
+    _mode = _boot_cfg.get("appearance", {}).get("color_mode", "Dark")
+    ctk.set_appearance_mode(_mode)
+except Exception:
+    ctk.set_appearance_mode("Dark")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,13 +119,25 @@ class DizelApp(ctk.CTk):
         except Exception as e:
             print(f"Failed to load application window icon: {e}")
 
+        # Merge with persisted config
+        cfg = ConfigManager.load()
+        if not checkpoint:
+            checkpoint = cfg.get("checkpoint", "")
+        # CLI device overrides config device if explicitly passed, 
+        # but if we're using "cpu" (the argparse default), config takes precedence if set.
+        if device == "cpu" and cfg.get("device") in ["cpu", "cuda"]:
+            device = cfg.get("device")
+
+        self._checkpoint = checkpoint
+        self._device     = device
+
         self._build_layout()
         self._wire_callbacks()
         self._refresh_history()
 
-        # Auto-load model if checkpoint was passed on CLI
-        if checkpoint:
-            self.after(200, lambda: self._load_model_async(checkpoint, device))
+        # Auto-load model if checkpoint was passed on CLI or found in config
+        if self._checkpoint:
+            self.after(200, lambda: self._load_model_async(self._checkpoint, self._device))
         else:
             self._show_status("  No checkpoint loaded — open Settings to select one.", dim=True)
 
