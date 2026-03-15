@@ -32,6 +32,7 @@ from typing import Callable
 from ..theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, ACCENT_HOVER, BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
+    BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT
 )
 from ..theme.fonts import LOGO, BTN_LABEL, LABEL, LABEL_SM
 
@@ -83,177 +84,263 @@ class SettingsDialog(ctk.CTkToplevel):
     # ── Layout ────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        # Title
-        ctk.CTkLabel(
-            self, text="Settings",
-            font=LOGO, text_color=TEXT_PRIMARY,
-        ).pack(anchor="w", padx=24, pady=(20, 4))
+        from dizel_ui.utils.icons import get_icon
 
-        sep = ctk.CTkFrame(self, fg_color=BORDER, height=1)
-        sep.pack(fill="x", padx=24)
+        # ── Title Row ──
+        title_row = ctk.CTkFrame(self, fg_color="transparent")
+        title_row.pack(fill="x", padx=24, pady=(20, 10))
+        
+        ico = get_icon("sliders", size=(20, 20), color=TEXT_PRIMARY)
+        ctk.CTkLabel(
+            title_row, text="  Settings", image=ico, compound="left",
+            font=LOGO, text_color=TEXT_PRIMARY,
+        ).pack(side="left")
+
+        # ── Tabview ──
+        self.tabs = ctk.CTkTabview(
+            self, fg_color=TAB_BG,
+            segmented_button_fg_color=TAB_UNSELECTED,
+            segmented_button_selected_color=BG_CARD,
+            segmented_button_unselected_color=TAB_UNSELECTED,
+            text_color=TEXT_SECONDARY,
+            segmented_button_selected_hover_color=BG_CARD,
+            segmented_button_unselected_hover_color=BORDER
+        )
+        self.tabs.pack(fill="both", expand=True, padx=24, pady=(0, 10))
+        
+        t_chat  = self.tabs.add("Chat")
+        t_model = self.tabs.add("Model")
+        t_app   = self.tabs.add("Appearance")
+        t_abt   = self.tabs.add("About")
 
         scroll = ctk.CTkScrollableFrame(
-            self, fg_color="transparent",
+            t_chat, fg_color="transparent",
             scrollbar_button_color=BORDER,
         )
-        scroll.pack(fill="both", expand=True, padx=24, pady=12)
+        scroll.pack(fill="both", expand=True, pady=4)
 
-        # ── Checkpoint ───────────────────────────────────────────────────
-        self._section(scroll, "Model Checkpoint")
+        # ── Base Model Card ──
+        self._section(scroll, "Checkpoint Loader")
+        model_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+        model_card.pack(fill="x", pady=(0, 12))
 
-        ckpt_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        ckpt_row.pack(fill="x", pady=(2, 8))
+        ckpt_row = ctk.CTkFrame(model_card, fg_color="transparent")
+        ckpt_row.pack(fill="x", padx=12, pady=(12, 6))
 
         self._ckpt_var = tk.StringVar()
+        ckpt_box = ctk.CTkFrame(ckpt_row, fg_color=BG_INPUT, corner_radius=6, border_color=BORDER, border_width=1)
+        ckpt_box.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        
+        hard_ico = get_icon("hard-drive", size=(14, 14), color=TEXT_PRIMARY)
+        ctk.CTkLabel(ckpt_box, text="", image=hard_ico).pack(side="left", padx=(10, 0))
+        
         ckpt_entry = ctk.CTkEntry(
-            ckpt_row,
-            textvariable=self._ckpt_var,
-            placeholder_text="Path to .pt checkpoint…",
-            font=LABEL,
-            fg_color=BG_CHAT,
-            border_color=BORDER,
-            text_color=TEXT_PRIMARY,
+            ckpt_box, textvariable=self._ckpt_var, placeholder_text="Select checkpoint...",
+            font=LABEL, fg_color="transparent", border_width=0, text_color=TEXT_PRIMARY,
         )
-        ckpt_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ckpt_entry.pack(side="left", fill="x", expand=True, padx=4, pady=4)
+        
+        val_btn = ctk.CTkButton(
+            ckpt_box, text="↑ Val", width=50, height=24, fg_color="transparent",
+            hover_color=BORDER, font=LABEL_SM, text_color=TEXT_SECONDARY, command=self._browse_checkpoint
+        )
+        val_btn.pack(side="right", padx=4)
 
-        ctk.CTkButton(
-            ckpt_row,
-            text="Browse…",
-            font=BTN_LABEL,
-            width=80,
-            fg_color=ACCENT,
-            hover_color=ACCENT_HOVER,
-            command=self._browse_checkpoint,
-        ).pack(side="right")
+        device_row = ctk.CTkFrame(model_card, fg_color="transparent")
+        device_row.pack(fill="x", padx=16, pady=(6, 12))
+        ctk.CTkLabel(device_row, text="Device", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        
+        self._device_var = ctk.StringVar(value="cpu")
+        dev_opt = ctk.CTkOptionMenu(
+            device_row, variable=self._device_var, values=["cpu", "cuda"],
+            font=LABEL, fg_color=BG_CHAT, button_color=BG_CHAT,
+            button_hover_color=BORDER, text_color=TEXT_PRIMARY, width=80, anchor="e"
+        )
+        dev_opt.pack(side="right")
 
-        # ── Device ───────────────────────────────────────────────────────
-        self._section(scroll, "Device")
-        self._device_var = tk.StringVar(value="cpu")
-        device_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        device_row.pack(fill="x", pady=(2, 8))
+        # ── System Card ──
+        sys_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+        sys_card.pack(fill="x", pady=(0, 12))
+        
+        sys_hdr = ctk.CTkFrame(sys_card, fg_color="transparent")
+        sys_hdr.pack(fill="x", padx=16, pady=(12, 4))
+        ctk.CTkLabel(sys_hdr, text="System Prompt", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        
+        chv_ico = get_icon("chevron-down", size=(14, 14), color=TEXT_DIM)
+        ctk.CTkLabel(sys_hdr, text="", image=chv_ico).pack(side="right")
 
-        for dev in ("cpu", "cuda"):
-            ctk.CTkRadioButton(
-                device_row,
-                text=dev.upper(),
-                variable=self._device_var,
-                value=dev,
-                font=LABEL,
-                text_color=TEXT_PRIMARY,
-                fg_color=ACCENT,
-            ).pack(side="left", padx=(0, 20))
-
-        # ── System prompt ────────────────────────────────────────────────
-        self._section(scroll, "System Prompt")
         self._sys_box = ctk.CTkTextbox(
-            scroll,
-            height=80,
-            font=LABEL,
-            fg_color=BG_CHAT,
-            text_color=TEXT_PRIMARY,
-            border_color=BORDER,
-            border_width=1,
-            corner_radius=8,
-            wrap="word",
+            sys_card, height=120, font=LABEL, fg_color=BG_CHAT,
+            text_color=TEXT_PRIMARY, border_width=0, corner_radius=6, wrap="word",
         )
-        self._sys_box.pack(fill="x", pady=(2, 8))
+        self._sys_box.pack(fill="x", padx=12, pady=(0, 8))
 
-        # ── Sampling sliders ────────────────────────────────────────────
-        self._section(scroll, "Sampling Parameters")
+        seed_row = ctk.CTkFrame(sys_card, fg_color="transparent")
+        seed_row.pack(fill="x", padx=16, pady=(4, 12))
+        ctk.CTkLabel(seed_row, text="Random Seed", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(seed_row, text="Auto >", font=LABEL, text_color=TEXT_DIM).pack(side="right")
 
-        self._temp_var   = tk.DoubleVar(value=0.8)
-        self._topk_var   = tk.IntVar(value=50)
-        self._topp_var   = tk.DoubleVar(value=0.92)
-        self._rep_var    = tk.DoubleVar(value=1.15)
-        self._maxt_var   = tk.IntVar(value=200)
+        # ── Sampling Card ──
+        self._section(scroll, "Sampling Settings")
+        samp_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+        samp_card.pack(fill="x", pady=(0, 12))
+
+        self._temp_var   = tk.DoubleVar(value=0.7)
+        self._topk_var   = tk.IntVar(value=40)
+        self._topp_var   = tk.DoubleVar(value=0.90)
+        self._rep_var    = tk.DoubleVar(value=1.10)
+        self._maxt_var   = tk.IntVar(value=400)
 
         sliders = [
             ("Temperature",        self._temp_var,  0.0,   2.0,  2),
             ("Top-K",              self._topk_var,  1,     200,  0),
             ("Top-P",              self._topp_var,  0.1,   1.0,  2),
-            ("Repetition Penalty", self._rep_var,   1.0,   2.0,  2),
-            ("Max New Tokens",     self._maxt_var,  32,    512,  0),
+            ("Repetition penalty", self._rep_var,   1.0,   2.0,  1),
+            ("Max new tokens",     self._maxt_var,  32,    2048, 0),
         ]
-        self._slider_widgets = {}
+        
+        slider_pad = ctk.CTkFrame(samp_card, fg_color="transparent")
+        slider_pad.pack(fill="x", padx=16, pady=16)
+        
         for label, var, lo, hi, decimals in sliders:
-            self._make_slider(scroll, label, var, lo, hi, decimals)
+            self._make_slider(slider_pad, label, var, lo, hi, decimals)
 
-        # ── Buttons ──────────────────────────────────────────────────────
+        # ── Footer Stats ──
+        ctk.CTkLabel(
+            scroll, text="Context: 512 / 512 tokens",
+            font=LABEL_SM, text_color=TEXT_DIM, anchor="w"
+        ).pack(anchor="w", padx=4, pady=(8, 4))
+        
+        stat_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
+        stat_card.pack(fill="x", pady=(0, 10))
+        
+        s1 = ctk.CTkFrame(stat_card, fg_color="transparent")
+        s1.pack(fill="x", padx=12, pady=(10, 2))
+        ctk.CTkLabel(s1, text="●  Tokens/sec", font=LABEL_SM, text_color=TEXT_SECONDARY).pack(side="left")
+        ctk.CTkLabel(s1, text="314 ms  〰", font=LABEL_SM, text_color=TEXT_DIM).pack(side="right")
+        
+        s2 = ctk.CTkFrame(stat_card, fg_color="transparent")
+        s2.pack(fill="x", padx=12, pady=(2, 10))
+        ctk.CTkLabel(s2, text="●  Memory usage", font=LABEL_SM, text_color=TEXT_SECONDARY).pack(side="left")
+        ctk.CTkLabel(s2, text="1.4 GB RAM", font=LABEL_SM, text_color=TEXT_DIM).pack(side="right")
+
+        # ── Model Tab ──
+        m_scroll = ctk.CTkScrollableFrame(t_model, fg_color="transparent", scrollbar_button_color=BORDER)
+        m_scroll.pack(fill="both", expand=True, pady=4)
+        
+        self._section(m_scroll, "Model Architecture")
+        arch_card = ctk.CTkFrame(m_scroll, fg_color=BG_CARD, corner_radius=12)
+        arch_card.pack(fill="x", pady=(0, 12))
+        
+        a1 = ctk.CTkFrame(arch_card, fg_color="transparent")
+        a1.pack(fill="x", padx=16, pady=(12, 4))
+        ctk.CTkLabel(a1, text="Family", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(a1, text="Llama 3 (Transformer)", font=LABEL, text_color=TEXT_DIM).pack(side="right")
+        
+        a2 = ctk.CTkFrame(arch_card, fg_color="transparent")
+        a2.pack(fill="x", padx=16, pady=(4, 12))
+        ctk.CTkLabel(a2, text="Parameters", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(a2, text="8B", font=LABEL, text_color=TEXT_DIM).pack(side="right")
+        
+        self._section(m_scroll, "Execution")
+        exec_card = ctk.CTkFrame(m_scroll, fg_color=BG_CARD, corner_radius=12)
+        exec_card.pack(fill="x", pady=(0, 12))
+        
+        o1 = ctk.CTkFrame(exec_card, fg_color="transparent")
+        o1.pack(fill="x", padx=16, pady=(12, 4))
+        ctk.CTkLabel(o1, text="GPU Offload Layers", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        
+        self._offload_var = ctk.IntVar(value=32)
+        ctk.CTkSlider(exec_card, variable=self._offload_var, from_=0, to=40, button_color=TEXT_PRIMARY, button_hover_color="#ffffff", progress_color=ACCENT, height=12).pack(fill="x", padx=16, pady=4)
+        
+        o2 = ctk.CTkFrame(exec_card, fg_color="transparent")
+        o2.pack(fill="x", padx=16, pady=(4, 12))
+        ctk.CTkSwitch(o2, text="Auto-detect max VRAM", font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT, button_color=TEXT_PRIMARY).pack(side="left")
+
+        # ── Appearance Tab ──
+        a_scroll = ctk.CTkScrollableFrame(t_app, fg_color="transparent", scrollbar_button_color=BORDER)
+        a_scroll.pack(fill="both", expand=True, pady=4)
+        
+        self._section(a_scroll, "Theme Preferences")
+        theme_card = ctk.CTkFrame(a_scroll, fg_color=BG_CARD, corner_radius=12)
+        theme_card.pack(fill="x", pady=(0, 12))
+        
+        t1 = ctk.CTkFrame(theme_card, fg_color="transparent")
+        t1.pack(fill="x", padx=16, pady=(12, 8))
+        ctk.CTkLabel(t1, text="Color Mode", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        self._mode_var = ctk.StringVar(value="Dark")
+        ctk.CTkSegmentedButton(t1, variable=self._mode_var, values=["System", "Light", "Dark"], selected_color=ACCENT, selected_hover_color=ACCENT_HOVER, unselected_color=BG_CHAT, unselected_hover_color=BORDER).pack(side="right")
+        
+        t2 = ctk.CTkFrame(theme_card, fg_color="transparent")
+        t2.pack(fill="x", padx=16, pady=(8, 12))
+        ctk.CTkLabel(t2, text="UI Scale", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        ctk.CTkLabel(t2, text="100%", font=LABEL, text_color=TEXT_DIM).pack(side="right")
+        
+        self._section(a_scroll, "Chat Display")
+        disp_card = ctk.CTkFrame(a_scroll, fg_color=BG_CARD, corner_radius=12)
+        disp_card.pack(fill="x", pady=(0, 12))
+        
+        d1 = ctk.CTkFrame(disp_card, fg_color="transparent")
+        d1.pack(fill="x", padx=16, pady=(12, 12))
+        ctk.CTkSwitch(d1, text="Show message timestamps", font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
+
+        # ── About Tab ──
+        v_card = ctk.CTkFrame(t_abt, fg_color="transparent")
+        v_card.pack(fill="both", expand=True, pady=40)
+        
+        logo_ico = get_icon("box", size=(48, 48), color=ACCENT)
+        ctk.CTkLabel(v_card, text="", image=logo_ico).pack(pady=(0, 16))
+        
+        ctk.CTkLabel(v_card, text="Dizel AI", font=LOGO, text_color=TEXT_PRIMARY).pack(pady=4)
+        ctk.CTkLabel(v_card, text="Version 1.0.0-beta", font=LABEL, text_color=TEXT_SECONDARY).pack()
+        
+        ctk.CTkLabel(v_card, text="A lightweight, localized LLM desktop interface.\nPowered by CustomTkinter.", font=LABEL, text_color=TEXT_DIM, justify="center").pack(pady=24)
+        
+        link_btn = ctk.CTkButton(v_card, text="View on GitHub", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER)
+        link_btn.pack(pady=8)
+
+        # ── Buttons ──
         btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=24, pady=(0, 20))
+        btn_row.pack(fill="x", padx=24, pady=16)
 
         ctk.CTkButton(
-            btn_row,
-            text="Cancel",
-            font=BTN_LABEL,
-            width=100,
-            fg_color="transparent",
-            border_width=1,
-            border_color=BORDER,
-            text_color=TEXT_SECONDARY,
-            hover_color="#1a1a28",
-            command=self.destroy,
+            btn_row, text="< Back", font=BTN_LABEL, width=80, fg_color="transparent",
+            border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, corner_radius=16,
+            hover_color=BORDER, command=self.destroy,
         ).pack(side="left")
 
         ctk.CTkButton(
-            btn_row,
-            text="Load & Apply",
-            font=BTN_LABEL,
-            width=130,
-            fg_color=ACCENT,
-            hover_color=ACCENT_HOVER,
+            btn_row, text="Close", font=BTN_LABEL, width=100, fg_color=ACCENT,
+            text_color="#ffffff", hover_color=ACCENT_HOVER, corner_radius=16,
             command=self._save_and_reload,
-        ).pack(side="right", padx=(8, 0))
-
-        ctk.CTkButton(
-            btn_row,
-            text="Apply",
-            font=BTN_LABEL,
-            width=90,
-            fg_color="#2a2a40",
-            hover_color="#3a3a50",
-            text_color=TEXT_PRIMARY,
-            command=self._save_only,
         ).pack(side="right")
 
     def _section(self, parent, title: str) -> None:
         ctk.CTkLabel(
-            parent, text=title,
-            font=LABEL_SM, text_color=TEXT_SECONDARY,
-            anchor="w",
-        ).pack(anchor="w", pady=(10, 2))
+            parent, text=title, font=LABEL, text_color=TEXT_PRIMARY, anchor="w",
+        ).pack(anchor="w", padx=4, pady=(10, 6))
 
     def _make_slider(self, parent, label: str, var, lo, hi, decimals: int) -> None:
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=3)
+        row.pack(fill="x", pady=6)
 
         fmt = f".{decimals}f"
         val_lbl = ctk.CTkLabel(
-            row,
-            text=f"{var.get():{fmt}}",
-            font=LABEL,
-            text_color=TEXT_PRIMARY,
-            width=46,
-            anchor="e",
+            row, text=f"{var.get():{fmt}}", font=LABEL, text_color=TEXT_PRIMARY, width=40, anchor="e",
         )
 
         def _update(_v=None):
             val_lbl.configure(text=f"{var.get():{fmt}}")
 
         ctk.CTkLabel(
-            row, text=label, font=LABEL,
-            text_color=TEXT_PRIMARY, anchor="w", width=160,
+            row, text=label, font=LABEL, text_color=TEXT_PRIMARY, anchor="w", width=140,
         ).pack(side="left")
 
         ctk.CTkSlider(
-            row,
-            variable=var,
-            from_=lo, to=hi,
-            button_color=ACCENT,
-            button_hover_color=ACCENT_HOVER,
-            progress_color=ACCENT,
-            command=_update,
-        ).pack(side="left", fill="x", expand=True, padx=8)
+            row, variable=var, from_=lo, to=hi, button_color=TEXT_PRIMARY,
+            button_hover_color="#ffffff", progress_color=ACCENT, command=_update,
+            height=12,
+        ).pack(side="left", fill="x", expand=True, padx=16)
 
         val_lbl.pack(side="right")
 

@@ -116,7 +116,7 @@ class MessageBubble(ctk.CTkFrame):
             bubble,
             text=role_label,
             font=LABEL_SM,
-            text_color=ACCENT_LIGHT if not self._is_user else "#d5b8ff",
+            text_color=ACCENT_LIGHT if not self._is_user else TEXT_PRIMARY,
             anchor="w",
         )
         role_lbl.pack(anchor="w", padx=16, pady=(12, 2))
@@ -138,7 +138,7 @@ class MessageBubble(ctk.CTkFrame):
             width=60,
             height=22,
             fg_color="transparent",
-            hover_color=BUBBLE_USER if self._is_user else "#241830",
+            hover_color=BUBBLE_USER if self._is_user else BG_CHAT,
             text_color=TEXT_SECONDARY,
             border_width=0,
             command=self._copy_text,

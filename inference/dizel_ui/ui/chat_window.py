@@ -25,6 +25,7 @@ from ..theme.colors import (
     BG_CHAT, BG_ROOT, ACCENT, ACCENT_LIGHT, ACCENT_HOVER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
     WELCOME_CARD, WELCOME_CARD_HOVER, TYPING_DOT, BUBBLE_ASST,
+    ACTION_PILL, SCROLLBAR
 )
 from dizel_ui.utils.icons import get_icon
 from ..theme.fonts import (
@@ -121,7 +122,7 @@ class ChatWindow(ctk.CTkFrame):
         self._scroll = ctk.CTkScrollableFrame(
             self,
             fg_color=BG_CHAT,
-            scrollbar_button_color="#2a2a3a",
+            scrollbar_button_color=SCROLLBAR,
             scrollbar_button_hover_color=ACCENT,
             corner_radius=0,
         )
@@ -212,10 +213,10 @@ class ChatWindow(ctk.CTkFrame):
         ).pack(padx=16, anchor="nw")
         
         # Add visual sparkle / graphic hint
-        img_placeholder = ctk.CTkFrame(card, fg_color="#322345", width=36, height=36, corner_radius=8)
+        img_placeholder = ctk.CTkFrame(card, fg_color=ACTION_PILL, width=36, height=36, corner_radius=8)
         img_placeholder.place(relx=0.85, rely=0.5, anchor="center")
         
-        ico = get_icon(icon_name, size=(18, 18), color="#a366ff")
+        ico = get_icon(icon_name, size=(18, 18), color=ACCENT)
         ico_lbl = ctk.CTkLabel(img_placeholder, text="", image=ico)
         ico_lbl.place(relx=0.5, rely=0.5, anchor="center")
 

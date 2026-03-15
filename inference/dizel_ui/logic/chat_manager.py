@@ -33,7 +33,7 @@ from typing import Callable, List, Dict, Optional
 
 # Allow importing from project root
 _UI_DIR   = os.path.dirname(os.path.abspath(__file__))
-_ROOT_DIR = os.path.dirname(os.path.dirname(_UI_DIR))   # project root (Dizel-v1/)
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(_UI_DIR)))   # project root (Dizel/)
 if _ROOT_DIR not in sys.path:
     sys.path.insert(0, _ROOT_DIR)
 
@@ -162,7 +162,8 @@ class ChatManager:
         model.eval()
 
         _report("Loading tokenizer…")
-        tokenizer = _Tokenizer()
+        tokenizer_path = os.path.join(_ROOT_DIR, _CONFIG.tokenizer.model_path)
+        tokenizer = _Tokenizer(model_path=tokenizer_path)
 
         with self._lock:
             self._model     = model

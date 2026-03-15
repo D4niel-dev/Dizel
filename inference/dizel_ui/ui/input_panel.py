@@ -74,7 +74,23 @@ class InputPanel(ctk.CTkFrame):
         box = ctk.CTkFrame(outer, fg_color=BG_INPUT, corner_radius=18, border_color=BORDER, border_width=1)
         box.pack(fill="x", expand=True)
 
-        # ── Text input field (Top half of box) ────────────────────────────
+        # ── Attachment Preview Area (Hidden by default) ───────────────────
+        self._preview_area = ctk.CTkFrame(box, fg_color="transparent", height=96)
+        self._preview_area.pack_propagate(False)
+        # Don't pack it initially until an attachment is added
+        
+        # We need a scrollable row inside it in case of many attachments
+        self._preview_scroll = ctk.CTkScrollableFrame(
+            self._preview_area, fg_color="transparent", orientation="horizontal", height=76,
+            scrollbar_button_color=BORDER, scrollbar_button_hover_color=ACCENT
+        )
+        self._preview_scroll.pack(fill="x", padx=16, pady=(8, 0))
+
+        # Keep track of attached widgets to destroy them later
+        self._attachment_widgets = []
+        self._attachments = []
+
+        # ── Text input field (Middle of box) ────────────────────────────
         self._input = ctk.CTkTextbox(
             box,
             font=INPUT_TEXT,
@@ -85,7 +101,7 @@ class InputPanel(ctk.CTkFrame):
             height=60,
             activate_scrollbars=True,
         )
-        self._input.pack(fill="both", expand=True, padx=16, pady=(16, 4))
+        self._input.pack(fill="both", expand=True, padx=16, pady=(12, 4))
         self._input.insert("0.0", PLACEHOLDER)
 
         self._input.bind("<FocusIn>",  self._on_focus_in)
@@ -94,11 +110,11 @@ class InputPanel(ctk.CTkFrame):
         self._input.bind("<KeyRelease>", self._on_key_release)
 
         # ── Inline Action Row (Bottom half of box) ────────────────────────
-        action_row = ctk.CTkFrame(box, fg_color="transparent", height=40)
-        action_row.pack(fill="x", padx=12, pady=(0, 12))
+        self._action_row = ctk.CTkFrame(box, fg_color="transparent", height=40)
+        self._action_row.pack(fill="x", padx=12, pady=(0, 12))
         
         # Left Actions
-        left_actions = ctk.CTkFrame(action_row, fg_color="transparent")
+        left_actions = ctk.CTkFrame(self._action_row, fg_color="transparent")
         left_actions.pack(side="left")
         
         for ico_name, lbl, cmd in [
@@ -115,7 +131,7 @@ class InputPanel(ctk.CTkFrame):
             btn.pack(side="left", padx=4)
 
         # Right Actions
-        right_actions = ctk.CTkFrame(action_row, fg_color="transparent")
+        right_actions = ctk.CTkFrame(self._action_row, fg_color="transparent")
         right_actions.pack(side="right")
 
         mic_ico = get_icon("mic", size=(18, 18), color=TEXT_DIM)
@@ -138,7 +154,7 @@ class InputPanel(ctk.CTkFrame):
             hover_color=SEND_BTN_HOVER,
             text_color="#ffffff",
             corner_radius=18,
-            command=self._submit,
+            command=self._on_send,
         )
         self._send_btn.pack(side="left", padx=(4, 0))
 
@@ -194,7 +210,7 @@ class InputPanel(ctk.CTkFrame):
         """Enter = send; Shift+Enter = newline."""
         if evt.state & 0x1:   # Shift held
             return              # allow default newline insertion
-        self._submit()
+        self._on_send()
         return "break"         # prevent default newline
 
     def _on_key_release(self, _evt=None) -> None:
@@ -213,14 +229,38 @@ class InputPanel(ctk.CTkFrame):
 
     # ── Submit / state control ────────────────────────────────────────────
 
-    def _submit(self) -> None:
-        if self._generating or self._placeholder_active:
+    def _on_send(self, _evt=None) -> None:
+        if self._generating:
             return
+
         text = self._input.get("0.0", "end").strip()
-        if not text:
+        files = self.get_attachments()
+        
+        # We need either text or an attachment to send
+        if not text and not files:
             return
-        self.clear()
-        self._on_send(text)
+
+        if self._placeholder_active and not files:
+            return
+
+        # Disable input while generating
+        self._set_ui_state(generating=True)
+
+        # Notify ChatWindow (via main app callback)
+        if self._on_send_msg:
+            self._on_send_msg(text, files)
+
+        # Clear input box
+        self._input.delete("0.0", "end")
+        self._input.insert("0.0", PLACEHOLDER)
+        self._input.configure(text_color=TEXT_DIM)
+        self._placeholder_active = True
+        
+        # Clear attachment previews
+        self.clear_attachments()
+        self._input.insert("0.0", PLACEHOLDER)
+        self._counter_lbl.configure(text="")
+        self._input.configure(height=48)
 
     def clear(self) -> None:
         """Clear the input field and reset to placeholder."""
@@ -230,6 +270,104 @@ class InputPanel(ctk.CTkFrame):
         self._input.insert("0.0", PLACEHOLDER)
         self._counter_lbl.configure(text="")
         self._input.configure(height=48)
+
+    def add_attachment(self, file_path: str) -> None:
+        import os
+        from PIL import Image, ImageOps
+        
+        # If this is the first attachment, repack everything to insert the preview area at the top
+        if not self._attachments:
+            self._input.pack_forget()
+            self._action_row.pack_forget()
+            
+            self._preview_area.pack(fill="x", pady=(4, 0))
+            self._input.pack(fill="both", expand=True, padx=16, pady=(4, 4))
+            self._action_row.pack(fill="x", padx=12, pady=(0, 12))
+            
+        self._attachments.append(file_path)
+        
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        # Determine icon and styling
+        bg_color = BG_INPUT_FIELD if 'BG_INPUT_FIELD' in globals() else "#1a1a24"
+        
+        if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+            ico_name = "image"
+            thumb_img = None
+            try:
+                from PIL import ImageDraw
+                pil_img = Image.open(file_path).convert("RGBA")
+                pil_img = ImageOps.fit(pil_img, (62, 62))
+                
+                # apply rounded mask
+                mask = Image.new('L', (62, 62), 0)
+                draw = ImageDraw.Draw(mask)
+                draw.rounded_rectangle((0, 0, 62, 62), radius=8, fill=255)
+                
+                img_masked = Image.new("RGBA", (62, 62), (0,0,0,0))
+                img_masked.paste(pil_img, (0,0), mask)
+                
+                thumb_img = ctk.CTkImage(light_image=img_masked, dark_image=img_masked, size=(62, 62))
+            except Exception as e:
+                pass
+        elif ext in [".zip", ".tar", ".gz", ".rar", ".7z"]:
+            ico_name = "archive"
+            bg_color = "#2a1e1e" # slightly reddish/brown for zips
+            thumb_img = None
+        else:
+            ico_name = "file"
+            thumb_img = None
+
+        pill = ctk.CTkFrame(self._preview_scroll, fg_color="transparent")
+        pill.pack(side="left", padx=(0, 12), pady=0)
+        
+        content = ctk.CTkFrame(pill, width=64, height=64, fg_color=bg_color, corner_radius=8, border_width=1, border_color=BORDER)
+        content.pack_propagate(False)
+        content.pack(side="left")
+        
+        if thumb_img:
+            img_lbl = ctk.CTkLabel(content, text="", image=thumb_img)
+            img_lbl.pack(fill="both", expand=True)
+        else:
+            type_ico = get_icon(ico_name, size=(24, 24), color=ACCENT)
+            ico_lbl = ctk.CTkLabel(content, text="", image=type_ico)
+            ico_lbl.pack(pady=(8, 0))
+            
+            ext_str = ext[1:].upper() if ext else "FILE"
+            if len(ext_str) > 5: ext_str = ext_str[:5]
+            name_lbl = ctk.CTkLabel(content, text=ext_str, font=LABEL_DIM, text_color=TEXT_PRIMARY)
+            name_lbl.pack(pady=(0, 0))
+            
+        # Top-right X button packed cleanly next to the tile
+        x_ico = get_icon("x", size=(14, 14), color=TEXT_DIM)
+        rm_btn = ctk.CTkButton(
+            pill, text="", image=x_ico, width=20, height=20, corner_radius=0, 
+            fg_color="transparent", hover_color=BORDER, border_width=0, cursor="hand2",
+            command=lambda p=pill, f=file_path: self._remove_attachment(p, f)
+        )
+        rm_btn.pack(side="left", anchor="n", padx=(4, 0))
+        
+        self._attachment_widgets.append(pill)
+
+    def _remove_attachment(self, pill: ctk.CTkFrame, file_path: str) -> None:
+        pill.destroy()
+        if pill in self._attachment_widgets:
+            self._attachment_widgets.remove(pill)
+        if file_path in self._attachments:
+            self._attachments.remove(file_path)
+            
+        if not self._attachments:
+            self._preview_area.pack_forget()
+
+    def get_attachments(self) -> list[str]:
+        return self._attachments.copy()
+
+    def clear_attachments(self) -> None:
+        for w in self._attachment_widgets:
+            w.destroy()
+        self._attachment_widgets.clear()
+        self._attachments.clear()
+        self._preview_area.pack_forget()
 
     def set_generating(self, generating: bool) -> None:
         """Toggle between Send and Stop button."""

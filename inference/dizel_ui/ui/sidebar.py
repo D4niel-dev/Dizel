@@ -13,6 +13,8 @@ The sidebar fires callbacks into ChatWindow; it owns no model state itself.
 
 import tkinter as tk
 import customtkinter as ctk
+import os
+from PIL import Image
 from typing import Callable, List, Dict, Optional
 
 from dizel_ui.utils.icons import get_icon
@@ -27,8 +29,6 @@ from ..theme.fonts import LOGO, NAV_ITEM, NAV_ITEM_SM, BTN_LABEL, LABEL_SM, LABE
 # ── Dimensions ────────────────────────────────────────────────────────────────
 SIDEBAR_W_OPEN   = 240
 SIDEBAR_W_CLOSED = 56
-ANIM_STEPS       = 8
-ANIM_DELAY_MS    = 14
 
 
 class HistoryItem(ctk.CTkFrame):
@@ -70,7 +70,7 @@ class HistoryItem(ctk.CTkFrame):
             width=20,
             height=20,
             fg_color="transparent",
-            hover_color="#3a1a1a",
+            hover_color=SIDEBAR_BORDER,
             text_color="#888",
             font=LABEL_SM,
             command=self._delete,
@@ -118,6 +118,7 @@ class Sidebar(ctk.CTkFrame):
         on_session_select: Callable[[str], None],
         on_session_delete: Callable[[str], None],
         on_settings:       Callable[[], None],
+        on_action:         Optional[Callable[[str], None]] = None,
         **kwargs,
     ) -> None:
         super().__init__(
@@ -133,8 +134,13 @@ class Sidebar(ctk.CTkFrame):
         self._on_session_select = on_session_select
         self._on_session_delete = on_session_delete
         self._on_settings       = on_settings
+        self._on_action         = on_action
         self._is_open           = True
         self._anim_target       = SIDEBAR_W_OPEN
+        self._hist_open         = True  # Toggled by the Chat button
+        
+        self._feature_btns      = []    # Keep references to update text later
+        self._workspace_btns    = []
 
         self._build()
 
@@ -146,24 +152,47 @@ class Sidebar(ctk.CTkFrame):
         top_bar.pack(fill="x", padx=0, pady=0)
         top_bar.pack_propagate(False)
 
-        self._logo_lbl = ctk.CTkLabel(
-            top_bar,
-            text="⬡ Dizel",
-            font=LOGO,
-            text_color=TEXT_PRIMARY,
-            anchor="w",
-        )
+        # We assume the script is run from project root, but we can resolve relative to this file
+        _UI_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logo_path = os.path.join(_UI_DIR, "assets", "app", "Dizel.png")
+        
+        try:
+            pil_img = Image.open(logo_path)
+            self._logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(24, 24))
+            
+            self._logo_lbl = ctk.CTkLabel(
+                top_bar,
+                text="  Dizel",
+                image=self._logo_img,
+                compound="left",
+                font=LOGO,
+                text_color=TEXT_PRIMARY,
+                anchor="w",
+            )
+        except Exception as e:
+            # Fallback if image fails to load
+            print(f"Could not load Dizel.png for sidebar: {e}")
+            self._logo_lbl = ctk.CTkLabel(
+                top_bar,
+                text="⬡ Dizel",
+                font=LOGO,
+                text_color=TEXT_PRIMARY,
+                anchor="w",
+            )
+            
         self._logo_lbl.pack(side="left", padx=16, pady=20)
+
+        self._icon_open = get_icon("sidebar", size=(18, 18), color=SIDEBAR_TEXT_DIM)
+        self._icon_closed = get_icon("menu", size=(18, 18), color=SIDEBAR_TEXT_DIM)
 
         self._toggle_btn = ctk.CTkButton(
             top_bar,
-            text="◫",
+            text="",
+            image=self._icon_open,
             width=28,
             height=28,
             fg_color="transparent",
             hover_color=SIDEBAR_BTN_HOVER,
-            text_color=SIDEBAR_TEXT_DIM,
-            font=LOGO,
             command=self.toggle,
         )
         self._toggle_btn.pack(side="right", padx=12, pady=18)
@@ -172,7 +201,7 @@ class Sidebar(ctk.CTkFrame):
         plus_ico = get_icon("plus", size=(18, 18), color=TEXT_PRIMARY)
         self._new_btn = ctk.CTkButton(
             self,
-            text="  New Chat",
+            text="New Chat",
             image=plus_ico,
             font=BTN_LABEL,
             fg_color=SIDEBAR_BTN_HOVER,
@@ -183,30 +212,29 @@ class Sidebar(ctk.CTkFrame):
             anchor="w",
             command=self._on_new_chat,
         )
-        self._new_btn.pack(fill="x", padx=16, pady=(12, 24))
+        self._new_btn.pack(fill="x", padx=14, pady=(12, 24))
 
-        # ── Features Section ──────────────────────────────────────────────
-        self._feat_lbl = ctk.CTkLabel(
-            self, text="Features", font=LABEL_DIM, text_color=SIDEBAR_TEXT_DIM, anchor="w"
+        # ── Features Container (Now just Chat) ────────────────────────────
+        self._chat_container = ctk.CTkFrame(self, fg_color="transparent")
+        self._chat_container.pack(fill="x", pady=(8, 2))
+
+        # ── Chat Button & History Accordion ──
+        chat_ico = get_icon("message-square", size=(18, 18), color=SIDEBAR_TEXT)
+        self._chat_btn = ctk.CTkButton(
+            self._chat_container, text="  Chats", image=chat_ico, font=NAV_ITEM, fg_color="transparent", 
+            hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6,
+            command=self._toggle_history
         )
-        self._feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
-
-        self._feat_container = ctk.CTkFrame(self, fg_color="transparent")
-        self._feat_container.pack(fill="x", pady=2)
-
-        features = [
-            ("message-square", "Chat"),
-            ("archive", "Archived"),
-            ("book", "Library")
-        ]
+        self._chat_btn.pack(fill="x", padx=12, pady=2)
         
-        for icon_name, text in features:
-            ico = get_icon(icon_name, size=(18, 18), color=SIDEBAR_TEXT)
-            btn = ctk.CTkButton(
-                self._feat_container, text=f"  {text}", image=ico, font=NAV_ITEM, fg_color="transparent", 
-                hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
-            )
-            btn.pack(fill="x", padx=12, pady=2)
+        # ── Scrollable history list (For Saved Chats) ──────────────
+        self._hist_frame = ctk.CTkScrollableFrame(
+            self._chat_container, fg_color="transparent",
+            scrollbar_button_color=SIDEBAR_BORDER,
+            scrollbar_button_hover_color=ACCENT,
+            height=180
+        )
+        self._hist_frame.pack(fill="x", padx=(28, 12), pady=0)
 
         # ── Separator ─────────────────────────────────────────────────────
         self._sep1 = ctk.CTkFrame(self, fg_color=SIDEBAR_BORDER, height=1)
@@ -226,23 +254,22 @@ class Sidebar(ctk.CTkFrame):
             ("image", "Image"),
             ("layout", "Presentation"),
             ("search", "Riset"),
+            ("archive", "Archived"),
+            ("book", "Library")
         ]
 
         for icon_name, text in workspaces:
             ico = get_icon(icon_name, size=(18, 18), color=SIDEBAR_TEXT)
+            cmd = (lambda t=text: self._on_action(f"Opening {t}...")) if self._on_action else None
             btn = ctk.CTkButton(
                 self._work_container, text=f"  {text}", image=ico, font=NAV_ITEM, fg_color="transparent", 
-                hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6
+                hover_color=SIDEBAR_BTN_HOVER, text_color=SIDEBAR_TEXT, anchor="w", height=32, corner_radius=6,
+                command=cmd
             )
             btn.pack(fill="x", padx=12, pady=2)
+            self._workspace_btns.append((btn, text))
 
-        # ── Scrollable history list (For Saved Chats if any) ──────────────
-        self._hist_frame = ctk.CTkScrollableFrame(
-            self, fg_color="transparent",
-            scrollbar_button_color=SIDEBAR_BORDER,
-            scrollbar_button_hover_color=ACCENT,
-        )
-        self._hist_frame.pack(fill="both", expand=True, padx=0, pady=4)
+        # ── History frame is now created under Chat ───────────────────────
 
         # ── Premium Upgrade Card ──────────────────────────────────────────
         self._premium_card = ctk.CTkFrame(self, fg_color=SIDEBAR_PREMIUM_BG, corner_radius=12)
@@ -294,56 +321,80 @@ class Sidebar(ctk.CTkFrame):
             )
             item.pack(fill="x")
 
+    def _toggle_history(self) -> None:
+        """Toggle the accordion state of the saved chats history."""
+        # Only allow toggle if the sidebar itself is open
+        if not self._is_open:
+            self.toggle()  # Open sidebar first
+            self._hist_open = True
+            return
+            
+        self._hist_open = not self._hist_open
+        if self._hist_open:
+            self._hist_frame.pack(fill="x", padx=(28, 12), pady=0)
+        else:
+            self._hist_frame.pack_forget()
+
     # ── Collapse / expand animation ───────────────────────────────────────
 
     def toggle(self) -> None:
         self._is_open    = not self._is_open
         self._anim_target = SIDEBAR_W_OPEN if self._is_open else SIDEBAR_W_CLOSED
         self._animate()
-        # Flip toggle arrow
-        self._toggle_btn.configure(text="◫" if self._is_open else "◨")
+        # Flip toggle icon
+        self._toggle_btn.configure(image=self._icon_open if self._is_open else self._icon_closed)
         # Hide / show text elements
         if self._is_open:
+            # Temporarily un-pack following containers to maintain vertical order when re-packing _work_lbl
+            self._work_container.pack_forget()
+            self._premium_card.pack_forget()
+
+            self._logo_lbl.configure(text="  Dizel")
             self._logo_lbl.pack(side="left", padx=16, pady=20)
-            self._new_btn.configure(text="  New Chat")
             
-            # Repack sections
-            self._feat_lbl.pack(fill="x", padx=16, pady=(0, 6))
-            self._feat_container.pack(fill="x", pady=2)
+            self._toggle_btn.pack_forget()
+            self._toggle_btn.pack(side="right", padx=12, pady=18)
+            
+            self._new_btn.configure(text="  New Chat", anchor="w")
+            self._new_btn.pack_configure(padx=16)
+            
+            # Show texts
+            self._chat_btn.configure(text="  Chats")
+            if self._hist_open:
+                self._hist_frame.pack(fill="x", padx=(28, 12), pady=0)
+                
             self._sep1.pack(fill="x", padx=16, pady=16)
             self._work_lbl.pack(fill="x", padx=16, pady=(0, 6))
+            
+            # Re-pack the containers
             self._work_container.pack(fill="x", pady=2)
+            for btn, text in self._workspace_btns:
+                btn.configure(text=f"  {text}")
+                
             self._premium_card.pack(fill="x", padx=16, pady=(8, 16))
-            self._hist_frame.pack(fill="both", expand=True, padx=0, pady=4)
 
         else:
             self._logo_lbl.pack_forget()
-            self._new_btn.configure(text="")
             
-            # Hide sections
-            self._feat_lbl.pack_forget()
-            self._feat_container.pack_forget()
-            self._sep1.pack_forget()
+            self._toggle_btn.pack_forget()
+            self._toggle_btn.pack(side="top", pady=18)
+            
+            self._new_btn.configure(text="", anchor="center")
+            self._new_btn.pack_configure(padx=(10, 10))
+            
+            # Hide texts but keep buttons (icons) visible
             self._work_lbl.pack_forget()
-            self._work_container.pack_forget()
+            self._sep1.pack_forget()
             self._premium_card.pack_forget()
             self._hist_frame.pack_forget()
+            
+            self._chat_btn.configure(text="")
+            for btn, _ in self._workspace_btns:
+                btn.configure(text="")
 
     def _animate(self) -> None:
-        current = self.winfo_width()
-        target  = self._anim_target
-        if current == target:
-            return
-        step = (target - current) // ANIM_STEPS
-        if step == 0:
-            step = 1 if target > current else -1
-        new_w = current + step
-        # Clamp
-        if (step > 0 and new_w >= target) or (step < 0 and new_w <= target):
-            new_w = target
-        self.configure(width=new_w)
-        if new_w != target:
-            self.after(ANIM_DELAY_MS, self._animate)
+        """Instant toggle instead of animated."""
+        self.configure(width=self._anim_target)
 
     @property
     def is_open(self) -> bool:

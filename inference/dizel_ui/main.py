@@ -18,10 +18,10 @@ Callbacks from that thread are marshalled back to the Tk event loop with .after(
 
 Run
 ---
-    cd Dizel-v1
-    python dizel_ui/main.py
-    python dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt
-    python dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cpu
+    cd Dizel
+    python inference/dizel_ui/main.py
+    python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt
+    python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cpu
 """
 
 import argparse
@@ -54,6 +54,7 @@ from dizel_ui.logic.history_manager import (
 )
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, TEXT_PRIMARY, TEXT_DIM,
+    ACTION_PILL, SIDEBAR_BTN_HOVER
 )
 from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 
@@ -120,7 +121,7 @@ class DizelApp(ctk.CTk):
         if checkpoint:
             self.after(200, lambda: self._load_model_async(checkpoint, device))
         else:
-            self._show_status("No checkpoint loaded — open Settings to select one.", dim=True)
+            self._show_status("  No checkpoint loaded — open Settings to select one.", dim=True)
 
     # ── Layout ────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ class DizelApp(ctk.CTk):
             on_session_select = self._load_session,
             on_session_delete = self._delete_session,
             on_settings       = self._open_settings,
+            on_action         = lambda msg: self._show_status(msg),
         )
         self._sidebar.grid(row=0, column=0, sticky="nsew")
 
@@ -154,7 +156,7 @@ class DizelApp(ctk.CTk):
         self._status_bar.grid_propagate(False)
 
         # Left Pill (Status / Model Info)
-        left_pill = ctk.CTkFrame(self._status_bar, fg_color="#100a14", corner_radius=16, height=32)
+        left_pill = ctk.CTkFrame(self._status_bar, fg_color=ACTION_PILL, corner_radius=16, height=32)
         left_pill.pack(side="left", ipadx=12, ipady=4)
         
         self._status_lbl = ctk.CTkLabel(
@@ -171,14 +173,14 @@ class DizelApp(ctk.CTk):
         export_ico = get_icon("external-link", size=(14, 14), color=TEXT_PRIMARY)
         export_pill = ctk.CTkButton(
             self._status_bar, text="  Export", image=export_ico, font=LABEL_SM, text_color=TEXT_PRIMARY,
-            fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=80, height=32
+            fg_color=ACTION_PILL, hover_color=SIDEBAR_BTN_HOVER, corner_radius=16, width=80, height=32
         )
         export_pill.pack(side="right", padx=(8, 0))
 
         config_ico = get_icon("settings", size=(14, 14), color=TEXT_PRIMARY)
         config_pill = ctk.CTkButton(
             self._status_bar, text="  Configuration", image=config_ico, font=LABEL_SM, text_color=TEXT_PRIMARY,
-            fg_color="#100a14", hover_color="#1f152b", corner_radius=16, width=120, height=32,
+            fg_color=ACTION_PILL, hover_color=SIDEBAR_BTN_HOVER, corner_radius=16, width=120, height=32,
             command=self._open_settings
         )
         config_pill.pack(side="right")
@@ -210,9 +212,7 @@ class DizelApp(ctk.CTk):
         import tkinter.filedialog as fd
         fpath = fd.askopenfilename(title="Select File to Attach")
         if fpath:
-            fname = os.path.basename(fpath)
-            self._input_panel._input.insert("end", f"\n[Attached: {fname}]\n")
-            self._show_status(f"Attached {fname}")
+            self._input_panel.add_attachment(fpath)
 
     def _do_options(self) -> None:
         dlg = ctk.CTkInputDialog(text="Enter an advanced system prompt:", title="Model Options")
