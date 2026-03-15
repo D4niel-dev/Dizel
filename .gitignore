@@ -35,7 +35,9 @@ logs/
 #data/
 datasets/
 inference/dizel_ui/history/
+inference/dizel_ui/.dizel/
 *.csv
+*.json
 *.jsonl
 *.parquet
 

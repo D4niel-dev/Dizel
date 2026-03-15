@@ -10,7 +10,7 @@
         "max_new_tokens": 2048
     },
     "appearance": {
-        "color_mode": "System",
+        "color_mode": "Dark",
         "show_timestamps": true,
         "animations": false
     }

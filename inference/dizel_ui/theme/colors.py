@@ -18,7 +18,7 @@ TAB_UNSELECTED  = ("#f1f5f9", "#121a28")
 
 # ── Message bubbles ───────────────────────────────────────────────────────────
 BUBBLE_USER     = ("#3b82f6", "#1e40af")   # user message — solid blue
-BUBBLE_ASST     = ("transparent", "transparent") # assistant message blends into BG
+BUBBLE_ASST     = "transparent"  # assistant message blends into BG (must be plain string)
 BUBBLE_USER_TXT = ("#ffffff", "#ffffff")
 BUBBLE_ASST_TXT = ("#0f172a", "#e2e8f0")
 
