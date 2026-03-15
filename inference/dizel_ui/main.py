@@ -102,6 +102,8 @@ class DizelApp(ctk.CTk):
         self.geometry("1100x700")
         self.minsize(self.MIN_W, self.MIN_H)
         self.configure(fg_color=BG_ROOT)
+        self.update()
+        self.state("zoomed")
         
         # Set Window Icon
         try:
