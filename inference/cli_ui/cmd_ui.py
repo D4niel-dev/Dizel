@@ -1,5 +1,5 @@
 """
-inference/chat.py — Local CLI chat interface for Dizel.
+inference/cmd_ui.py — Local CLI chat interface for Dizel.
 
 Supports three modes
 --------------------
@@ -10,18 +10,18 @@ Supports three modes
 Usage
 -----
     # Interactive chat (SFT checkpoint recommended)
-    python inference/chat.py --checkpoint checkpoints/dizel-sft-best.pt
+    python inference/cmd_ui.py --checkpoint checkpoints/dizel-sft-best.pt
 
     # One-shot completion
-    python inference/chat.py --checkpoint checkpoints/dizel-pretrain-best.pt \\
+    python inference/cmd_ui.py --checkpoint checkpoints/dizel-pretrain-best.pt \\
         --mode complete --prompt "The speed of light is"
 
     # JSON mode
-    python inference/chat.py --checkpoint checkpoints/dizel-sft-best.pt \\
+    python inference/cmd_ui.py --checkpoint checkpoints/dizel-sft-best.pt \\
         --mode json --prompt "Tell me about photosynthesis"
 
     # Greedy decoding (deterministic)
-    python inference/chat.py --checkpoint checkpoints/dizel-sft-best.pt \\
+    python inference/cmd_ui.py --checkpoint checkpoints/dizel-sft-best.pt \\
         --temperature 0.0
 
 Keyboard shortcuts in chat mode
