@@ -49,12 +49,17 @@ dizel/
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   ├── cmd_ui.py                  ← CLI chat / completion / JSON inference
+│   ├── cli_ui
+│   │   └── cmd_ui.py            ← CLI chat / completion / JSON inference
 │   └── dizel_ui/                ← Full Desktop GUI Application!
 │       ├── main.py              ← Run this to start the desktop app
 │       ├── ui/                  ← CustomTkinter UI components (Zyricon theme)
 │       ├── logic/               ← Async generation and config/history managers
 │       └── assets/              ← Logo and avatar images
+│       
+├── utils/
+│   ├── data_cleaner.py          ← Clean the training data
+│   ├── test_model.py            ← Test the model
 │   └── verify.py                ← Sanity checks (no GPU required)
 │
 ├── checkpoints/                 ← Saved model checkpoints (auto-created)
