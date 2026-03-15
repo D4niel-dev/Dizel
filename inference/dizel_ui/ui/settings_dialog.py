@@ -58,6 +58,7 @@ class SettingsDialog(ctk.CTkToplevel):
         self.geometry("540x620")
         self.resizable(False, False)
         self.configure(fg_color=BG_ROOT)
+        self.update()
         self.grab_set()          # modal behaviour
         self.lift()
         self.focus_force()
