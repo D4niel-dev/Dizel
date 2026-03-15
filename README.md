@@ -49,7 +49,7 @@ dizel/
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   ├── cmd.py                  ← CLI chat / completion / JSON inference
+│   ├── cmd_ui.py                  ← CLI chat / completion / JSON inference
 │   └── dizel_ui/                ← Full Desktop GUI Application!
 │       ├── main.py              ← Run this to start the desktop app
 │       ├── ui/                  ← CustomTkinter UI components (Zyricon theme)
