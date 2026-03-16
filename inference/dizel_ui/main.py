@@ -313,6 +313,7 @@ class DizelApp(ctk.CTk):
             self._show_status("⚠ Model not loaded — open Settings (⚙) to select a checkpoint.")
             return
         if self._chat_mgr.is_generating:
+            self._show_status("⚠ Still generating — please wait or press Stop.")
             return
 
         # Render user bubble

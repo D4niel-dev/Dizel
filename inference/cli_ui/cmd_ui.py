@@ -509,23 +509,25 @@ def ui():
     if console.size.width > 120:
         console.print("[bold yellow]Tip: Best wiewed in a smaller terminal window.[/bold yellow]")
 
-    header = Rule(Align.center(
-            f"\n[bold cyan]{MODEL_NAME} — {VERSION} — {DESCRIPTION}[/bold cyan]"
-    ), style="cyan")
+    header = Rule(
+            f"\n[bold cyan]{MODEL_NAME} — {VERSION} — {DESCRIPTION}[/bold cyan]",
+            style="cyan"
+    )
 
-    info = Panel(Align.center(
+    info = Panel(
         f"[dim]Build: {BUILD}[/dim]\n"
         f"[dim]Author: {AUTHOR}[/dim]\n"
         f"[dim]Context Length: {CONTEXT_LENGTH}[/dim]\n"
         f"[dim]Vocabulary Size: {VOCAB_SIZE}[/dim]\n"
         f"[dim]Model Size: {MODEL_SIZE}[/dim]\n"
         f"[dim]Model: {APP_NAME}[/dim]"
-    ))
+    )
 
-    commands = Panel(Align.center(
+    commands = Panel(
             "[bold]Commands[/bold]\n"
-            "/quit  /new  /system <text>  /info  /temp /save <file> /load <file> <f>"
-    ), border_style="cyan")
+            "/quit  /new  /system <text>  /info  /temp /save <file> /load <file> <f>", 
+            border_style="cyan"
+    )
 
     return Group(header, info, commands)
 

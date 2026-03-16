@@ -73,3 +73,9 @@ build/
 *.log
 *.tmp
 *.temp
+
+# -----------------------
+# Other files
+# -----------------------
+.agent/
+.shared/

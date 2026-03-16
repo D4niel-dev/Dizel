@@ -30,11 +30,11 @@ class ConfigManager:
             "If uncertain, explicitly state limitations."
         ),
         "sampling": {
-            "temperature": 0.8,
-            "top_k": 50,
+            "temperature": 0.4,
+            "top_k": 90,
             "top_p": 0.92,
             "repetition_penalty": 1.15,
-            "max_new_tokens": 512,
+            "max_new_tokens": 200,
         }
     }
 

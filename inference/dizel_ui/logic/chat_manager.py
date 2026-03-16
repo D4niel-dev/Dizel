@@ -273,12 +273,31 @@ class ChatManager:
         ids += self._tokenizer.encode(_ROLE_TOKENS["assistant"])
         return ids
 
-    def _trim_history_if_needed(self, prompt_ids: list) -> list:
+    def _trim_history_if_needed(self, prompt_ids: list, effective_max: int) -> list:
         """If the prompt is too long, drop the oldest turns."""
-        max_allowed = self._model.cfg.context_length - self.max_new_tokens - 10
+        ctx = self._model.cfg.context_length
+        # Ensure we always reserve at least 16 tokens for the prompt
+        max_allowed = max(ctx - effective_max - 10, 16)
+        print(f"[ChatManager] max_allowed={max_allowed} (ctx={ctx}, effective_max={effective_max})", flush=True)
+
+        prev_len = -1
         while len(prompt_ids) > max_allowed and len(self.history) > 2:
+            # Guard against infinite loop when history can't be trimmed further
+            if len(prompt_ids) == prev_len:
+                print(f"[ChatManager] WARNING: Cannot trim history further, hard-truncating prompt from {len(prompt_ids)} to {max_allowed} tokens.", flush=True)
+                # Keep the LAST max_allowed tokens (most recent context)
+                prompt_ids = prompt_ids[-max_allowed:]
+                break
+            prev_len = len(prompt_ids)
             self.history = self.history[-4:]
             prompt_ids   = self._build_prompt_ids()
+
+        # Final safety: never return an empty prompt
+        if not prompt_ids:
+            print("[ChatManager] ERROR: prompt_ids is empty after trimming! Rebuilding.", flush=True)
+            self.history = self.history[-2:]  # Keep only last exchange
+            prompt_ids = self._build_prompt_ids()
+
         return prompt_ids
 
     def _generate_worker(
@@ -289,15 +308,28 @@ class ChatManager:
         on_error:  Callable[[str], None],
     ) -> None:
         """Background thread: runs generation and fires callbacks."""
+        import time
+
         self._is_generating  = True
         self._stop_requested = False
 
         try:
+            # Clamp max_new_tokens to leave room for the prompt
+            ctx = self._model.cfg.context_length
+            effective_max = min(self.max_new_tokens, ctx - 50)
+            if effective_max < 1:
+                effective_max = 50
+            if effective_max != self.max_new_tokens:
+                print(f"[ChatManager] Clamped max_new_tokens from {self.max_new_tokens} → {effective_max} (ctx={ctx})", flush=True)
+
             # Add user turn to history
             self.history.append({"role": "user", "content": user_text})
+            print(f"[ChatManager] Generating response for: {user_text[:60]}...", flush=True)
 
             prompt_ids  = self._build_prompt_ids()
-            prompt_ids  = self._trim_history_if_needed(prompt_ids)
+            print(f"[ChatManager] Raw prompt length: {len(prompt_ids)} tokens", flush=True)
+            prompt_ids  = self._trim_history_if_needed(prompt_ids, effective_max)
+            print(f"[ChatManager] Final prompt length: {len(prompt_ids)} tokens", flush=True)
 
             # Build end-token set (stop generation at these ids)
             end_ids = [self._tokenizer.eos_id]
@@ -305,14 +337,22 @@ class ChatManager:
                 if et not in end_ids:
                     end_ids.append(et)
 
+            # Limit PyTorch CPU threads to reduce GIL contention with Tkinter
+            if self._device == "cpu":
+                _torch.set_num_threads(2)
+
             ctx            = self._model.cfg.context_length
             idx            = _torch.tensor([prompt_ids], dtype=_torch.long,
                                            device=self._device)
             generated_ids  = []
 
+            if idx.size(1) == 0:
+                raise ValueError("Prompt is empty after trimming — try reducing max_new_tokens in Settings.")
+
             with _torch.no_grad():
-                for _ in range(self.max_new_tokens):
+                for step in range(effective_max):
                     if self._stop_requested:
+                        print("[ChatManager] Stop requested, breaking.", flush=True)
                         break
 
                     input_ids = idx[:, -ctx:]
@@ -356,6 +396,7 @@ class ChatManager:
                     tid = next_id.item()
 
                     if tid in end_ids:
+                        print(f"[ChatManager] Hit end token at step {step}", flush=True)
                         break
 
                     generated_ids.append(tid)
@@ -371,11 +412,24 @@ class ChatManager:
                     if piece:
                         on_token(piece)
 
+                    # Release GIL briefly so Tkinter can process UI events
+                    time.sleep(0.001)
+
             # Full decoded response
             full_response = self._tokenizer.decode(generated_ids)
             for special in list(_ROLE_TOKENS.values()) + [_END_TOKEN]:
                 full_response = full_response.replace(special, "")
             full_response = full_response.strip()
+
+            print(f"[ChatManager] Generated {len(generated_ids)} tokens", flush=True)
+            if full_response:
+                print(f"[ChatManager] Response: {full_response[:100]}...", flush=True)
+            else:
+                print("[ChatManager] Response was EMPTY", flush=True)
+
+            # Handle empty responses (model hit end token immediately)
+            if not full_response:
+                full_response = "(The model produced an empty response. Try rephrasing your question or adjusting sampling settings.)"
 
             # Append assistant turn to history
             self.history.append({"role": "assistant", "content": full_response})
@@ -383,10 +437,13 @@ class ChatManager:
             on_done(full_response)
 
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             on_error(f"Generation error: {exc}")
         finally:
             self._is_generating  = False
             self._stop_requested = False
+            print("[ChatManager] Generation finished, _is_generating = False", flush=True)
 
 
 # ---------------------------------------------------------------------------

@@ -193,12 +193,17 @@ class SettingsDialog(ctk.CTkToplevel):
         self._rep_var    = tk.DoubleVar(value=1.10)
         self._maxt_var   = tk.IntVar(value=400)
 
+        # Derive max-tokens ceiling from model context length (dynamic)
+        _info = self._mgr.model_info if self._mgr.is_ready else {}
+        _ctx  = _info.get("ctx_len", 512)
+        _max_tok_ceil = max(_ctx - 50, 64)   # always leave 50 tokens for the prompt
+
         sliders = [
-            ("Temperature",        self._temp_var,  0.0,   2.0,  2),
-            ("Top-K",              self._topk_var,  1,     200,  0),
-            ("Top-P",              self._topp_var,  0.1,   1.0,  2),
-            ("Repetition penalty", self._rep_var,   1.0,   2.0,  2),
-            ("Max new tokens",     self._maxt_var,  32,    2048, 0),
+            ("Temperature",        self._temp_var,  0.0,   2.0,           2),
+            ("Top-K",              self._topk_var,  1,     200,           0),
+            ("Top-P",              self._topp_var,  0.1,   1.0,           2),
+            ("Repetition penalty", self._rep_var,   1.0,   2.0,           2),
+            ("Max new tokens",     self._maxt_var,  32,    _max_tok_ceil, 0),
         ]
         
         slider_pad = ctk.CTkFrame(samp_card, fg_color="transparent")
@@ -391,7 +396,12 @@ class SettingsDialog(ctk.CTkToplevel):
         self._topk_var.set(self._mgr.top_k)
         self._topp_var.set(self._mgr.top_p)
         self._rep_var.set(self._mgr.repetition_penalty)
-        self._maxt_var.set(self._mgr.max_new_tokens)
+
+        # Clamp max_new_tokens to the model-derived ceiling
+        _info = self._mgr.model_info if self._mgr.is_ready else {}
+        _ctx  = _info.get("ctx_len", 512)
+        _ceil = max(_ctx - 50, 64)
+        self._maxt_var.set(min(self._mgr.max_new_tokens, _ceil))
 
         self._sys_box.delete("0.0", "end")
         self._sys_box.insert("0.0", self._mgr.system_prompt)
