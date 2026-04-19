@@ -2,7 +2,7 @@
   <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
     width="100%"
     height="100%"/>
-  <h1><strong>Dizel — Distributed Intelligent Zero-shot Execution Layer</strong></h1>
+  <h1>Dizel — Distributed Intelligent Zero-shot Execution Layer</h1>
   <p>
     A Tiny GPT-Style Language Model From Scratch.
   </p>
