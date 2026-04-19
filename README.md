@@ -2,7 +2,7 @@
   <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
     width="100%"
     height="100%"/>
-  <p>Dizel — Distributed Intelligent Zero-shot Execution Layer</p>
+  <p><strong>Dizel — Distributed Intelligent Zero-shot Execution Layer</strong></p>
 </div>
 
 Dizel is a complete, educational implementation of a GPT-style causal language
