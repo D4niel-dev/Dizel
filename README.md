@@ -1,7 +1,15 @@
-# Dizel — A Tiny GPT-Style Language Model From Scratch
+<div align="center">
+  <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
+    width="100%"
+    height="100%"/>
+  <h1><strong>Dizel — Distributed Intelligent Zero-shot Execution Layer</strong></h1>
+  <p>
+    A Tiny GPT-Style Language Model From Scratch.
+  </p>
+</div>
 
 Dizel is a complete, educational implementation of a GPT-style causal language
-model (~110 M parameters) built with PyTorch. It is designed to run locally on a
+model (~253 M parameters) built with PyTorch. It is designed to run locally on a
 single consumer GPU (~4 GB VRAM) over a weekend, with no distributed training
 required.
 
