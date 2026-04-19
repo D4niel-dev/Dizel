@@ -3,9 +3,6 @@
     width="100%"
     height="100%"/>
   <p>Dizel — Distributed Intelligent Zero-shot Execution Layer</p>
-  <p>
-    A Tiny GPT-Style Language Model From Scratch.
-  </p>
 </div>
 
 Dizel is a complete, educational implementation of a GPT-style causal language
