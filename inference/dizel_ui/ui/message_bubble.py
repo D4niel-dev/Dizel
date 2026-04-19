@@ -1,206 +1,297 @@
-"""
-dizel_ui/ui/message_bubble.py
-──────────────────────────────
-Individual chat message bubble widget.
+# dizel_ui/ui/message_bubble.py
 
-Each bubble is a self-contained CTkFrame that renders:
-  • role label ("You" or "Dizel")
-  • message text (wrapping CTkTextbox, read-only)
-  • copy button (top-right corner)
-  • optional token count / timestamp meta line
+import datetime
+from PySide6.QtWidgets import (QFrame, QLabel, QTextEdit, QVBoxLayout, 
+                               QHBoxLayout, QPushButton, QApplication, QSizePolicy, QGraphicsOpacityEffect, QGraphicsDropShadowEffect)
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup, QRect
+from PySide6.QtGui import QTextOption, QTextCursor
 
-User bubbles are right-aligned with an indigo background.
-Assistant bubbles are left-aligned with a dark slate background.
-"""
-
-import tkinter as tk
-import customtkinter as ctk
-from datetime import datetime
-
-from ..theme.colors import (
+from dizel_ui.theme.colors import (
     BUBBLE_USER, BUBBLE_ASST, BUBBLE_USER_TXT, BUBBLE_ASST_TXT,
-    BG_CHAT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM, ACCENT_LIGHT,
+    BG_CHAT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM, ACCENT, ACCENT_LIGHT, WELCOME_CARD_HOVER, resolve
 )
-from ..theme.fonts import MSG_TEXT, MSG_META, LABEL_SM
-from ..logic.config_manager import ConfigManager
+from dizel_ui.theme.fonts import MSG_TEXT, MSG_META, LABEL_SM
+from dizel_ui.logic.config_manager import ConfigManager
+from dizel_ui.theme.stylesheets import get_frame_style, get_button_style
+from dizel_ui.utils.icons import get_icon
+from dizel_ui.utils.anim_helpers import AnimHelpers
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _make_textbox(parent, text: str, fg_color: str, text_color: str,
-                  width: int) -> ctk.CTkTextbox:
+class _AutoResizingTextEdit(QTextEdit):
     """
-    Create a read-only, auto-sized CTkTextbox for the message content.
-    Height expands to fit content.
+    A read-only QTextEdit that automatically resizes its height to fit its content.
     """
-    box = ctk.CTkTextbox(
-        parent,
-        fg_color=fg_color,
-        text_color=text_color,
-        font=MSG_TEXT,
-        wrap="word",
-        activate_scrollbars=False,
-        border_width=0,
-        width=width,
-    )
-    box.insert("0.0", text)
-    box.configure(state="disabled")
+    def __init__(self, fg_color: str, text_color: str, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setFrameStyle(QFrame.NoFrame)
+        self.setFont(MSG_TEXT)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.setWordWrapMode(QTextOption.WrapMode.WordWrap)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        
+        bg = resolve(fg_color)
+        txt = resolve(text_color)
+        
+        bg_css = bg if bg != 'transparent' else 'transparent'
+        
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {bg_css};
+                color: {txt};
+                border: none;
+            }}
+        """)
+        
+        self.document().documentLayout().documentSizeChanged.connect(self._adjust_height)
 
-    # Calculate natural height
-    lines     = text.count("\n") + 1
-    max_chars = max((len(ln) for ln in text.splitlines()), default=0)
-    # Rough char-per-line estimate
-    chars_per_line = max(width // 8, 40)
-    wrapped_lines  = sum(
-        max(1, (len(ln) + chars_per_line - 1) // chars_per_line)
-        for ln in text.splitlines()
-    ) if text.strip() else 1
-    height = max(30, wrapped_lines * 22 + 10)
-    box.configure(height=height)
-    return box
+    def _adjust_height(self):
+        doc_height = self.document().size().height()
+        # Add a little padding to the height
+        self.setFixedHeight(int(doc_height) + 10)
 
-
-# ── MessageBubble ──────────────────────────────────────────────────────────────
-
-class MessageBubble(ctk.CTkFrame):
+class MessageBubble(QFrame):
     """
-    A single chat message rendered as a styled bubble.
-
-    Parameters
-    ----------
-    parent      : parent widget (usually the chat scroll frame)
-    role        : "user" | "assistant"
-    content     : message text to display
-    meta        : optional metadata string (e.g. "128 tokens • 2.3 s")
-    bubble_width: max pixel width of the bubble itself (auto-set by ChatWindow)
+    A single chat message rendered as a styled PySide6 bubble.
     """
+    def __init__(self, role: str, content: str, meta: str = "", attachments: list = None, bubble_width: int = 500, on_regenerate=None, parent=None):
+        super().__init__(parent)
+        self._on_regenerate = on_regenerate
 
-    # How wide the bubble can grow relative to the chat column
-    _MAX_FRACTION = 0.78
-
-    def __init__(
-        self,
-        parent,
-        role:         str,
-        content:      str,
-        meta:         str  = "",
-        bubble_width: int  = 500,
-        **kwargs,
-    ) -> None:
-        super().__init__(parent, fg_color="transparent", **kwargs)
-
-        self._role    = role
+        self._role = role
         self._content = content
         self._is_user = (role == "user")
+        
+        bg_color = BUBBLE_USER if self._is_user else BUBBLE_ASST
+        txt_color = BUBBLE_USER_TXT if self._is_user else BUBBLE_ASST_TXT
+        role_label = "You" if self._is_user else "Dizel"
 
-        bg_color   = BUBBLE_USER  if self._is_user else BUBBLE_ASST
-        txt_color  = BUBBLE_USER_TXT if self._is_user else BUBBLE_ASST_TXT
-        align_side = "e" if self._is_user else "w"   # east = right, west = left
-        role_label = "You" if self._is_user else "✦ Dizel"
-
-        # ── Outer row frame (full width, anchored left or right) ──────────
-        self.columnconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", padx=0, pady=4)
-
-        # ── Bubble container ──────────────────────────────────────────────
-        bubble = ctk.CTkFrame(
-            row,
-            fg_color=bg_color,
-            corner_radius=16,
-        )
-
-        # ── Role label ────────────────────────────────────────────────────
-        role_lbl = ctk.CTkLabel(
-            bubble,
-            text=role_label,
-            font=LABEL_SM,
-            text_color=ACCENT_LIGHT if not self._is_user else TEXT_PRIMARY,
-            anchor="w",
-        )
-        role_lbl.pack(anchor="w", padx=16, pady=(12, 2))
-
-        # ── Message text ──────────────────────────────────────────────────
-        self._textbox = _make_textbox(
-            bubble, content, bg_color, txt_color, bubble_width - 24
-        )
-        self._textbox.pack(fill="x", padx=14, pady=(0, 4))
-
-        # ── Copy button ───────────────────────────────────────────────────
-        bottom_row = ctk.CTkFrame(bubble, fg_color="transparent")
-        bottom_row.pack(fill="x", padx=10, pady=(0, 8))
-
-        self._copy_btn = ctk.CTkButton(
-            bottom_row,
-            text="⎘ Copy",
-            font=MSG_META,
-            width=60,
-            height=22,
-            fg_color="transparent",
-            hover_color=BUBBLE_USER if self._is_user else BG_CHAT,
-            text_color=TEXT_SECONDARY,
-            border_width=0,
-            command=self._copy_text,
-            anchor="w",
-        )
-        self._copy_btn.pack(side="left")
-
-        # ── Meta line (token count / latency) ─────────────────────────────
-        if meta:
-            meta_lbl = ctk.CTkLabel(
-                bottom_row,
-                text=meta,
-                font=MSG_META,
-                text_color=TEXT_DIM,
-                anchor="e",
-            )
-            meta_lbl.pack(side="right", padx=6)
-
-        # ── Timestamp (hover tooltip substitute) ──────────────────────────
-        app_cfg = ConfigManager.load().get("appearance", {})
-        ts = datetime.now().strftime("%H:%M")
-        ts_lbl = ctk.CTkLabel(
-            bottom_row,
-            text=ts,
-            font=MSG_META,
-            text_color=TEXT_DIM,
-        )
-        if app_cfg.get("show_timestamps", True):
-            ts_lbl.pack(side="right")
-
-        # Pack bubble aligned to correct side
+        # Bubble alignment:
+        # User = right aligned, Assistant = left aligned
+        outer_layout = QHBoxLayout(self)
+        # Give the AI response more breathing room by reducing the right margin clamp
+        outer_layout.setContentsMargins(12 if not self._is_user else 100, 2, 100 if not self._is_user else 12, 2)
+        
+        # Spacer for alignment
         if self._is_user:
-            bubble.pack(anchor="e", padx=(80, 12), pady=2)
+            outer_layout.addStretch(1)
+
+        # Bubble Container
+        self._bubble_frame = QFrame(self)
+        self._bubble_frame.setStyleSheet(get_frame_style(bg_color, radius=16))
+        self._bubble_frame.setSizePolicy(QSizePolicy.Expanding if self._is_user else QSizePolicy.Fixed, QSizePolicy.Minimum)
+        
+        # Enforce minimum width so the AI bubble never feels cramped
+        if not self._is_user:
+            self._bubble_frame.setMinimumWidth(bubble_width)
+            self._bubble_frame.setMaximumWidth(bubble_width)
+        
+        bubble_layout = QVBoxLayout(self._bubble_frame)
+        bubble_layout.setContentsMargins(16, 12, 16, 12)
+        bubble_layout.setSpacing(4)
+
+        # Role label
+        # Role + Avatar Container
+        role_container = QFrame(self._bubble_frame)
+        role_container.setStyleSheet("background: transparent;")
+        role_layout = QHBoxLayout(role_container)
+        role_layout.setContentsMargins(0, 0, 0, 0)
+        role_layout.setSpacing(8)
+        
+        self._avatar_lbl = None
+        if not self._is_user:
+            import os
+            from PySide6.QtGui import QPixmap
+            self._avatar_lbl = QLabel(role_container)
+            self._avatar_lbl.setFixedSize(24, 24)
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            avatar_path = os.path.join(base_dir, "assets", "app", "Dizel.png")
+            if os.path.exists(avatar_path):
+                original = QPixmap(avatar_path)
+                if not original.isNull():
+                    self._avatar_lbl.setPixmap(original.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            role_layout.addWidget(self._avatar_lbl)
+
+        role_lbl = QLabel(role_label, role_container)
+        role_lbl.setFont(LABEL_SM)
+        role_lbl_color = resolve(TEXT_PRIMARY if self._is_user else ACCENT)
+        role_lbl.setStyleSheet(f"color: {role_lbl_color}; background: transparent; border: none;")
+        role_layout.addWidget(role_lbl, alignment=Qt.AlignLeft)
+        role_layout.addStretch(1)
+        
+        bubble_layout.addWidget(role_container)
+
+        # Attachments Preview
+        if attachments:
+            import os
+            from PySide6.QtGui import QPixmap 
+            
+            att_scroll = QFrame(self._bubble_frame)
+            att_scroll.setStyleSheet("background: transparent; border: none;")
+            att_layout = QHBoxLayout(att_scroll)
+            att_layout.setContentsMargins(0, 4, 0, 8)
+            att_layout.setSpacing(12)
+            
+            has_valid = False
+            for path in attachments:
+                if not os.path.exists(path):
+                    continue
+                has_valid = True
+                ext = os.path.splitext(path)[1].lower()
+                name = os.path.basename(path)
+                
+                if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
+                    pi = QPixmap(path)
+                    if not pi.isNull():
+                        # Restrict to reasonable standard UI sizes while preserving ratios
+                        pi = pi.scaled(240, 240, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        lbl = QLabel(att_scroll)
+                        lbl.setPixmap(pi)
+                        lbl.setStyleSheet(f"border-radius: 16px; border: 1px solid {resolve(ACCENT_LIGHT)}; background: transparent;")
+                        att_layout.addWidget(lbl)
+                else:
+                    # Generic File Pill
+                    pill = QFrame(att_scroll)
+                    pill.setFixedHeight(36)
+                    pill.setStyleSheet(get_frame_style('transparent', radius=8, border_color=ACCENT_LIGHT))
+                    pill_lyt = QHBoxLayout(pill)
+                    pill_lyt.setContentsMargins(10, 0, 12, 0)
+                    pill_lyt.setSpacing(8)
+                    
+                    i_name = "archive" if ext in ['.zip', '.tar', '.gz', '.rar', '.7z'] else "file"
+                    ico = get_icon(i_name, size=(16,16), color=TEXT_PRIMARY)
+                    if ico:
+                        il = QLabel(pill)
+                        il.setPixmap(ico.pixmap(16,16))
+                        il.setStyleSheet("background: transparent;")
+                        pill_lyt.addWidget(il)
+                        
+                    tl = QLabel(name if len(name)<30 else name[:27]+"...", pill)
+                    tl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none;")
+                    tl.setFont(LABEL_SM)
+                    pill_lyt.addWidget(tl)
+                    att_layout.addWidget(pill)
+                    
+            if has_valid:
+                att_layout.addStretch(1)
+                bubble_layout.addWidget(att_scroll)
+
+        # Message text
+        self._textbox = _AutoResizingTextEdit(bg_color, txt_color, self._bubble_frame)
+        self._textbox.setPlainText(content)
+        bubble_layout.addWidget(self._textbox)
+
+        # Bottom row (action bar)
+        self._action_bar = QFrame(self._bubble_frame)
+        self._action_bar.setStyleSheet("background: transparent; border: none;")
+        bottom_layout = QHBoxLayout(self._action_bar)
+        bottom_layout.setContentsMargins(0, 4, 0, 0)
+        bottom_layout.setSpacing(6)
+        
+        if not self._is_user:
+            # Action bar starts hidden for assistant — revealed on finalise()
+            self._action_bar.hide()
+            
+        self._copy_btn = None
+        def create_btn(lbl, icon_name, is_copy=False):
+            btn = QPushButton(f" {lbl}" if lbl else "", self._action_bar)
+            ico = get_icon(icon_name, size=(16, 16), color=TEXT_SECONDARY)
+            if ico: btn.setIcon(ico)
+            btn.setFont(MSG_META)
+            hover_color = BUBBLE_USER if self._is_user else WELCOME_CARD_HOVER
+            btn.setStyleSheet(get_button_style("transparent", hover_color, TEXT_SECONDARY, radius=4))
+            btn.setCursor(Qt.PointingHandCursor)
+            
+            if is_copy:
+                btn.clicked.connect(self._copy_text)
+                self._copy_btn = btn
+                
+            bottom_layout.addWidget(btn)
+            return btn
+            
+        create_btn("Copy", "copy", is_copy=True)
+        
+        if not self._is_user:
+            regen_btn = create_btn("Regenerate", "refresh-cw")
+            if self._on_regenerate:
+                regen_btn.clicked.connect(self._on_regenerate)
+            
+            bottom_layout.addStretch(1)
+            create_btn("", "thumbs-up")
+            create_btn("", "thumbs-down")
+            create_btn("Share", "share")
         else:
-            bubble.pack(anchor="w", padx=(12, 80), pady=2)
+            # Hide action bar initially for user, only show on hover
+            self._action_bar.hide()
+            bottom_layout.addStretch(1)
 
-    def _copy_text(self) -> None:
-        """Copy message content to clipboard."""
-        self.clipboard_clear()
-        self.clipboard_append(self._content)
-        # Brief visual feedback
-        self._copy_btn.configure(text="✓ Copied")
-        self.after(1500, lambda: self._copy_btn.configure(text="⎘ Copy"))
+        # Meta line (token count / latency)
+        self._meta_lbl = None
+        if not self._is_user:
+            self._meta_lbl = QLabel(meta, self._action_bar)
+            self._meta_lbl.setFont(MSG_META)
+            self._meta_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+            bottom_layout.addWidget(self._meta_lbl)
 
-    def append_text(self, piece: str) -> None:
-        """
-        Append a streaming token piece to this bubble's textbox.
-        Used during live generation so text appears incrementally.
-        """
-        self._textbox.configure(state="normal")
-        self._textbox.insert("end", piece)
-        self._textbox.configure(state="disabled")
-        self._textbox.see("end")
+        # Timestamp
+        app_cfg = ConfigManager.load().get("appearance", {})
+        if app_cfg.get("show_timestamps", True):
+            ts = datetime.datetime.now().strftime("%H:%M")
+            ts_lbl = QLabel(ts, self._action_bar)
+            ts_lbl.setFont(MSG_META)
+            ts_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+            bottom_layout.addWidget(ts_lbl)
 
-    def finalise(self, full_text: str, meta: str = "") -> None:
-        """
-        Replace the textbox content with the final full response and
-        update the meta line.  Called when generation completes.
-        """
+        bubble_layout.addWidget(self._action_bar)
+        outer_layout.addWidget(self._bubble_frame)
+        
+        if not self._is_user:
+            outer_layout.addStretch(1)
+
+    def enterEvent(self, event):
+        # On Hover: show action bar
+        if self._is_user:
+            self._action_bar.show()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        # On Leave: hide user action bar
+        if self._is_user:
+            self._action_bar.hide()
+        super().leaveEvent(event)
+
+    def _copy_text(self):
+        QApplication.clipboard().setText(self._content)
+        self._copy_btn.setText("Copied")
+        import dizel_ui.utils.icons as icons
+        chk_icon = icons.get_icon("check", size=(16,16), color=TEXT_SECONDARY)
+        if chk_icon: self._copy_btn.setIcon(chk_icon)
+        
+        def _reset():
+            self._copy_btn.setText(" Copy")
+            cp_icon = icons.get_icon("copy", size=(16,16), color=TEXT_SECONDARY)
+            if cp_icon: self._copy_btn.setIcon(cp_icon)
+            
+        QTimer.singleShot(1500, _reset)
+
+    def append_text(self, piece: str):
+        # Move cursor to end and insert plain text
+        cursor = self._textbox.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertText(piece)
+        self._textbox.setTextCursor(cursor)
+        
+        # Ensures that auto-resizing happens
+        self._textbox._adjust_height()
+
+    def finalise(self, full_text: str, meta: str = "", skip_anim: bool = False):
         self._content = full_text
-        self._textbox.configure(state="normal")
-        self._textbox.delete("0.0", "end")
-        self._textbox.insert("0.0", full_text)
-        self._textbox.configure(state="disabled")
+        self._textbox.setPlainText(full_text)
+        self._textbox._adjust_height()
+        
+        if not self._is_user:
+            if self._meta_lbl:
+                self._meta_lbl.setText(meta)
+            self._action_bar.show()
+

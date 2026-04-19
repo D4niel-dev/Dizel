@@ -32,10 +32,12 @@ logs/
 # -----------------------
 # Dataset files
 # -----------------------
-#data/
+data/
+tokenizer/*.txt
 datasets/
 inference/dizel_ui/history/
 inference/dizel_ui/.dizel/
+inference/dizel_ui/assets/
 *.csv
 *.json
 *.jsonl
@@ -46,6 +48,7 @@ inference/dizel_ui/.dizel/
 # -----------------------
 .cache/
 huggingface/
+data/raw/
 
 # -----------------------
 # IDE files
@@ -53,6 +56,7 @@ huggingface/
 .vscode/
 .idea/
 node_modules/
+docs/
 
 # -----------------------
 # OS junk
@@ -66,6 +70,9 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+tokenizer/dizel.model
+tokenizer/dizel.vocab
+checkpoints/
 
 # -----------------------
 # Temporary files

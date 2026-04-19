@@ -35,9 +35,11 @@ from torch.amp import GradScaler
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import CONFIG, DizelConfig
 from model.architecture import DizelLM
-from training.dataset import Tokenizer, build_sft_loaders
+from training.dataset import Tokenizer, build_sft_loaders, build_mixed_sft_loaders
+from training.data_mixing import DEFAULT_MIX, DatasetMixConfig, DatasetMixEntry
 from training.pretrain import (
-    cosine_lr_with_warmup, set_lr, evaluate, save_checkpoint, load_checkpoint
+    cosine_lr_with_warmup, set_lr, evaluate, save_checkpoint, load_checkpoint,
+    save_tokenizer,
 )
 
 
@@ -84,18 +86,32 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
     mc.vocab_size = len(tokenizer)
 
     # ── Data ─────────────────────────────────────────────────────────────
-    if not os.path.exists(sc.sft_data_path):
-        print(f"[sft] ⚠ SFT data not found at '{sc.sft_data_path}'")
-        print(f"[sft]   Run: python sft_data/generate_sft_data.py")
-        print(f"[sft]   Or populate {sc.sft_data_path} manually.")
-        sys.exit(1)
+    use_mix = getattr(cfg, '_use_mix', True)
+    if use_mix:
+        mix_config = getattr(cfg, '_mix_config', DEFAULT_MIX)
+        print(f"[sft] Using mixed dataset ({len(mix_config.datasets)} sources)")
+        try:
+            train_loader, val_loader = build_mixed_sft_loaders(
+                mix_config     = mix_config,
+                tokenizer      = tokenizer,
+                context_length = mc.context_length,
+                batch_size     = sc.batch_size,
+            )
+        except Exception as e:
+            print(f"[sft] ⚠ Mixed dataset failed ({e}), falling back to single file")
+            use_mix = False
 
-    train_loader, val_loader = build_sft_loaders(
-        jsonl_path     = sc.sft_data_path,
-        tokenizer      = tokenizer,
-        context_length = mc.context_length,
-        batch_size     = sc.batch_size,
-    )
+    if not use_mix:
+        if not os.path.exists(sc.sft_data_path):
+            print(f"[sft] ⚠ SFT data not found at '{sc.sft_data_path}'")
+            print(f"[sft]   Run: python sft_data/generate_sft_data.py")
+            sys.exit(1)
+        train_loader, val_loader = build_sft_loaders(
+            jsonl_path     = sc.sft_data_path,
+            tokenizer      = tokenizer,
+            context_length = mc.context_length,
+            batch_size     = sc.batch_size,
+        )
 
     # ── Model (load from pretrain checkpoint) ────────────────────────────
     model = DizelLM(mc).to(device)
@@ -200,17 +216,20 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
                     save_checkpoint(
                         model, optimizer, step, val_loss, CONFIG,
                         os.path.join(sc.output_dir, f"{sc.run_name}-best.pt"),
+                        tokenizer=tokenizer,
                     )
 
             if step % sc.save_interval == 0:
                 save_checkpoint(
                     model, optimizer, step, float("inf"), CONFIG,
                     os.path.join(sc.output_dir, f"{sc.run_name}-step{step}.pt"),
+                    tokenizer=tokenizer,
                 )
 
     save_checkpoint(
         model, optimizer, step, best_val, CONFIG,
         os.path.join(sc.output_dir, f"{sc.run_name}-final.pt"),
+        tokenizer=tokenizer,
     )
     print(f"\n[sft] Done.  Best val loss: {best_val:.4f}")
 
@@ -227,6 +246,10 @@ def parse_args():
     p.add_argument("--lr",        type=float, default=None)
     p.add_argument("--max_steps", type=int,   default=None)
     p.add_argument("--no_amp",    action="store_true")
+    p.add_argument("--no_mix",    action="store_true",
+                   help="Disable mixed dataset loading, use single sft_data_path")
+    p.add_argument("--mix_config", type=str, default="",
+                   help="Path to dataset mix JSON config. Uses DEFAULT_MIX if empty.")
     return p.parse_args()
 
 
@@ -242,7 +265,16 @@ def main() -> None:
     if args.max_steps is not None: cfg.sft.max_steps = args.max_steps
     if args.no_amp:                cfg.sft.use_amp   = False
     if args.base_checkpoint:       cfg.sft.base_checkpoint = args.base_checkpoint
-    
+
+    # Mixed dataset control
+    cfg._use_mix = not args.no_mix
+    if args.mix_config:
+        import json as _json
+        with open(args.mix_config) as f:
+            data = _json.load(f)
+        entries = [DatasetMixEntry(**e) for e in data.get("datasets", [])]
+        cfg._mix_config = DatasetMixConfig(datasets=entries, seed=data.get("seed", 42))
+
     # Passing the resume path directly instead of base_checkpoint if resuming
     target_ckpt = args.resume if args.resume else args.base_checkpoint
     sft_train(cfg, target_ckpt)

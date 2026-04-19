@@ -156,13 +156,29 @@ def build_pretrain_loaders(
     train_loader, val_loader, train_dataset
     (train_dataset is returned so you can call reshuffle() each epoch)
     """
-    # ── Read and tokenise ───────────────────────────────────────────────
-    with open(data_path, "r", encoding="utf-8") as f:
-        raw = f.read()
+    # ── Read and tokenise in chunks (avoids OOM on large corpora) ────────
+    file_size = os.path.getsize(data_path)
+    file_mb = file_size / (1024 * 1024)
+    CHUNK_SIZE = 5 * 1024 * 1024   # 5 MB per chunk
 
-    print(f"[dataset] Tokenising corpus ({len(raw):,} chars) ...")
-    all_ids = tokenizer.encode(raw, add_bos=True)
-    print(f"[dataset] Total tokens: {len(all_ids):,}")
+    print(f"[dataset] Tokenising corpus ({file_mb:.1f} MB) in {CHUNK_SIZE // (1024*1024)} MB chunks ...")
+
+    all_ids = []
+    bytes_read = 0
+    with open(data_path, "r", encoding="utf-8") as f:
+        while True:
+            chunk = f.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            # Add BOS only at the very start
+            add_bos = (bytes_read == 0)
+            ids = tokenizer.encode(chunk, add_bos=add_bos)
+            all_ids.extend(ids)
+            bytes_read += len(chunk.encode("utf-8"))
+            pct = min(100, int(bytes_read / file_size * 100))
+            print(f"\r[dataset] Tokenising... {pct}%  ({len(all_ids):,} tokens)", end="", flush=True)
+
+    print(f"\n[dataset] Total tokens: {len(all_ids):,}")
 
     # ── Train / val split ───────────────────────────────────────────────
     split_at  = int(len(all_ids) * train_split)
@@ -282,12 +298,19 @@ class SFTDataset(Dataset):
         self.mask_prompt_loss = mask_prompt_loss
         self.samples          = []
 
+        skipped = 0
         with open(jsonl_path, "r", encoding="utf-8") as f:
-            for line in f:
+            for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
                     continue
-                obj = json.loads(line)
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError as e:
+                    skipped += 1
+                    if skipped <= 5:
+                        print(f"  [warn] Skipping bad JSON on line {line_num}: {e}")
+                    continue
                 msgs = obj.get("messages", [])
                 if not msgs:
                     continue
@@ -299,6 +322,8 @@ class SFTDataset(Dataset):
                 if len(x) < 2:
                     continue
                 self.samples.append((x, y, mask))
+        if skipped:
+            print(f"  [warn] Skipped {skipped} bad JSON lines total")
 
         print(f"[dataset] SFT samples loaded: {len(self.samples)}")
 
@@ -350,6 +375,129 @@ def build_sft_loaders(
 
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True,
+        collate_fn=collate, num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(), drop_last=True,
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=batch_size, shuffle=False,
+        collate_fn=collate, num_workers=num_workers,
+        pin_memory=torch.cuda.is_available(),
+    )
+    return train_loader, val_loader
+
+
+# ---------------------------------------------------------------------------
+# Mixed SFT Dataset (v1.2 — multiple JSONL files with weighted sampling)
+# ---------------------------------------------------------------------------
+class MixedSFTDataset(Dataset):
+    """
+    Loads multiple JSONL files and assigns per-sample weights for
+    weighted random sampling during training.
+
+    Each dataset source gets its weight from the DatasetMixConfig.
+    Samples from high-weight sources appear more frequently per epoch.
+    """
+
+    def __init__(
+        self,
+        mix_config,
+        tokenizer: Tokenizer,
+        context_length: int,
+        mask_prompt_loss: bool = True,
+    ) -> None:
+        self.tokenizer        = tokenizer
+        self.ctx              = context_length
+        self.mask_prompt_loss = mask_prompt_loss
+        self.samples          = []
+        self.sample_weights   = []
+
+        for entry in mix_config.datasets:
+            if not os.path.exists(entry.path):
+                print(f"  [mix] ⚠ Skipping missing dataset: {entry.name} ({entry.path})")
+                continue
+
+            ds_samples = []
+            skipped = 0
+            with open(entry.path, "r", encoding="utf-8") as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        skipped += 1
+                        continue
+                    msgs = obj.get("messages", [])
+                    if not msgs:
+                        continue
+                    x, y, mask = format_conversation(msgs, tokenizer)
+                    x    = x[:context_length]
+                    y    = y[:context_length]
+                    mask = mask[:context_length]
+                    if len(x) < 2:
+                        continue
+                    ds_samples.append((x, y, mask))
+
+                    if entry.max_samples > 0 and len(ds_samples) >= entry.max_samples:
+                        break
+
+            if skipped:
+                print(f"  [mix] {entry.name}: skipped {skipped} bad JSON lines")
+
+            print(f"  [mix] {entry.name}: {len(ds_samples)} samples (weight={entry.weight})")
+            self.samples.extend(ds_samples)
+            self.sample_weights.extend([entry.weight] * len(ds_samples))
+
+        # Normalize weights
+        if self.sample_weights:
+            total = sum(self.sample_weights)
+            self.sample_weights = [w / total for w in self.sample_weights]
+
+        print(f"[dataset] Mixed SFT total: {len(self.samples)} samples from {len(mix_config.datasets)} sources")
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int):
+        x, y, mask = self.samples[idx]
+        return (
+            torch.tensor(x,    dtype=torch.long),
+            torch.tensor(y,    dtype=torch.long),
+            torch.tensor(mask, dtype=torch.float),
+        )
+
+
+def build_mixed_sft_loaders(
+    mix_config,
+    tokenizer: Tokenizer,
+    context_length: int,
+    batch_size: int,
+    val_frac: float = 0.10,
+    seed: int = 42,
+    num_workers: int = 0,
+):
+    """Build train/val DataLoaders from a mixed dataset config with weighted sampling."""
+    from torch.utils.data import WeightedRandomSampler
+
+    full = MixedSFTDataset(mix_config, tokenizer, context_length)
+
+    n_val   = max(1, int(len(full) * val_frac))
+    n_train = len(full) - n_val
+    train_ds, val_ds = torch.utils.data.random_split(
+        full, [n_train, n_val],
+        generator=torch.Generator().manual_seed(seed),
+    )
+
+    # Build weighted sampler for training set only
+    train_weights = [full.sample_weights[i] for i in train_ds.indices]
+    sampler = WeightedRandomSampler(train_weights, num_samples=len(train_ds), replacement=True)
+
+    collate = lambda b: sft_collate_fn(b, pad_id=tokenizer.pad_id)
+
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size,
+        sampler=sampler,
         collate_fn=collate, num_workers=num_workers,
         pin_memory=torch.cuda.is_available(), drop_last=True,
     )

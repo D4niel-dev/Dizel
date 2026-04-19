@@ -8,6 +8,9 @@ sentencepiece>=0.1.99
 # CLI Interface
 rich>=13.7.0
 
+# GUI Interface
+pyside6>=11.2.0
+
 # Optional: faster training logging
 # tensorboard>=2.14.0
 # tqdm>=4.66.0

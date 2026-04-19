@@ -1,7 +1,7 @@
 # Dizel — A Tiny GPT-Style Language Model From Scratch
 
 Dizel is a complete, educational implementation of a GPT-style causal language
-model (~20 M parameters) built with PyTorch. It is designed to run locally on a
+model (~110 M parameters) built with PyTorch. It is designed to run locally on a
 single consumer GPU (~4 GB VRAM) over a weekend, with no distributed training
 required.
 
@@ -12,7 +12,7 @@ required.
 | Component | Details |
 |---|---|
 | **Architecture** | Causal Transformer (Pre-LayerNorm, GELU MLP, multi-head self-attention) |
-| **Parameters** | ~20 M (configurable 10–30 M) |
+| **Parameters** | ~110 M (configurable 10–250 M) |
 | **Tokenizer** | SentencePiece BPE, 8 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation |
 | **SFT** | Basic chat format, prompt-loss masking |
@@ -26,20 +26,31 @@ required.
 ```text
 dizel/
 ├── config.py                    ← All hyperparameters in one place
-├── requirements.txt
+├── requirements.txt             ← All app requirements and optionals too
 │
 ├── data/
 │   └── english.md               ← Training corpus (plain English text)
 │
 ├── tokenizer/
 │   ├── train_tokenizer.py       ← Train SentencePiece BPE tokenizer
+│   ├── corpus.txt               ← (generated) plain texts
 │   ├── dizel.model              ← (generated) tokenizer model
 │   └── dizel.vocab              ← (generated) vocabulary
 │
 ├── model/
+│   ├── __init__.py              ← Null (Package loader)
+│   ├── dizel_info.py            ← Model full specs and info
 │   └── architecture.py          ← DizelLM: full Transformer implementation
 │
+├── core/
+│   ├── agents/                  ← Content Dict and Lily agents config
+│   ├── tools/                   ← Tools and functions of Dict and Lily
+│   ├── __init__.py              ← Null (Package loader)
+│   ├── prompt_builder.py        ← Format agent results into clean text context for Dizel
+│   └── router.py                ← Detect input type and dispatch to the correct agent
+│
 ├── training/
+│   ├── __init__.py              ← Null (Package loader)
 │   ├── dataset.py               ← PretrainDataset, SFTDataset, Tokenizer wrapper
 │   ├── pretrain.py              ← Pre-training loop (AMP, grad accum, LR schedule)
 │   └── sft.py                   ← Supervised fine-tuning for chat format
@@ -51,19 +62,26 @@ dizel/
 ├── inference/
 │   ├── cli_ui
 │   │   └── cmd_ui.py            ← CLI chat / completion / JSON inference
+│   │
 │   └── dizel_ui/                ← Full Desktop GUI Application!
 │       ├── main.py              ← Run this to start the desktop app
-│       ├── ui/                  ← CustomTkinter UI components (Zyricon theme)
+│       ├── __init__.py          ← Null (Package loader)
+│       ├── theme/               ← Theme manager and logic
+│       ├── history/             ← Saved chats via JSON    (auto-created)
+│       ├── .dizel/              ← Saved settings via JSON (auto-created)
+│       ├── ui/                  ← PySide6 UI components
+│       ├── utils                ← Icons loader and Dict and Lily logic
 │       ├── logic/               ← Async generation and config/history managers
 │       └── assets/              ← Logo and avatar images
 │       
 ├── utils/
+│   ├── __init__.py              ← Null (Package loader)
 │   ├── data_cleaner.py          ← Clean the training data
 │   ├── test_model.py            ← Test the model
 │   └── verify.py                ← Sanity checks (no GPU required)
 │
 ├── checkpoints/                 ← Saved model checkpoints (auto-created)
-└── logs/                        ← Training loss CSV logs (auto-created)
+└── logs/                        ← Training loss CSV logs  (auto-created)
 ```
 
 ---
@@ -106,9 +124,9 @@ If you have downloaded a pre-trained Dizel checkpoint (e.g. `dizel-sft-best.pt`)
    ```bash
    python inference/dizel_ui/main.py
    ```
-3. Click the **⚙ Settings** button in the UI.
+3. Click the **⚙ Configuration** button in the UI.
 4. Use the **Checkpoint Loader** to select your `.pt` file.
-5. Click **Close** — the model will load in the background, and you're ready to chat!
+5. Click **Back**/**Save** — the model will load in the background, and you're ready to chat!
 
 *If you do not have a checkpoint and want to build the model from scratch, continue with Step 1 below.*
 
@@ -120,16 +138,16 @@ Open `config.py`. Key parameters:
 
 ```python
 # Model size
-d_model  = 384   # hidden dimension  (256 = smaller/faster, 512 = larger/slower)
-n_layers = 6     # transformer depth
-n_heads  = 6     # attention heads   (d_model must be divisible by n_heads)
+d_model  = 384          # hidden dimension  (256 = smaller/faster, 512 = larger/slower)
+n_layers = 6            # transformer depth
+n_heads  = 6            # attention heads   (d_model must be divisible by n_heads)
 
 # Training
-batch_size  = 8   # micro-batch per step
-grad_accum  = 8   # effective batch = 8 × 8 = 64 sequences
-max_steps   = 4000
-lr          = 3e-4
-context_length = 512
+batch_size  = 8         # micro-batch per step
+grad_accum  = 8         # effective batch = 8 × 8 = 64 sequences
+max_steps   = 4000      # how many steps the pretrain and sft does
+lr          = 3e-4      # how much the model will learn with the training
+context_length = 512    # how much contexts for the model to generate a respond
 ```
 
 **Estimated parameters** by `d_model`:
@@ -139,6 +157,7 @@ context_length = 512
 | 256     | 6        | ~10 M      |
 | 384     | 6        | ~20 M      |
 | 512     | 6        | ~34 M      |
+| 2048    | 12       | ~110.35 M  |
 
 ---
 
@@ -150,6 +169,8 @@ results, **add more plain English text** to the same file:
 - Wikipedia article extracts (plain text dump)
 - Project Gutenberg books
 - Any well-written English prose
+- HuggingFace dataset samples
+- etc...
 
 The more diverse the data, the better. Even 1–5 MB of text makes a noticeable
 difference.
@@ -219,7 +240,11 @@ Checkpoints are saved to `checkpoints/`:
 
 Resume training from a checkpoint:
 ```bash
-python training/pretrain.py --resume checkpoints/dizel-pretrain-step2000.pt
+# 1st Option
+python training/pretrain.py --resume checkpoints/dizel-pretrain-step{N}.pt
+
+# 2nd Option (Recommended)
+python training/pretrain.py --resume checkpoints/dizel-pretrain-best.pt
 ```
 
 **Approximate training time (RTX 3060, 12 GB VRAM):**
@@ -235,7 +260,6 @@ python sft_data/generate_sft_data.py
 ```
 
 Creates `sft_data/chat.jsonl` with ~60 synthetic Q&A pairs in the chat format:
-
 ```json
 {
   "messages": [
@@ -246,7 +270,7 @@ Creates `sft_data/chat.jsonl` with ~60 synthetic Q&A pairs in the chat format:
 }
 ```
 
-You can add your own examples to this file in the same format.
+*You can add your own examples to this file in the same format.*
 
 ---
 
@@ -261,20 +285,31 @@ SFT runs for 500 steps (default) at a lower learning rate (1e-4). It:
 - Teaches the model the `<|user|>` / `<|assistant|>` conversation format
 - Computes loss **only on assistant tokens** (prompt masking)
 
-Output checkpoint: `checkpoints/dizel-sft-best.pt`
+Output checkpoint:
+- `checkpoints/dizel-sft-step{N}.pt`
+- `checkpoints/dizel-sft-best.pt`
+
+Resume sft from a checkpoint:
+```bash
+# 1st Option
+python training/pretrain.py --resume checkpoints/dizel-sft-step{N}.pt
+
+# 2nd Option (Recommended)
+python training/pretrain.py --resume checkpoints/dizel-sft-best.pt
+```
 
 ---
 
 ### Step 8 — Chat with Dizel
 
-**Interactive chat (recommended after SFT):**
+**Interactive chat:**
 ```bash
-python inference/chat.py --checkpoint checkpoints/dizel-sft-best.pt
+python inference/cli_ui/cmd_ui.py --checkpoint checkpoints/dizel-sft-best.pt
 ```
 
 **Raw text completion (pretrain checkpoint):**
 ```bash
-python inference/chat.py \
+python inference/cli_ui/cmd_ui.py \
     --checkpoint checkpoints/dizel-pretrain-best.pt \
     --mode complete \
     --prompt "Photosynthesis is the process by which"
@@ -282,7 +317,7 @@ python inference/chat.py \
 
 **JSON structured output:**
 ```bash
-python inference/chat.py \
+python inference/cli_ui/cmd_ui.py \
     --checkpoint checkpoints/dizel-sft-best.pt \
     --mode json \
     --prompt "List the planets in the solar system"
@@ -290,7 +325,7 @@ python inference/chat.py \
 
 **Sampling controls:**
 ```bash
-python inference/chat.py \
+python inference/cli_ui/cmd_ui.py \
     --checkpoint checkpoints/dizel-sft-best.pt \
     --temperature 0.7 \
     --top_k 40 \
@@ -310,9 +345,9 @@ python inference/chat.py \
 
 ---
 
-### Step 9 — Launch the Desktop UI (Recommended)
+### Step 9 — Launch the Desktop UI *(Recommended)*
 
-Dizel now includes a fully localized, premium Desktop Interface built with CustomTkinter featuring the **Zyricon Dark Theme**. 
+Dizel includes a fully localized, premium Desktop Interface built with PySide6 featuring the **Premium Dark Theme**. 
 
 ```bash
 python inference/dizel_ui/main.py
@@ -320,14 +355,20 @@ python inference/dizel_ui/main.py
 
 **(Optional)** Pass a checkpoint right from the command line:
 ```bash
-python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda
+python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda | cpu
 ```
 
 **Features of the Desktop App:**
 - **Persistent Settings:** Your temperature, top-p, checkpoints, and UI preferences are saved automatically bridging sessions.
 - **Chat History:** Seamlessly manage multiple conversations from the left sidebar.
 - **Attachment Previews:** Visually queue up reference items for your prompts.
+- **Model Switcher:** Switch from Dizel and Mila model versions.
+- **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` modes.
 - **Hardware Info:** Live UI tracking of Generation Tokens/sec and Context windows.
+- **KeyBoard Shortcut:** `CTRL+K` with open the shortcut for alot of options.
+- **Contexts Limiter:** Live UI tracking of context limits.
+- **Dark/Light Themes:** Premium colors for Dark and Light mode 
+  *(WARNING! Light mode can cause a flashbang when switch from Dark mode, so please be careful)*.
 
 ---
 
@@ -401,7 +442,7 @@ Small corpora are the primary challenge. Dizel uses several mitigations:
 | **Learning rate schedule** | Cosine + warmup | Stable convergence |
 | **Weight tying** | Embeddings/LM head | Parameter efficiency |
 
-If val loss stops decreasing early, try:
+> If val loss stops decreasing early, try:
 1. Adding more training data (most effective)
 2. Increasing dropout to 0.2–0.3
 3. Reducing model size (smaller d_model)
@@ -449,19 +490,25 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 ## Frequently Asked Questions
 
 **Q: Why does the model repeat itself?**  
-Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature`.
+> Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature`.
 
 **Q: Why is the output nonsensical?**  
-The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more data.
+> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more data. The more dataset it gets, the more it'll respond with less nonsensial texts.
 
 **Q: Can I run this on CPU?**  
-Yes — set `device = "cpu"`. Training will be ~50× slower. Inference is fine for short generations.
+> Yes — set `device = "cpu"`. Training will be ~50× slower. Inference is fine for short generations.
 
 **Q: How do I use my own text?**  
-Replace or append to `data/english.md`, re-run `train_tokenizer.py`, then retrain.
+> Replace or append to `data/english.md`, re-run `train_tokenizer.py`, then retrain.
 
 **Q: How do I make the model produce better JSON?**  
-Add more JSON examples to `sft_data/chat.jsonl` and re-run SFT. Lower temperature to 0.2–0.4.
+> Add more JSON examples to `sft_data/chat.jsonl` and re-run SFT. Lower temperature to 0.2–0.4.
+
+**Q: Is the model free-to-use?**  
+> Yes, it is! — As if right now, this model has the MIT license, things may change in the future.
+
+**Q: How can i report any errors/issues?**  
+> Very simple! — Just go to the model Github Res and create an *Issue* request.
 
 ---
 

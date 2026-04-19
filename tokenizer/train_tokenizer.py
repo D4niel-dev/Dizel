@@ -1,5 +1,5 @@
 """
-tokenizer/train_tokenizer.py — Train a BPE SentencePiece tokenizer on the corpus.
+tokenizer/train_tokenizer.py -- Train a BPE SentencePiece tokenizer on the corpus.
 
 Usage:
     python tokenizer/train_tokenizer.py
@@ -13,23 +13,15 @@ import sys
 import os
 import re
 
-# Make project root importable when called directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 from config import CONFIG
 
 
 def extract_text_from_markdown(path: str) -> str:
-    """
-    Strip Markdown headers and return plain text suitable for
-    SentencePiece training.  Keeps all prose.
-    """
+    """Strip Markdown headers and return plain text."""
     with open(path, "r", encoding="utf-8") as f:
         raw = f.read()
-
-    # Remove Markdown headings (##, ###, etc.)
     text = re.sub(r"^#{1,6}\s+", "", raw, flags=re.MULTILINE)
-    # Collapse excessive blank lines
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
@@ -44,7 +36,7 @@ def write_plain_text(text: str, out_path: str) -> None:
 
 def train_tokenizer(plain_text_path: str, model_prefix: str, vocab_size: int) -> None:
     """
-    Train a BPE SentencePiece model.
+    Train a BPE SentencePiece model with newline preservation.
 
     Special token IDs (must match TokenizerConfig):
       0 = <pad>
@@ -55,9 +47,7 @@ def train_tokenizer(plain_text_path: str, model_prefix: str, vocab_size: int) ->
     try:
         import sentencepiece as spm
     except ImportError:
-        raise ImportError(
-            "SentencePiece not installed. Run: pip install sentencepiece"
-        )
+        raise ImportError("SentencePiece not installed. Run: pip install sentencepiece")
 
     spm.SentencePieceTrainer.train(
         input=plain_text_path,
@@ -74,11 +64,12 @@ def train_tokenizer(plain_text_path: str, model_prefix: str, vocab_size: int) ->
         bos_piece="<s>",
         eos_piece="</s>",
         unk_piece="<unk>",
-        # Extra special tokens used in chat formatting
+        # Chat role tokens
         user_defined_symbols=["<|user|>", "<|assistant|>", "<|system|>", "<|json|>", "<|end|>"],
-        # Treat whitespace so tokens preserve word boundaries
+        # Whitespace handling — preserve newlines!
         add_dummy_prefix=True,
-        remove_extra_whitespaces=True,
+        remove_extra_whitespaces=False,
+        normalization_rule_name="identity",
         split_digits=False,
         byte_fallback=True,
     )
@@ -96,12 +87,21 @@ def verify_tokenizer(model_path: str) -> None:
     ids = sp.encode(test)
     decoded = sp.decode(ids)
 
-    print(f"[tokenizer] Test encode → {len(ids)} tokens")
+    print(f"[tokenizer] Test encode -> {len(ids)} tokens")
     print(f"[tokenizer] Tokens      : {sp.id_to_piece(ids[:12])} ...")
     print(f"[tokenizer] Decoded     : {decoded[:80]}")
-    assert decoded.strip() == test.strip(), \
+    assert decoded.strip() == test.strip(), (
         f"Round-trip mismatch!\n  original : {test}\n  decoded  : {decoded}"
-    print("[tokenizer] Round-trip OK ✓")
+    )
+    print("[tokenizer] Round-trip OK")
+
+    # Verify newline preservation
+    nl_ids = sp.encode("\n")
+    print(f"[tokenizer] Newline encode test: {nl_ids}")
+    if nl_ids:
+        print(f"[tokenizer] Newline token: {repr(sp.id_to_piece(nl_ids[0]))}")
+    else:
+        print("[tokenizer] WARNING: Newline still not tokenized!")
 
 
 def main() -> None:
@@ -113,8 +113,14 @@ def main() -> None:
     os.makedirs("tokenizer", exist_ok=True)
 
     print(f"[tokenizer] Reading corpus from {data_path} ...")
-    text = extract_text_from_markdown(data_path)
-    write_plain_text(text, plain_path)
+    if data_path.endswith(".txt"):
+        import shutil
+        shutil.copy(data_path, plain_path)
+        size_mb = os.path.getsize(plain_path) / (1024 * 1024)
+        print(f"[tokenizer] Copied plain text to {plain_path}  ({size_mb:.1f} MB)")
+    else:
+        text = extract_text_from_markdown(data_path)
+        write_plain_text(text, plain_path)
 
     print(f"[tokenizer] Training SentencePiece BPE  "
           f"(vocab={cfg.vocab_size:,}) ...")

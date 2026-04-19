@@ -52,6 +52,7 @@ def save_session(
     messages:   List[Dict],
     session_id: str = None,
     title:      str = None,
+    pinned:     bool = None,
 ) -> str:
     """
     Save a conversation to disk.
@@ -79,11 +80,24 @@ def save_session(
                 break
         title = title or "New Chat"
 
+    is_pinned = False
+    existing_data = load_session(session_id)
+    if existing_data:
+        is_pinned = existing_data.get("pinned", False)
+        # Preserve original creation time if available
+        created_time = existing_data.get("created", datetime.now().isoformat(timespec="seconds"))
+    else:
+        created_time = datetime.now().isoformat(timespec="seconds")
+    
+    if pinned is not None:
+        is_pinned = pinned
+
     data = {
         "id":       session_id,
         "title":    title,
-        "created":  datetime.now().isoformat(timespec="seconds"),
+        "created":  created_time,
         "messages": messages,
+        "pinned":   is_pinned,
     }
 
     slug = _safe_filename(title)
@@ -138,11 +152,12 @@ def list_sessions() -> List[Dict]:
                 "title":   data.get("title", "Untitled"),
                 "created": data.get("created", ""),
                 "preview": preview,
+                "pinned":  data.get("pinned", False),
             })
         except Exception:
             continue
 
-    sessions.sort(key=lambda s: s["created"], reverse=True)
+    sessions.sort(key=lambda s: (not s.get("pinned", False), s["created"]), reverse=True)
     return sessions
 
 
@@ -153,6 +168,27 @@ def delete_session(session_id: str) -> bool:
         if fname.startswith(session_id) and fname.endswith(".json"):
             os.remove(os.path.join(HISTORY_DIR, fname))
             return True
+    return False
+
+
+def toggle_pin_session(session_id: str) -> bool:
+    """Toggle pin state of a session and return the new status."""
+    _ensure_dir()
+    for fname in os.listdir(HISTORY_DIR):
+        if fname.startswith(session_id) and fname.endswith(".json"):
+            path = os.path.join(HISTORY_DIR, fname)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                new_pinned = not data.get("pinned", False)
+                data["pinned"] = new_pinned
+                
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                return new_pinned
+            except Exception:
+                pass
     return False
 
 

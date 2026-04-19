@@ -22,6 +22,7 @@ Usage
 import argparse
 import math
 import os
+import shutil
 import sys
 import time
 from contextlib import nullcontext
@@ -93,6 +94,19 @@ def evaluate(
 # ---------------------------------------------------------------------------
 # Checkpoint helpers
 # ---------------------------------------------------------------------------
+def save_tokenizer(tokenizer: "Tokenizer", checkpoint_dir: str) -> str:
+    """Copy the tokenizer .model file into the checkpoint directory.
+    
+    Returns the path where the tokenizer was saved.
+    """
+    src = tokenizer.sp.serialized_model_proto()
+    dst_path = os.path.join(checkpoint_dir, "tokenizer.model")
+    with open(dst_path, "wb") as f:
+        f.write(src)
+    print(f"  [ckpt] Tokenizer saved -> {dst_path}")
+    return dst_path
+
+
 def save_checkpoint(
     model: DizelLM,
     optimizer: optim.Optimizer,
@@ -100,15 +114,23 @@ def save_checkpoint(
     val_loss: float,
     cfg: DizelConfig,
     path: str,
+    tokenizer: "Tokenizer" = None,
 ) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save({
+    ckpt_data = {
         "step":        step,
         "val_loss":    val_loss,
         "model_state": model.state_dict(),
         "optim_state": optimizer.state_dict(),
         "model_cfg":   cfg.model,
-    }, path)
+    }
+    # Embed tokenizer binary so checkpoint is fully self-contained
+    if tokenizer is not None:
+        ckpt_data["tokenizer_model"] = tokenizer.sp.serialized_model_proto()
+        ckpt_data["vocab_size"] = len(tokenizer)
+        # Also save standalone copy alongside checkpoint
+        save_tokenizer(tokenizer, os.path.dirname(path))
+    torch.save(ckpt_data, path)
     print(f"  [ckpt] Saved -> {path}  (val_loss={val_loss:.4f})")
 
 
@@ -120,7 +142,19 @@ def load_checkpoint(
 ) -> int:
     """Load checkpoint and return the step it was saved at."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
-    model.load_state_dict(ckpt["model_state"])
+    state_dict = ckpt["model_state"]
+    model_keys = set(model.state_dict().keys())
+    ckpt_keys = set(state_dict.keys())
+    # Match checkpoint keys to model keys (handle _orig_mod. in either direction)
+    if model_keys != ckpt_keys:
+        stripped = {k.replace("_orig_mod.", ""): v for k, v in state_dict.items()}
+        prefixed = {"_orig_mod." + k: v for k, v in state_dict.items()}
+        if set(stripped.keys()) == model_keys:
+            state_dict = stripped
+        elif set(prefixed.keys()) == model_keys:
+            state_dict = prefixed
+    model.load_state_dict(state_dict)
+
     if optimizer is not None and "optim_state" in ckpt:
         optimizer.load_state_dict(ckpt["optim_state"])
     step = ckpt.get("step", 0)
@@ -311,6 +345,7 @@ def train(cfg: DizelConfig, resume_from: str = None) -> None:
                     save_checkpoint(
                         model, optimizer, step, val_loss, cfg,
                         os.path.join(pc.checkpoint_dir, f"{pc.run_name}-best.pt"),
+                        tokenizer=tokenizer,
                     )
 
             # -- Periodic checkpoint --------------------------------------
@@ -318,6 +353,7 @@ def train(cfg: DizelConfig, resume_from: str = None) -> None:
                 save_checkpoint(
                     model, optimizer, step, float("inf"), cfg,
                     os.path.join(pc.checkpoint_dir, f"{pc.run_name}-step{step}.pt"),
+                    tokenizer=tokenizer,
                 )
 
             # -- Reshuffle windows periodically --------------------------
@@ -329,6 +365,7 @@ def train(cfg: DizelConfig, resume_from: str = None) -> None:
     save_checkpoint(
         model, optimizer, step, best_val, cfg,
         os.path.join(pc.checkpoint_dir, f"{pc.run_name}-final.pt"),
+        tokenizer=tokenizer,
     )
     log_file.close()
     print(f"\n[train] Pre-training complete. Best val loss: {best_val:.4f}")

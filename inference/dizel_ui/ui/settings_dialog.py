@@ -1,432 +1,627 @@
-"""
-dizel_ui/ui/settings_dialog.py
-────────────────────────────────
-Modal settings dialog for configuring:
-  • Checkpoint path (file-browser)
-  • Device selection (CPU / CUDA)
-  • Sampling parameters (temperature, top-k, top-p, rep. penalty, max tokens)
-  • System prompt
+# dizel_ui/ui/settings_dialog.py
 
-Changes take effect immediately on Save.
-"""
-
-# ── Make project root importable ──────────────────────────────────────────────
 import os
-import sys
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, 
+                               QWidget, QLabel, QPushButton, QLineEdit, QComboBox, 
+                               QTextEdit, QSlider, QCheckBox, QFileDialog, QScrollArea, QFrame, QSizePolicy)
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QPixmap
 
-_HERE          = os.path.dirname(os.path.abspath(__file__))
-_INFERENCE_DIR = os.path.dirname(_HERE)
-_PROJ_ROOT     = os.path.dirname(_INFERENCE_DIR)
-
-if _PROJ_ROOT not in sys.path:
-    sys.path.insert(0, _PROJ_ROOT)
-if _INFERENCE_DIR not in sys.path:
-    sys.path.insert(0, _INFERENCE_DIR)
-
-
-import tkinter as tk
-import customtkinter as ctk
-from tkinter import filedialog
-from typing import Callable
-
-from ..theme.colors import (
+from dizel_ui.utils.icons import get_icon
+from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, ACCENT_HOVER, BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
-    BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT
+    BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT, resolve
 )
-from ..theme.fonts import LOGO, BTN_LABEL, LABEL, LABEL_SM
-from ..logic.config_manager import ConfigManager
+from dizel_ui.theme.fonts import LOGO, BTN_LABEL, LABEL, LABEL_SM
+from dizel_ui.logic.config_manager import ConfigManager
+from dizel_ui.theme.stylesheets import get_button_style, get_frame_style, get_scrollbar_style
+from dizel_ui.theme.theme_manager import Theme
 
+try:
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+    import model.dizel_info as info
+except ImportError:
+    info = None
 
-class SettingsDialog(ctk.CTkToplevel):
-    """
-    Settings modal.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_INFERENCE_DIR = os.path.dirname(_HERE)
 
-    Parameters
-    ----------
-    parent      : root window
-    chat_mgr    : ChatManager instance (settings applied to it on save)
-    on_reload   : callback() called when the user requests a model reload
-    """
-
-    def __init__(self, parent, chat_mgr, on_reload: Callable[[], None]) -> None:
+class SettingsDialog(QDialog):
+    def __init__(self, parent, chat_mgr, on_reload):
         super().__init__(parent)
-        self._mgr      = chat_mgr
+        self._mgr = chat_mgr
         self._on_reload = on_reload
 
-        self.title("Settings — Dizel AI")
-        self.geometry("540x620")
-        self.resizable(False, False)
-        self.configure(fg_color=BG_ROOT)
-        self.update()
-        self.grab_set()          # modal behaviour
-        self.lift()
-        self.focus_force()
-
+        self.setWindowTitle("Settings — Dizel AI")
+        self.setFixedSize(850, 700)
+        self.setStyleSheet(f"QDialog {{ background-color: {resolve(BG_ROOT)}; }}")
+        
         self._build()
         self._load_current()
 
-        # Set Window Icon (deferred — CTkToplevel needs to be mapped first)
-        self.after(200, self._set_icon)
-
-    def _set_icon(self) -> None:
-        try:
-            ico_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.ico")
-            if os.path.exists(ico_path):
-                self.iconbitmap(ico_path)
-                self.after(10, lambda: self.iconbitmap(ico_path))  # re-apply after CTk override
-            else:
-                png_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
-                if os.path.exists(png_path):
-                    img = tk.PhotoImage(file=png_path)
-                    self.iconphoto(False, img)
-        except Exception as e:
-            print(f"Failed to load settings window icon: {e}")
-
-    # ── Layout ────────────────────────────────────────────────────────────
-
-    def _build(self) -> None:
-        from dizel_ui.utils.icons import get_icon
-
-        # ── Title Row ──
-        title_row = ctk.CTkFrame(self, fg_color="transparent")
-        title_row.pack(fill="x", padx=24, pady=(20, 10))
+    def _build(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(24, 20, 24, 16)
         
+        # Title Row
+        title_row = QHBoxLayout()
+        title_lbl = QLabel("  Settings")
+        title_lbl.setFont(LOGO)
+        title_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)};")
         ico = get_icon("sliders", size=(20, 20), color=TEXT_PRIMARY)
-        ctk.CTkLabel(
-            title_row, text="  Settings", image=ico, compound="left",
-            font=LOGO, text_color=TEXT_PRIMARY,
-        ).pack(side="left")
+        if hasattr(title_lbl, 'setPixmap') and not ico:
+            pass # fallbacks
+        if ico:
+            # Add icon label
+            ico_lbl = QLabel()
+            ico_lbl.setPixmap(ico.pixmap(20, 20))
+            title_row.addWidget(ico_lbl)
+            
+        title_row.addWidget(title_lbl)
+        title_row.addStretch(1)
+        main_layout.addLayout(title_row)
 
-        # ── Tabview ──
-        self.tabs = ctk.CTkTabview(
-            self, fg_color=TAB_BG,
-            segmented_button_fg_color=TAB_UNSELECTED,
-            segmented_button_selected_color=BG_CARD,
-            segmented_button_unselected_color=TAB_UNSELECTED,
-            text_color=TEXT_SECONDARY,
-            segmented_button_selected_hover_color=BG_CARD,
-            segmented_button_unselected_hover_color=BORDER
-        )
-        self.tabs.pack(fill="both", expand=True, padx=24, pady=(0, 10))
+        c_bg_tab = resolve(TAB_BG)
+        c_unsel = resolve(TAB_UNSELECTED)
+        c_card = resolve(BG_CARD)
+        c_text = resolve(TEXT_SECONDARY)
+        c_border = resolve(BORDER)
+
+        self.tabs = QTabWidget(self)
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{ border: 0; background: transparent; }}
+            QTabBar::tab {{
+                background: transparent;
+                color: {c_text};
+                padding: 10px 24px;
+                border-radius: 18px;
+                margin: 4px;
+                font-weight: 600;
+            }}
+            QTabBar::tab:selected {{ background: {resolve(ACCENT)}; color: #ffffff; }}
+            QTabBar::tab:hover:!selected {{ background: {c_border}; color: {resolve(TEXT_PRIMARY)}; }}
+        """)
+        main_layout.addWidget(self.tabs)
         
-        t_chat  = self.tabs.add("Chat")
-        t_model = self.tabs.add("Model")
-        t_app   = self.tabs.add("Appearance")
-        t_abt   = self.tabs.add("About")
+        self._build_chat_tab()
+        self._build_model_tab()
+        self._build_app_tab()
+        self._build_about_tab()
 
-        scroll = ctk.CTkScrollableFrame(
-            t_chat, fg_color="transparent",
-            scrollbar_button_color=BORDER,
-        )
-        scroll.pack(fill="both", expand=True, pady=4)
-
-        # ── Base Model Card ──
-        self._section(scroll, "Checkpoint Loader")
-        model_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
-        model_card.pack(fill="x", pady=(0, 12))
-
-        ckpt_row = ctk.CTkFrame(model_card, fg_color="transparent")
-        ckpt_row.pack(fill="x", padx=12, pady=(12, 6))
-
-        self._ckpt_var = tk.StringVar()
-        ckpt_box = ctk.CTkFrame(ckpt_row, fg_color=BG_INPUT, corner_radius=6, border_color=BORDER, border_width=1)
-        ckpt_box.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        # Buttons Row
+        btn_layout = QHBoxLayout()
+        back_btn = QPushButton("< Back")
+        back_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, border_color=BORDER))
+        back_btn.setCursor(Qt.PointingHandCursor)
+        back_btn.clicked.connect(self.reject)
         
-        hard_ico = get_icon("hard-drive", size=(14, 14), color=TEXT_PRIMARY)
-        ctk.CTkLabel(ckpt_box, text="", image=hard_ico).pack(side="left", padx=(10, 0))
+        close_btn = QPushButton("Save & Close")
+        close_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff"))
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.clicked.connect(self._save_and_reload)
         
-        ckpt_entry = ctk.CTkEntry(
-            ckpt_box, textvariable=self._ckpt_var, placeholder_text="Select checkpoint...",
-            font=LABEL, fg_color="transparent", border_width=0, text_color=TEXT_PRIMARY,
-        )
-        ckpt_entry.pack(side="left", fill="x", expand=True, padx=4, pady=4)
+        btn_layout.addWidget(back_btn)
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(close_btn)
+        main_layout.addLayout(btn_layout)
+
+    def _create_scroll_tab(self):
+        w = QWidget()
+        l = QVBoxLayout(w)
+        l.setContentsMargins(0, 4, 0, 0)
         
-        val_btn = ctk.CTkButton(
-            ckpt_box, text="↑ Val", width=50, height=24, fg_color="transparent",
-            hover_color=BORDER, font=LABEL_SM, text_color=TEXT_SECONDARY, command=self._browse_checkpoint
-        )
-        val_btn.pack(side="right", padx=4)
-
-        device_row = ctk.CTkFrame(model_card, fg_color="transparent")
-        device_row.pack(fill="x", padx=16, pady=(6, 12))
-        ctk.CTkLabel(device_row, text="Device", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameStyle(QFrame.NoFrame)
+        scroll.setStyleSheet(get_scrollbar_style("transparent", BORDER, ACCENT) + "QScrollArea { background: transparent; }")
         
-        self._device_var = ctk.StringVar(value="cpu")
-        dev_opt = ctk.CTkOptionMenu(
-            device_row, variable=self._device_var, values=["cpu", "cuda"],
-            font=LABEL, fg_color=BG_CHAT, button_color=BG_CHAT,
-            button_hover_color=BORDER, text_color=TEXT_PRIMARY, width=80, anchor="e"
-        )
-        dev_opt.pack(side="right")
-
-        # ── System Card ──
-        sys_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
-        sys_card.pack(fill="x", pady=(0, 12))
+        cont = QWidget()
+        cont.setStyleSheet("background: transparent;")
+        cont.setLayout(QVBoxLayout())
+        cont.layout().setAlignment(Qt.AlignTop)
         
-        sys_hdr = ctk.CTkFrame(sys_card, fg_color="transparent")
-        sys_hdr.pack(fill="x", padx=16, pady=(12, 4))
-        ctk.CTkLabel(sys_hdr, text="System Prompt", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
+        scroll.setWidget(cont)
+        l.addWidget(scroll)
+        return w, cont.layout()
+
+    def _section(self, layout, title):
+        lbl = QLabel(title)
+        lbl.setFont(LABEL)
+        lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-weight: 600; margin-top: 14px; margin-bottom: 8px; letter-spacing: 0.5px;")
+        layout.addWidget(lbl)
+
+    def _build_chat_tab(self):
+        tab, layout = self._create_scroll_tab()
+        self.tabs.addTab(tab, "Chat")
+
+        # Base Model
+        self._section(layout, "CHECKPOINT LOADER")
+        card = QFrame()
+        card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        card_l = QVBoxLayout(card)
+        card_l.setContentsMargins(16, 16, 16, 16)
+        card_l.setSpacing(12)
         
-        chv_ico = get_icon("chevron-down", size=(14, 14), color=TEXT_DIM)
-        ctk.CTkLabel(sys_hdr, text="", image=chv_ico).pack(side="right")
+        row1 = QHBoxLayout()
+        self._ckpt_edit = QLineEdit()
+        self._ckpt_edit.setPlaceholderText("Select checkpoint...")
+        self._ckpt_edit.setStyleSheet(f"background: {resolve(BG_INPUT)}; color: {resolve(TEXT_PRIMARY)}; border: 1px solid {resolve(BORDER)}; padding: 10px 12px; border-radius: 6px;")
+        
+        browse_btn = QPushButton("↑ Val")
+        browse_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_SECONDARY))
+        browse_btn.clicked.connect(self._browse_checkpoint)
+        
+        row1.addWidget(self._ckpt_edit)
+        row1.addWidget(browse_btn)
+        card_l.addLayout(row1)
 
-        self._sys_box = ctk.CTkTextbox(
-            sys_card, height=120, font=LABEL, fg_color=BG_CHAT,
-            text_color=TEXT_PRIMARY, border_width=0, corner_radius=6, wrap="word",
-        )
-        self._sys_box.pack(fill="x", padx=12, pady=(0, 8))
+        row2 = QHBoxLayout()
+        d_lbl = QLabel("Device")
+        d_lbl.setFont(LABEL)
+        d_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)};")
+        self._device_combo = QComboBox()
+        self._device_combo.addItems(["cpu", "cuda"])
+        self._device_combo.setStyleSheet(f"background: {resolve(BG_CHAT)}; color: {resolve(TEXT_PRIMARY)}; border: 1px solid {resolve(BORDER)}; padding: 8px 12px; border-radius: 6px;")
+        
+        row2.addWidget(d_lbl)
+        row2.addStretch(1)
+        row2.addWidget(self._device_combo)
+        card_l.addLayout(row2)
+        
+        layout.addWidget(card)
 
-        seed_row = ctk.CTkFrame(sys_card, fg_color="transparent")
-        seed_row.pack(fill="x", padx=16, pady=(4, 12))
-        ctk.CTkLabel(seed_row, text="Random Seed", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        ctk.CTkLabel(seed_row, text="Auto >", font=LABEL, text_color=TEXT_DIM).pack(side="right")
+        # System Card
+        self._section(layout, "SYSTEM PROMPT")
+        sys_card = QFrame()
+        sys_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        sys_l = QVBoxLayout(sys_card)
+        sys_l.setContentsMargins(16, 16, 16, 16)
+        
+        self._sys_box = QTextEdit()
+        self._sys_box.setFixedHeight(120)
+        self._sys_box.setStyleSheet(f"background: {resolve(BG_CHAT)}; color: {resolve(TEXT_PRIMARY)}; border: none; padding: 12px; border-radius: 6px; font-size: 13px;")
+        sys_l.addWidget(self._sys_box)
+        layout.addWidget(sys_card)
 
-        # ── Sampling Card ──
-        self._section(scroll, "Sampling Settings")
-        samp_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
-        samp_card.pack(fill="x", pady=(0, 12))
-
-        self._temp_var   = tk.DoubleVar(value=0.7)
-        self._topk_var   = tk.IntVar(value=40)
-        self._topp_var   = tk.DoubleVar(value=0.90)
-        self._rep_var    = tk.DoubleVar(value=1.10)
-        self._maxt_var   = tk.IntVar(value=400)
-
-        # Derive max-tokens ceiling from model context length (dynamic)
-        _info = self._mgr.model_info if self._mgr.is_ready else {}
-        _ctx  = _info.get("ctx_len", 512)
-        _max_tok_ceil = max(_ctx - 50, 64)   # always leave 50 tokens for the prompt
+        # Sampling Card
+        self._section(layout, "SAMPLING SETTINGS")
+        samp_card = QFrame()
+        samp_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        samp_l = QVBoxLayout(samp_card)
+        samp_l.setContentsMargins(16, 16, 16, 16)
+        samp_l.setSpacing(14)
+        
+        self._sliders = {}
+        _info = self._mgr.model_info if getattr(self._mgr, "is_ready", False) else {}
+        _ctx = _info.get("ctx_len", 512)
+        _max_tok_ceil = max(_ctx - 50, 64)
 
         sliders = [
-            ("Temperature",        self._temp_var,  0.0,   2.0,           2),
-            ("Top-K",              self._topk_var,  1,     200,           0),
-            ("Top-P",              self._topp_var,  0.1,   1.0,           2),
-            ("Repetition penalty", self._rep_var,   1.0,   2.0,           2),
-            ("Max new tokens",     self._maxt_var,  32,    _max_tok_ceil, 0),
+            ("Temperature", "temp", 0, 200, 70, 100),       # 0.0-2.0
+            ("Top-K", "topk", 1, 200, 40, 1),               # int
+            ("Top-P", "topp", 10, 100, 90, 100),            # 0.1-1.0
+            ("Repe/Penalty", "rep", 100, 200, 110, 100),    # 1.0-2.0
+            ("Max new tokens", "maxt", 32, _max_tok_ceil, min(400, _max_tok_ceil), 1)
         ]
-        
-        slider_pad = ctk.CTkFrame(samp_card, fg_color="transparent")
-        slider_pad.pack(fill="x", padx=16, pady=16)
-        
-        for label, var, lo, hi, decimals in sliders:
-            self._make_slider(slider_pad, label, var, lo, hi, decimals)
 
-        # ── Footer Stats ──
-        ctk.CTkLabel(
-            scroll, text="Context: 512 / 512 tokens",
-            font=LABEL_SM, text_color=TEXT_DIM, anchor="w"
-        ).pack(anchor="w", padx=4, pady=(8, 4))
-        
-        stat_card = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=12)
-        stat_card.pack(fill="x", pady=(0, 10))
-        
-        s1 = ctk.CTkFrame(stat_card, fg_color="transparent")
-        s1.pack(fill="x", padx=12, pady=(10, 2))
-        ctk.CTkLabel(s1, text="●  Tokens/sec", font=LABEL_SM, text_color=TEXT_SECONDARY).pack(side="left")
-        ctk.CTkLabel(s1, text="314 ms  〰", font=LABEL_SM, text_color=TEXT_DIM).pack(side="right")
-        
-        s2 = ctk.CTkFrame(stat_card, fg_color="transparent")
-        s2.pack(fill="x", padx=12, pady=(2, 10))
-        ctk.CTkLabel(s2, text="●  Memory usage", font=LABEL_SM, text_color=TEXT_SECONDARY).pack(side="left")
-        ctk.CTkLabel(s2, text="1.4 GB RAM", font=LABEL_SM, text_color=TEXT_DIM).pack(side="right")
-
-        # ── Model Tab ──
-        m_scroll = ctk.CTkScrollableFrame(t_model, fg_color="transparent", scrollbar_button_color=BORDER)
-        m_scroll.pack(fill="both", expand=True, pady=4)
-        
-        self._section(m_scroll, "Model Architecture")
-        arch_card = ctk.CTkFrame(m_scroll, fg_color=BG_CARD, corner_radius=12)
-        arch_card.pack(fill="x", pady=(0, 12))
-        
-        a1 = ctk.CTkFrame(arch_card, fg_color="transparent")
-        a1.pack(fill="x", padx=16, pady=(12, 4))
-        ctk.CTkLabel(a1, text="Family", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        ctk.CTkLabel(a1, text="Llama 3 (Transformer)", font=LABEL, text_color=TEXT_DIM).pack(side="right")
-        
-        a2 = ctk.CTkFrame(arch_card, fg_color="transparent")
-        a2.pack(fill="x", padx=16, pady=(4, 12))
-        ctk.CTkLabel(a2, text="Parameters", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        ctk.CTkLabel(a2, text="8B", font=LABEL, text_color=TEXT_DIM).pack(side="right")
-        
-        self._section(m_scroll, "Execution")
-        exec_card = ctk.CTkFrame(m_scroll, fg_color=BG_CARD, corner_radius=12)
-        exec_card.pack(fill="x", pady=(0, 12))
-        
-        o1 = ctk.CTkFrame(exec_card, fg_color="transparent")
-        o1.pack(fill="x", padx=16, pady=(12, 4))
-        ctk.CTkLabel(o1, text="GPU Offload Layers", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        
-        self._offload_var = ctk.IntVar(value=32)
-        ctk.CTkSlider(exec_card, variable=self._offload_var, from_=0, to=40, button_color=TEXT_PRIMARY, button_hover_color="#ffffff", progress_color=ACCENT, height=12).pack(fill="x", padx=16, pady=4)
-        
-        o2 = ctk.CTkFrame(exec_card, fg_color="transparent")
-        o2.pack(fill="x", padx=16, pady=(4, 12))
-        ctk.CTkSwitch(o2, text="Auto-detect max VRAM", font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT, button_color=TEXT_PRIMARY).pack(side="left")
-
-        # ── Appearance Tab ──
-        a_scroll = ctk.CTkScrollableFrame(t_app, fg_color="transparent", scrollbar_button_color=BORDER)
-        a_scroll.pack(fill="both", expand=True, pady=4)
-        
-        self._section(a_scroll, "Theme Preferences")
-        theme_card = ctk.CTkFrame(a_scroll, fg_color=BG_CARD, corner_radius=12)
-        theme_card.pack(fill="x", pady=(0, 12))
-        
-        t1 = ctk.CTkFrame(theme_card, fg_color="transparent")
-        t1.pack(fill="x", padx=16, pady=(12, 8))
-        ctk.CTkLabel(t1, text="Color Mode", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        self._mode_var = ctk.StringVar(value="Dark")
-        ctk.CTkSegmentedButton(t1, variable=self._mode_var, values=["System", "Light", "Dark"], selected_color=ACCENT, selected_hover_color=ACCENT_HOVER, unselected_color=BG_CHAT, unselected_hover_color=BORDER).pack(side="right")
-        
-        t2 = ctk.CTkFrame(theme_card, fg_color="transparent")
-        t2.pack(fill="x", padx=16, pady=(8, 12))
-        ctk.CTkLabel(t2, text="UI Scale", font=LABEL, text_color=TEXT_PRIMARY).pack(side="left")
-        ctk.CTkLabel(t2, text="100%", font=LABEL, text_color=TEXT_DIM).pack(side="right")
-        
-        self._section(a_scroll, "Chat Display")
-        disp_card = ctk.CTkFrame(a_scroll, fg_color=BG_CARD, corner_radius=12)
-        disp_card.pack(fill="x", pady=(0, 12))
-        
-        d1 = ctk.CTkFrame(disp_card, fg_color="transparent")
-        d1.pack(fill="x", padx=16, pady=(12, 8))
-        self._ts_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(d1, text="Show message timestamps", variable=self._ts_var, font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
-
-        d2 = ctk.CTkFrame(disp_card, fg_color="transparent")
-        d2.pack(fill="x", padx=16, pady=(4, 12))
-        self._anim_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(d2, text="Enable UI animations", variable=self._anim_var, font=LABEL, text_color=TEXT_PRIMARY, progress_color=ACCENT).pack(side="left")
-
-        # ── About Tab ──
-        v_card = ctk.CTkFrame(t_abt, fg_color="transparent")
-        v_card.pack(fill="both", expand=True, pady=30)
-        
-        # Load app logo for About tab
-        from PIL import Image
-        import os
-        logo_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.ico")
+        for label, key, min_v, max_v, def_v, div in sliders:
+            row = QHBoxLayout()
+            l1 = QLabel(label)
+            l1.setFixedWidth(120)
+            l1.setFont(LABEL)
+            l1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)};")
             
-        try:
-            pil_img = Image.open(logo_path)
-            logo_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(64, 64))
-            ctk.CTkLabel(v_card, text="", image=logo_img).pack(pady=(0, 16))
-        except Exception:
-            # Fallback if image missing/corrupt
-            logo_ico = get_icon("box", size=(48, 48), color=ACCENT)
-            ctk.CTkLabel(v_card, text="", image=logo_ico).pack(pady=(0, 16))
+            sl = QSlider(Qt.Horizontal)
+            sl.setRange(min_v, max_v)
+            sl.setValue(def_v)
+            sl.setStyleSheet(f"""
+                QSlider::groove:horizontal {{
+                    border-radius: 2px;
+                    height: 4px;
+                    background: {resolve(BORDER)};
+                }}
+                QSlider::handle:horizontal {{
+                    background: {resolve(ACCENT)};
+                    width: 14px;
+                    height: 14px;
+                    margin: -5px 0;
+                    border-radius: 7px;
+                }}
+            """)
+            
+            val_lbl = QLabel(f"{def_v/div:.2f}" if div > 1 else str(def_v))
+            val_lbl.setFixedWidth(40)
+            val_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            val_lbl.setFont(LABEL)
+            val_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-weight: 500;")
+            
+            def make_updater(lbl, d):
+                return lambda v: lbl.setText(f"{v/d:.2f}" if d > 1 else str(v))
+            sl.valueChanged.connect(make_updater(val_lbl, div))
+            
+            row.addWidget(l1)
+            row.addWidget(sl)
+            row.addWidget(val_lbl)
+            samp_l.addLayout(row)
+            
+            self._sliders[key] = (sl, div)
+            
+        layout.addWidget(samp_card)
+        layout.addStretch(1)
+
+    def _build_model_tab(self):
+        tab, layout = self._create_scroll_tab()
+        self.tabs.addTab(tab, "Model")
         
-        ctk.CTkLabel(v_card, text="Dizel AI", font=LOGO, text_color=TEXT_PRIMARY).pack(pady=4)
-        ctk.CTkLabel(v_card, text="Version 1.0.0-beta", font=LABEL, text_color=TEXT_SECONDARY).pack()
+        def add_row(parent_layout, label_text, val_text):
+            row = QHBoxLayout()
+            l1 = QLabel(label_text)
+            l1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+            l2 = QLabel(val_text)
+            l2.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+            row.addWidget(l1)
+            row.addStretch(1)
+            row.addWidget(l2)
+            parent_layout.addLayout(row)
         
-        ctk.CTkLabel(v_card, text="A lightweight, localized LLM desktop interface.\nPowered by CustomTkinter.", font=LABEL, text_color=TEXT_DIM, justify="center").pack(pady=24)
+        self._section(layout, "MODEL ARCHITECTURE")
+        card = QFrame()
+        card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        card_l = QVBoxLayout(card)
+        card_l.setContentsMargins(16, 20, 16, 20)
         
-        def open_url(url="https://github.com/D4niel-dev/Dizel"): import webbrowser; webbrowser.open(url)
-
-        links_row = ctk.CTkFrame(v_card, fg_color="transparent")
-        links_row.pack(pady=8)
+        add_row(card_l, "Family", getattr(info, "ARCHITECTURE", "Transformer") if info else "Llama 3 (Transformer)")
+        add_row(card_l, "Parameters", getattr(info, "MODEL_SIZE", "Unknown") if info else "Unknown")
+        add_row(card_l, "Context Length", getattr(info, "CONTEXT_LENGTH", "Unknown") if info else "Unknown")
+        add_row(card_l, "Vocab Size", getattr(info, "VOCAB_SIZE", "Unknown") if info else "Unknown")
         
-        ctk.CTkButton(links_row, text="GitHub Repo", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER, width=120, command=lambda: open_url("https://github.com/D4niel-dev/Dizel")).pack(side="left", padx=6)
-        ctk.CTkButton(links_row, text="Documentation", fg_color=BG_CARD, border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, hover_color=BORDER, width=120, command=lambda: open_url("https://github.com/D4niel-dev/Dizel/blob/main/README.md")).pack(side="left", padx=6)
+        row_stats = QHBoxLayout()
+        l_stat = QLabel("Layers / Heads / Dim")
+        l_stat.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        v_stat = QLabel(f"{getattr(info, 'NUM_LAYERS', '?')} / {getattr(info, 'NUM_HEADS', '?')} / {getattr(info, 'HIDDEN_DIM', '?')}" if info else "?")
+        v_stat.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+        row_stats.addWidget(l_stat)
+        row_stats.addStretch(1)
+        row_stats.addWidget(v_stat)
+        card_l.addLayout(row_stats)
         
-        ctk.CTkButton(v_card, text="Report an Issue", fg_color="transparent", text_color=ACCENT, hover_color=BG_CARD, width=200, command=lambda: open_url("https://github.com/D4niel-dev/Dizel/issues")).pack(pady=8)
+        layout.addWidget(card)
+        
+        self._section(layout, "TRAINING DATA")
+        t_card = QFrame()
+        t_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        t_l = QVBoxLayout(t_card)
+        t_l.setContentsMargins(16, 20, 16, 20)
+        
+        add_row(t_l, "Dataset Composition", getattr(info, "TRAINING_DATA", "Unknown") if info else "Unknown")
+        add_row(t_l, "Corpus Size", getattr(info, "TRAIN_TOKENS", "Unknown") if info else "Unknown")
+        add_row(t_l, "Training Steps", getattr(info, "TRAIN_STEPS", "Unknown") if info else "Unknown")
+        
+        layout.addWidget(t_card)
+        
+        self._section(layout, "CAPABILITIES")
+        c_card = QFrame()
+        c_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        c_l = QVBoxLayout(c_card)
+        c_l.setContentsMargins(16, 20, 16, 20)
+        c_l.setSpacing(12)
+        
+        caps = getattr(info, "CAPABILITIES", []) if info else []
+        if not caps:
+            caps = ["Reasoning", "Structured Output"]
+            
+        for c in caps:
+            lbl = QLabel("• " + c)
+            lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 14px;")
+            c_l.addWidget(lbl)
+            
+        layout.addWidget(c_card)
+        layout.addStretch(1)
 
-        # ── Buttons ──
-        btn_row = ctk.CTkFrame(self, fg_color="transparent")
-        btn_row.pack(fill="x", padx=24, pady=16)
+    def _build_app_tab(self):
+        tab, layout = self._create_scroll_tab()
+        self.tabs.addTab(tab, "Appearance")
+        
+        toggle_qss = f"""
+            QCheckBox {{
+                color: {resolve(TEXT_PRIMARY)};
+                spacing: 12px;
+                font-size: 14px;
+            }}
+            QCheckBox::indicator {{
+                width: 36px;
+                height: 20px;
+                border-radius: 10px;
+                background-color: {resolve(BORDER)};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {resolve(ACCENT)};
+            }}
+        """
 
-        ctk.CTkButton(
-            btn_row, text="< Back", font=BTN_LABEL, width=80, fg_color="transparent",
-            border_width=1, border_color=BORDER, text_color=TEXT_PRIMARY, corner_radius=16,
-            hover_color=BORDER, command=self.destroy,
-        ).pack(side="left")
+        self._section(layout, "THEME PREFERENCES")
+        card = QFrame()
+        card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        card_l = QVBoxLayout(card)
+        card_l.setContentsMargins(16, 20, 16, 20)
+        card_l.setSpacing(16)
+        
+        row1 = QHBoxLayout()
+        ico1 = QLabel()
+        pm_ico = get_icon("moon", (18,18), TEXT_DIM)
+        if pm_ico: ico1.setPixmap(pm_ico.pixmap(18,18))
+        row1.addWidget(ico1)
+        
+        l1 = QLabel("  Color Mode")
+        l1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        row1.addWidget(l1)
+        row1.addStretch(1)
+        
+        self._theme_combo = QComboBox()
+        self._theme_combo.addItems(["System", "Light", "Dark", "Dark Blue"])
+        
+        combo_style = f"""
+            QComboBox {{
+                background: {resolve(BG_CHAT)}; 
+                color: {resolve(TEXT_PRIMARY)}; 
+                padding: 8px 12px; 
+                border-radius: 6px;
+                border: 1px solid {resolve(BORDER)};
+            }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox QAbstractItemView {{
+                background-color: {resolve(BG_CHAT)};
+                color: {resolve(TEXT_PRIMARY)};
+                selection-background-color: {resolve(ACCENT)};
+                selection-color: white;
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 4px;
+            }}
+        """
+        self._theme_combo.setStyleSheet(combo_style)
+        
+        def _theme_changed(idx):
+            mode = self._theme_combo.currentText().lower().replace(" ", "_")
+            Theme.set_mode(mode)
+        
+        self._theme_combo.currentIndexChanged.connect(_theme_changed)
+        row1.addWidget(self._theme_combo)
+        card_l.addLayout(row1)
+        
+        row2 = QHBoxLayout()
+        ico2 = QLabel()
+        fs_ico = get_icon("type", (18,18), TEXT_DIM)
+        if fs_ico: ico2.setPixmap(fs_ico.pixmap(18,18))
+        row2.addWidget(ico2)
+        
+        l2 = QLabel("  Font Scale")
+        l2.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        row2.addWidget(l2)
+        row2.addStretch(1)
+        
+        self._font_combo = QComboBox()
+        self._font_combo.addItems(["Small", "Medium", "Large"])
+        self._font_combo.setStyleSheet(combo_style)
+        row2.addWidget(self._font_combo)
+        card_l.addLayout(row2)
+        layout.addWidget(card)
+        
+        self._section(layout, "CHAT DISPLAY")
+        d_card = QFrame()
+        d_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        d_l = QVBoxLayout(d_card)
+        d_l.setContentsMargins(16, 20, 16, 20)
+        d_l.setSpacing(16)
+        
+        self._ts_chk = QCheckBox("Show message timestamps")
+        self._ts_chk.setStyleSheet(toggle_qss)
+        
+        self._anim_chk = QCheckBox("Enable UI animations")
+        self._anim_chk.setStyleSheet(toggle_qss)
+        
+        self._md_chk = QCheckBox("Syntax highlighting for code blocks")
+        self._md_chk.setStyleSheet(toggle_qss)
+        
+        self._send_chk = QCheckBox("Press Enter to send message")
+        self._send_chk.setStyleSheet(toggle_qss)
+        
+        d_l.addWidget(self._ts_chk)
+        d_l.addWidget(self._anim_chk)
+        d_l.addWidget(self._md_chk)
+        d_l.addWidget(self._send_chk)
+        layout.addWidget(d_card)
+        
+        self._section(layout, "MESSAGE BUBBLES")
+        b_card = QFrame()
+        b_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        b_l = QVBoxLayout(b_card)
+        b_l.setContentsMargins(16, 20, 16, 20)
+        
+        b_row = QHBoxLayout()
+        b_lbl = QLabel("Avatar Display")
+        b_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        b_row.addWidget(b_lbl)
+        b_row.addStretch(1)
+        
+        self._avatar_combo = QComboBox()
+        self._avatar_combo.addItems(["Show avatars", "Compact (names only)"])
+        self._avatar_combo.setStyleSheet(combo_style)
+        b_row.addWidget(self._avatar_combo)
+        b_l.addLayout(b_row)
+        layout.addWidget(b_card)
+        
+        layout.addStretch(1)
 
-        ctk.CTkButton(
-            btn_row, text="Close", font=BTN_LABEL, width=100, fg_color=ACCENT,
-            text_color="#ffffff", hover_color=ACCENT_HOVER, corner_radius=16,
-            command=self._save_and_reload,
-        ).pack(side="right")
+    def _build_about_tab(self):
+        tab, layout = self._create_scroll_tab()
+        self.tabs.addTab(tab, "About")
+        
+        # Logo & App Info Section
+        header = QFrame()
+        header.setStyleSheet("background: transparent; border: none;")
+        h_layout = QVBoxLayout(header)
+        h_layout.setAlignment(Qt.AlignCenter)
+        h_layout.setSpacing(12)
+        h_layout.setContentsMargins(0, 24, 0, 16)
+        
+        logo_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
+        if os.path.exists(logo_path):
+            lbl = QLabel()
+            lbl.setPixmap(QPixmap(logo_path).scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            h_layout.addWidget(lbl, alignment=Qt.AlignCenter)
+            
+        t1 = QLabel(getattr(info, "MODEL_NAME", "Dizel AI") + " CLI" if info else "Dizel AI")
+        t1.setFont(LOGO)
+        t1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 28px;")
+        h_layout.addWidget(t1, alignment=Qt.AlignCenter)
+        
+        v_str = getattr(info, 'VERSION', '1.0.0-beta')
+        b_str = getattr(info, 'BUILD', 'YYYY-MM-DD')
+        t2 = QLabel(f"Version {v_str} • Build {b_str}")
+        t2.setStyleSheet(f"color: {resolve(TEXT_SECONDARY)}; font-size: 14px; font-weight: 500;")
+        h_layout.addWidget(t2, alignment=Qt.AlignCenter)
+        
+        layout.addWidget(header)
 
-    def _section(self, parent, title: str) -> None:
-        ctk.CTkLabel(
-            parent, text=title, font=LABEL, text_color=TEXT_PRIMARY, anchor="w",
-        ).pack(anchor="w", padx=4, pady=(10, 6))
+        # Buttons (Updates, Debug info)
+        updates_row = QHBoxLayout()
+        updates_row.setAlignment(Qt.AlignCenter)
+        btn_update = QPushButton(" Check for Updates")
+        u_ico = get_icon("refresh-cw", (16,16), TEXT_PRIMARY)
+        if u_ico: btn_update.setIcon(u_ico)
+        btn_update.setFixedHeight(36)
+        btn_update.setFont(BTN_LABEL)
+        btn_update.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, TEXT_PRIMARY, radius=8))
+        btn_update.setCursor(Qt.PointingHandCursor)
+        updates_row.addWidget(btn_update)
+        layout.addLayout(updates_row)
+        layout.addSpacing(24)
 
-    def _make_slider(self, parent, label: str, var, lo, hi, decimals: int) -> None:
-        row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=6)
+        self._section(layout, "LINKS & COMMUNITY")
+        links_card = QFrame()
+        links_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        lc_lyt = QVBoxLayout(links_card)
+        lc_lyt.setContentsMargins(16, 20, 16, 20)
+        
+        def add_link_row(text, icon_name, link):
+            row = QHBoxLayout()
+            ico_lbl = QLabel()
+            ico = get_icon(icon_name, (18,18), TEXT_DIM)
+            if ico: ico_lbl.setPixmap(ico.pixmap(18,18))
+            row.addWidget(ico_lbl)
+            
+            lbl = QLabel("  " + text)
+            lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+            row.addWidget(lbl)
+            row.addStretch(1)
+            
+            link_lbl = QLabel(link)
+            link_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
+            row.addWidget(link_lbl)
+            lc_lyt.addLayout(row)
 
-        fmt = f".{decimals}f"
-        val_lbl = ctk.CTkLabel(
-            row, text=f"{var.get():{fmt}}", font=LABEL, text_color=TEXT_PRIMARY, width=40, anchor="e",
-        )
+        add_link_row("Official Website", "globe", "https://dizel.ai")
+        lc_lyt.addSpacing(16)
+        add_link_row("GitHub Repository", "github", getattr(info, 'REPOSITORY', 'github.com/d4niel-dev/dizel'))
+        lc_lyt.addSpacing(16)
+        add_link_row("Discord Community", "discord", "discord.gg/dizel")
+        layout.addWidget(links_card)
 
-        def _update(*args):
-            try:
-                val_lbl.configure(text=f"{var.get():{fmt}}")
-            except Exception:
-                pass
+        self._section(layout, "DATA & PRIVACY")
+        data_card = QFrame()
+        data_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        dc_lyt = QVBoxLayout(data_card)
+        dc_lyt.setContentsMargins(16, 20, 16, 20)
+        
+        dc_row1 = QHBoxLayout()
+        d_lbl = QLabel("Clear Local Data")
+        d_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        dc_row1.addWidget(d_lbl)
+        dc_row1.addStretch(1)
+        clr_btn = QPushButton("Clear Cache")
+        clr_btn.setStyleSheet(get_button_style("transparent", BORDER, "#FF4D4D", border_color=BORDER))
+        clr_btn.setFixedHeight(32)
+        clr_btn.setCursor(Qt.PointingHandCursor)
+        dc_row1.addWidget(clr_btn)
+        dc_lyt.addLayout(dc_row1)
+        
+        dc_lyt.addSpacing(16)
+        
+        dc_row2 = QHBoxLayout()
+        ack_lbl = QLabel("Acknowledgments")
+        ack_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        dc_row2.addWidget(ack_lbl)
+        dc_row2.addStretch(1)
+        ack_val = QLabel("PySide6 • PyTorch • HuggingFace")
+        ack_val.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
+        dc_row2.addWidget(ack_val)
+        dc_lyt.addLayout(dc_row2)
+        
+        layout.addWidget(data_card)
+        layout.addStretch(1)
 
-        var.trace_add("write", _update)
-
-        ctk.CTkLabel(
-            row, text=label, font=LABEL, text_color=TEXT_PRIMARY, anchor="w", width=140,
-        ).pack(side="left")
-
-        ctk.CTkSlider(
-            row, variable=var, from_=lo, to=hi, button_color=TEXT_PRIMARY,
-            button_hover_color="#ffffff", progress_color=ACCENT, command=lambda _: _update(),
-            height=12,
-        ).pack(side="left", fill="x", expand=True, padx=16)
-
-        val_lbl.pack(side="right")
-
-    # ── Data helpers ─────────────────────────────────────────────────────
-
-    def _load_current(self) -> None:
-        """Pre-populate fields from current ChatManager state & persistent config."""
+    def _load_current(self):
         cfg = ConfigManager.load()
+        self._ckpt_edit.setText(cfg.get("checkpoint", ""))
         
-        # Checkpoint is an app-level thing, so we load it from config
-        self._ckpt_var.set(cfg.get("checkpoint", ""))
-        self._device_var.set(self._mgr._device or cfg.get("device", "cpu"))
+        # Load from chat_mgr if available
+        mgr_dev = getattr(self._mgr, "_device", cfg.get("device", "cpu"))
+        if mgr_dev == "cuda": self._device_combo.setCurrentIndex(1)
+        else: self._device_combo.setCurrentIndex(0)
         
-        self._temp_var.set(self._mgr.temperature)
-        self._topk_var.set(self._mgr.top_k)
-        self._topp_var.set(self._mgr.top_p)
-        self._rep_var.set(self._mgr.repetition_penalty)
-
-        # Clamp max_new_tokens to the model-derived ceiling
-        _info = self._mgr.model_info if self._mgr.is_ready else {}
-        _ctx  = _info.get("ctx_len", 512)
-        _ceil = max(_ctx - 50, 64)
-        self._maxt_var.set(min(self._mgr.max_new_tokens, _ceil))
-
-        self._sys_box.delete("0.0", "end")
-        self._sys_box.insert("0.0", self._mgr.system_prompt)
-
-        # Load appearance defaults
+        self._sys_box.setPlainText(getattr(self._mgr, "system_prompt", cfg.get("system_prompt", "")))
+        
+        # Load sliders
+        def set_val(key, val):
+            sl, div = self._sliders[key]
+            sl.setValue(int(val * div))
+            
+        set_val("temp", getattr(self._mgr, "temperature", 0.7))
+        set_val("topk", getattr(self._mgr, "top_k", 40))
+        set_val("topp", getattr(self._mgr, "top_p", 0.90))
+        set_val("rep", getattr(self._mgr, "repetition_penalty", 1.10))
+        
+        maxt = getattr(self._mgr, "max_new_tokens", 400)
+        maxt_sl, maxt_div = self._sliders["maxt"]
+        maxt_sl.setValue(min(maxt, maxt_sl.maximum()))
+        
         app_cfg = cfg.get("appearance", {})
-        self._mode_var.set(app_cfg.get("color_mode", "Dark"))
-        self._ts_var.set(app_cfg.get("show_timestamps", True))
-        self._anim_var.set(app_cfg.get("animations", True))
+        cm = app_cfg.get("color_mode", "system").lower().replace(" ", "_")
+        if cm == "system":
+            self._theme_combo.setCurrentIndex(0)
+        elif cm == "light":
+            self._theme_combo.setCurrentIndex(1)
+        elif cm == "dark_blue":
+            self._theme_combo.setCurrentIndex(3)
+        else:
+            self._theme_combo.setCurrentIndex(2)
+            
+        self._ts_chk.setChecked(app_cfg.get("show_timestamps", True))
+        self._anim_chk.setChecked(app_cfg.get("animations", True))
+        self._md_chk.setChecked(app_cfg.get("syntax_highlighting", True))
+        self._send_chk.setChecked(app_cfg.get("enter_to_send", True))
+        
+        font_idx = self._font_combo.findText(app_cfg.get("font_scale", "Medium"))
+        if font_idx >= 0: self._font_combo.setCurrentIndex(font_idx)
+        
+        av_idx = self._avatar_combo.findText(app_cfg.get("avatar_display", "Show avatars"))
+        if av_idx >= 0: self._avatar_combo.setCurrentIndex(av_idx)
 
-    def _apply_to_manager(self) -> None:
-        """Write UI values into the ChatManager and persist to disk via ConfigManager."""
-        self._mgr.temperature        = round(self._temp_var.get(), 2)
-        self._mgr.top_k              = int(self._topk_var.get())
-        self._mgr.top_p              = round(self._topp_var.get(), 2)
-        self._mgr.repetition_penalty = round(self._rep_var.get(), 2)
-        self._mgr.max_new_tokens     = int(self._maxt_var.get())
-        self._mgr.system_prompt      = self._sys_box.get("0.0", "end").strip()
-        self._mgr._device            = self._device_var.get()
+    def _apply_to_manager(self):
+        # Update settings to memory object if needed
+        self._mgr.temperature = self._sliders["temp"][0].value() / self._sliders["temp"][1]
+        self._mgr.top_k = self._sliders["topk"][0].value()
+        self._mgr.top_p = self._sliders["topp"][0].value() / self._sliders["topp"][1]
+        self._mgr.repetition_penalty = self._sliders["rep"][0].value() / self._sliders["rep"][1]
+        self._mgr.max_new_tokens = self._sliders["maxt"][0].value()
+        self._mgr.system_prompt = self._sys_box.toPlainText().strip()
+        self._mgr._device = self._device_combo.currentText()
         
-        # Persist to disk
         cfg = ConfigManager.load()
-        cfg["device"] = self._device_var.get()
-        
-        ckpt = self._ckpt_var.get().strip()
+        cfg["device"] = self._device_combo.currentText()
+        ckpt = self._ckpt_edit.text().strip()
         if ckpt:
             cfg["checkpoint"] = ckpt
             
@@ -439,36 +634,26 @@ class SettingsDialog(ctk.CTkToplevel):
             "max_new_tokens": self._mgr.max_new_tokens,
         }
         cfg["appearance"] = {
-            "color_mode": self._mode_var.get(),
-            "show_timestamps": self._ts_var.get(),
-            "animations": self._anim_var.get(),
+            "color_mode": self._theme_combo.currentText(),
+            "show_timestamps": self._ts_chk.isChecked(),
+            "animations": self._anim_chk.isChecked(),
+            "syntax_highlighting": self._md_chk.isChecked(),
+            "enter_to_send": self._send_chk.isChecked(),
+            "font_scale": self._font_combo.currentText(),
+            "avatar_display": self._avatar_combo.currentText(),
         }
         ConfigManager.save(cfg)
-        
-        # Apply appearance mode instantly
-        ctk.set_appearance_mode(self._mode_var.get())
 
-    def _browse_checkpoint(self) -> None:
-        path = filedialog.askopenfilename(
-            title="Select Dizel checkpoint",
-            filetypes=[("PyTorch checkpoint", "*.pt"), ("All files", "*.*")],
-        )
+    def _browse_checkpoint(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Select Dizel checkpoint", "", "PyTorch checkpoint (*.pt);;All files (*.*)")
         if path:
-            self._ckpt_var.set(path)
+            self._ckpt_edit.setText(path)
 
-    def _save_only(self) -> None:
+    def _save_and_reload(self):
         self._apply_to_manager()
-        ckpt = self._ckpt_var.get().strip()
+        ckpt = self._ckpt_edit.text().strip()
         if ckpt:
-            self._mgr._device = self._device_var.get()
-        self.destroy()
-
-    def _save_and_reload(self) -> None:
-        self._apply_to_manager()
-        ckpt = self._ckpt_var.get().strip()
-        if ckpt:
-            # Store new checkpoint path so on_reload can pick it up
             self._mgr._pending_checkpoint = ckpt
-            self._mgr._device             = self._device_var.get()
-        self.destroy()
+            self._mgr._device = self._device_combo.currentText()
+        self.accept()
         self._on_reload()

@@ -24,10 +24,9 @@ class ConfigManager:
         "checkpoint": "",
         "device": "cpu",
         "system_prompt": (
-            "You are Dizel, a structured analytical AI model. "
-            "Prioritize clarity, precision, and logical organization. "
-            "Avoid unnecessary verbosity. "
-            "If uncertain, explicitly state limitations."
+            "You are Dizel, a highly capable, intelligent, and helpful AI assistant. "
+            "You answer thoughtfully, concisely, and accurately. "
+            "You use formatting like markdown to organize your thoughts and provide clear, structured text."
         ),
         "sampling": {
             "temperature": 0.4,
@@ -35,6 +34,13 @@ class ConfigManager:
             "top_p": 0.92,
             "repetition_penalty": 1.15,
             "max_new_tokens": 200,
+        },
+        "appearance": {
+            "theme": "dark"
+        },
+        "user_profile": {
+            "username": "User",
+            "avatar": ""
         }
     }
 

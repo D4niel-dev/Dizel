@@ -3,36 +3,37 @@
 ## Model CLI
 APP_NAME = "Dizel CLI"
 MODEL_NAME = "Dizel"
-VERSION = "v1.0.0"
-MODEL_SIZE = "8.8M parameters"
-CONTEXT_LENGTH = "256 Tokens"
-VOCAB_SIZE = "16,000 tokens"
+VERSION = "v1.2.0"
+MODEL_SIZE = "284M parameters"
+CONTEXT_LENGTH = "4096 Tokens"
+VOCAB_SIZE = "32,000 tokens"
 AUTHOR = "D4niel-dev"
-DESCRIPTION = "A Structured Analytical LLM"
+DESCRIPTION = "A Structured Analytical Reasoning & Math LLM"
 
 ## Model Architecture
-ARCHITECTURE = "Transformer"
-NUM_LAYERS = 6
-NUM_HEADS = 4
-HIDDEN_DIM = 256
-MLP_SIZE = 1024
-DROPOUT = 0.3
+ARCHITECTURE = "Transformer (RoPE)"
+NUM_LAYERS = 20
+NUM_HEADS = 16
+HIDDEN_DIM = 1024
+MLP_SIZE = 4096
+DROPOUT = 0.05
 CAPABILITIES = {
     "Reasoning",
     "Structured JSON Output",
     "Step-by-steps Analysis (WIP)",
-    "Tool-ready Responses (Planned)"
+    "Tool-ready Responses (Planned)",
+    "Extended Context (4096 tokens)",
 }
 
 ## Model Training Data
-TRAINING_DATA = "Mixed Web + Synthetic Reasoning"
-TRAIN_TOKENS = "50M Tokens"
-TRAIN_STEPS = "4000 ~ 5000"
+TRAINING_DATA = "Mixed Web + Synthetic Reasoning + Code"
+TRAIN_TOKENS = "TBD"
+TRAIN_STEPS = "TBD"
 
 ## Model Defaults
 DEFAULT_TEMPERATURE = 0.8
 DEFAULT_TOP_P = 0.9
-DEFAULT_MAX_TOKENS = 256
+DEFAULT_MAX_TOKENS = 400
 SPECIAL_TOKENS = {
     "bos": 1,
     "eos": 2,
@@ -42,4 +43,4 @@ SPECIAL_TOKENS = {
 ## Model Others
 REPOSITORY = "https://github.com/d4niel-dev/dizel"
 LICENSE = "MIT"
-BUILD = "2026-03-08"
+BUILD = "2026-04-16"

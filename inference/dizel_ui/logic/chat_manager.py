@@ -73,10 +73,9 @@ def _lazy_import() -> None:
 # Default system prompt
 # ---------------------------------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are Dizel, a structured analytical AI model. "
-    "Prioritize clarity, precision, and logical organization. "
-    "Avoid unnecessary verbosity. "
-    "If uncertain, explicitly state limitations."
+    "You are Dizel, a highly capable, intelligent, and helpful AI assistant. "
+    "You answer thoughtfully, concisely, and accurately. "
+    "You use formatting like markdown to organize your thoughts and provide clear, structured text."
 )
 
 
@@ -163,13 +162,62 @@ class ChatManager:
         model_cfg = ckpt.get("model_cfg", _CONFIG.model)
 
         _report("Building model…")
-        model = _DizelLM(model_cfg).to(device)
-        model.load_state_dict(ckpt["model_state"])
+        state_dict = ckpt["model_state"]
+        cleaned = {k.replace("_orig_mod.", ""): v for k, v in state_dict.items()}
+
+        # Detect checkpoint version: v1.1 has pos_emb, v1.2 uses RoPE
+        is_legacy = "transformer.pos_emb.weight" in cleaned
+
+        if is_legacy:
+            _report("Detected v1.1 checkpoint (learned pos_emb) — loading in legacy mode…")
+            # Add pos_emb to the model so the state_dict can load
+            pos_emb_weight = cleaned["transformer.pos_emb.weight"]
+            ctx_len, d_model = pos_emb_weight.shape
+
+            model = _DizelLM(model_cfg).to(device)
+            # Register the missing parameter so load_state_dict succeeds
+            model.transformer["pos_emb"] = _torch.nn.Embedding(ctx_len, d_model).to(device)
+
+            model.load_state_dict(cleaned)
+
+            # Monkey-patch forward to ADD pos_emb to token embeddings (v1.1 behavior)
+            _original_forward = model.forward
+            def _legacy_forward(idx, targets=None, loss_mask=None):
+                B, T = idx.shape
+                tok = model.transformer["tok_emb"](idx)
+                pos = model.transformer["pos_emb"](_torch.arange(T, device=idx.device))
+                x = model.transformer["emb_drop"](tok + pos)
+                for block in model.transformer["blocks"]:
+                    x = block(x)
+                x = model.transformer["ln_f"](x)
+                logits = model.lm_head(x)
+                if targets is None:
+                    return logits, None
+                loss = _torch.nn.functional.cross_entropy(
+                    logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1
+                )
+                return logits, loss
+            model.forward = _legacy_forward
+        else:
+            _report("Detected v1.2 checkpoint (RoPE) — loading normally…")
+            model = _DizelLM(model_cfg).to(device)
+            model.load_state_dict(cleaned)
+
         model.eval()
 
         _report("Loading tokenizer…")
-        tokenizer_path = os.path.join(_ROOT_DIR, _CONFIG.tokenizer.model_path)
-        tokenizer = _Tokenizer(model_path=tokenizer_path)
+        # Prefer embedded tokenizer from checkpoint (guarantees vocab match)
+        if "tokenizer_model" in ckpt:
+            import tempfile
+            tok_bytes = ckpt["tokenizer_model"]
+            tok_tmp = os.path.join(os.path.dirname(checkpoint_path), "_embedded_tokenizer.model")
+            with open(tok_tmp, "wb") as f:
+                f.write(tok_bytes)
+            tokenizer = _Tokenizer(model_path=tok_tmp)
+            _report(f"Using embedded tokenizer (vocab={len(tokenizer)})")
+        else:
+            tokenizer_path = os.path.join(_ROOT_DIR, _CONFIG.tokenizer.model_path)
+            tokenizer = _Tokenizer(model_path=tokenizer_path)
 
         with self._lock:
             self._model     = model
@@ -222,12 +270,38 @@ class ChatManager:
 
     # ── Message sending ────────────────────────────────────────────────
 
+    def regenerate_last(
+        self,
+        on_token:    Callable[[str], None],
+        on_done:     Callable[[str], None],
+        on_error:    Callable[[str], None],
+    ) -> None:
+        """Regenerate the last prompt by popping the assistant message."""
+        if not self.history:
+            on_error("History is empty.")
+            return
+
+        # Pop any trailing assistant messages
+        while self.history and self.history[-1].get("role") == "assistant":
+            self.history.pop()
+
+        if not self.history or self.history[-1].get("role") != "user":
+            on_error("Last message is not from the user.")
+            return
+
+        last_user_msg = self.history.pop()
+        user_text = last_user_msg.get("content", "")
+        attachments = last_user_msg.get("attachments", [])
+
+        self.send_message(user_text, attachments, on_token, on_done, on_error)
+
     def send_message(
         self,
-        user_text:  str,
-        on_token:   Callable[[str], None],
-        on_done:    Callable[[str], None],
-        on_error:   Callable[[str], None],
+        user_text:   str,
+        attachments: List[str],
+        on_token:    Callable[[str], None],
+        on_done:     Callable[[str], None],
+        on_error:    Callable[[str], None],
     ) -> None:
         """
         Send a user message and generate a response asynchronously.
@@ -245,7 +319,7 @@ class ChatManager:
 
         thread = threading.Thread(
             target=self._generate_worker,
-            args=(user_text, on_token, on_done, on_error),
+            args=(user_text, attachments, on_token, on_done, on_error),
             daemon=True,
         )
         thread.start()
@@ -256,13 +330,13 @@ class ChatManager:
 
     # ── Internal generation ────────────────────────────────────────────
 
-    def _build_prompt_ids(self) -> list:
+    def _build_prompt_ids(self, history_subset=None) -> list:
         """
         Build the full token id sequence for the current conversation.
         Follows the same format as inference/chat.py.
         """
         ids = []
-        messages = [{"role": "system", "content": self.system_prompt}] + self.history
+        messages = [{"role": "system", "content": self.system_prompt}] + (history_subset if history_subset is not None else self.history)
         for msg in messages:
             role    = msg["role"]
             content = msg["content"]
@@ -274,14 +348,15 @@ class ChatManager:
         return ids
 
     def _trim_history_if_needed(self, prompt_ids: list, effective_max: int) -> list:
-        """If the prompt is too long, drop the oldest turns."""
+        """If the prompt is too long, drop the oldest turns from the prompt only (preserves self.history)."""
         ctx = self._model.cfg.context_length
         # Ensure we always reserve at least 16 tokens for the prompt
         max_allowed = max(ctx - effective_max - 10, 16)
         print(f"[ChatManager] max_allowed={max_allowed} (ctx={ctx}, effective_max={effective_max})", flush=True)
 
+        local_history = list(self.history)
         prev_len = -1
-        while len(prompt_ids) > max_allowed and len(self.history) > 2:
+        while len(prompt_ids) > max_allowed and len(local_history) > 2:
             # Guard against infinite loop when history can't be trimmed further
             if len(prompt_ids) == prev_len:
                 print(f"[ChatManager] WARNING: Cannot trim history further, hard-truncating prompt from {len(prompt_ids)} to {max_allowed} tokens.", flush=True)
@@ -289,23 +364,25 @@ class ChatManager:
                 prompt_ids = prompt_ids[-max_allowed:]
                 break
             prev_len = len(prompt_ids)
-            self.history = self.history[-4:]
-            prompt_ids   = self._build_prompt_ids()
+            # Drop the oldest 2 messages (one user, one assistant exchange)
+            local_history = local_history[2:]
+            prompt_ids   = self._build_prompt_ids(local_history)
 
         # Final safety: never return an empty prompt
         if not prompt_ids:
             print("[ChatManager] ERROR: prompt_ids is empty after trimming! Rebuilding.", flush=True)
-            self.history = self.history[-2:]  # Keep only last exchange
-            prompt_ids = self._build_prompt_ids()
+            local_history = self.history[-2:] if len(self.history) >= 2 else self.history
+            prompt_ids = self._build_prompt_ids(local_history)
 
         return prompt_ids
 
     def _generate_worker(
         self,
-        user_text: str,
-        on_token:  Callable[[str], None],
-        on_done:   Callable[[str], None],
-        on_error:  Callable[[str], None],
+        user_text:   str,
+        attachments: List[str],
+        on_token:    Callable[[str], None],
+        on_done:     Callable[[str], None],
+        on_error:    Callable[[str], None],
     ) -> None:
         """Background thread: runs generation and fires callbacks."""
         import time
@@ -323,7 +400,10 @@ class ChatManager:
                 print(f"[ChatManager] Clamped max_new_tokens from {self.max_new_tokens} → {effective_max} (ctx={ctx})", flush=True)
 
             # Add user turn to history
-            self.history.append({"role": "user", "content": user_text})
+            msg_dict = {"role": "user", "content": user_text}
+            if attachments:
+                msg_dict["attachments"] = attachments
+            self.history.append(msg_dict)
             print(f"[ChatManager] Generating response for: {user_text[:60]}...", flush=True)
 
             prompt_ids  = self._build_prompt_ids()
@@ -403,7 +483,15 @@ class ChatManager:
                     idx = _torch.cat([idx, next_id], dim=1)
 
                     # Decode piece and stream it
-                    piece = self._tokenizer.sp.id_to_piece(tid).replace("▁", " ")
+                    piece = self._tokenizer.sp.id_to_piece(tid)
+                    # Convert SentencePiece byte tokens (e.g. <0x0A> → \n)
+                    if piece.startswith("<0x") and piece.endswith(">"):
+                        try:
+                            byte_val = int(piece[3:-1], 16)
+                            piece = chr(byte_val)
+                        except (ValueError, OverflowError):
+                            pass
+                    piece = piece.replace("▁", " ")
                     # Filter out special tokens leaking into output
                     if piece in ("<unk>", "⁇"):
                         continue
@@ -445,8 +533,77 @@ class ChatManager:
             self._stop_requested = False
             print("[ChatManager] Generation finished, _is_generating = False", flush=True)
 
+    # ── Tool-augmented generation ──────────────────────────────────────
+
+    def send_message_with_tools(
+        self,
+        augmented_text: str,
+        deep_think:     bool,
+        attachments:    List[str],
+        on_token,
+        on_done,
+        on_error,
+    ) -> None:
+        """
+        Send a message with tool-augmented context.
+
+        If Deep Think is active, temporarily overrides generation params
+        (higher max_new_tokens, lower temperature). Params are restored
+        after generation completes.
+        """
+        if not deep_think:
+            self.send_message(augmented_text, attachments, on_token, on_done, on_error)
+            return
+
+        # Save originals
+        from core.generation_modes import get_deep_think_overrides
+        overrides = get_deep_think_overrides()
+
+        orig_max   = self.max_new_tokens
+        orig_temp  = self.temperature
+        orig_topk  = self.top_k
+        orig_topp  = self.top_p
+        orig_sys   = self.system_prompt
+
+        # Apply overrides
+        if overrides.max_new_tokens is not None:
+            self.max_new_tokens = overrides.max_new_tokens
+        if overrides.temperature is not None:
+            self.temperature = overrides.temperature
+        if overrides.top_k is not None:
+            self.top_k = overrides.top_k
+        if overrides.top_p is not None:
+            self.top_p = overrides.top_p
+        if overrides.system_addendum:
+            self.system_prompt += overrides.system_addendum
+
+        print(
+            f"[ChatManager] Deep Think ON: max_tokens={self.max_new_tokens}, "
+            f"temp={self.temperature}, top_k={self.top_k}",
+            flush=True,
+        )
+
+        def _restore():
+            self.max_new_tokens = orig_max
+            self.temperature    = orig_temp
+            self.top_k          = orig_topk
+            self.top_p          = orig_topp
+            self.system_prompt  = orig_sys
+            print("[ChatManager] Deep Think params restored", flush=True)
+
+        def on_done_wrapper(full_text):
+            _restore()
+            on_done(full_text)
+
+        def on_error_wrapper(msg):
+            _restore()
+            on_error(msg)
+
+        self.send_message(augmented_text, attachments, on_token, on_done_wrapper, on_error_wrapper)
+
 
 # ---------------------------------------------------------------------------
 # __init__
 # ---------------------------------------------------------------------------
 __all__ = ["ChatManager", "SYSTEM_PROMPT"]
+

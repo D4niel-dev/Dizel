@@ -1,20 +1,20 @@
 """
 model/architecture.py — Dizel causal Transformer (GPT-style).
 
-Architecture highlights
------------------------
-* Learned positional embeddings (simple, stable for short contexts)
+Architecture highlights (v1.2)
+-----------------------------
+* Rotary Positional Embeddings (RoPE) — applied to Q and K in attention
 * Pre-LayerNorm (applied before attention/MLP, not after)
 * Causal self-attention with optional flash-attention fallback
 * GELU-activated MLP (two linear layers + gelu)
 * Weight tying between token embedding and LM head
 * No biases by default (reduces parameter count, marginally better)
-* Dropout for overfitting mitigation on small datasets
+* Dropout for overfitting mitigation
 
-Parameter budget (defaults from config.py)
--------------------------------------------
-  vocab=8000, d_model=384, n_layers=6, n_heads=6
-  ≈ 20 M parameters  →  fits in ~400 MB GPU RAM (fp32) / ~200 MB (fp16)
+Parameter budget (v1.2 defaults from config.py)
+------------------------------------------------
+  vocab=32000, d_model=1024, n_layers=20, n_heads=16
+  ≈ 252 M parameters  →  fits in ~2 GB GPU RAM (fp16)
 """
 
 import math
@@ -27,6 +27,7 @@ from typing import Optional
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import ModelConfig
+from model.rope import RotaryPositionalEmbedding
 
 
 # ---------------------------------------------------------------------------
@@ -34,11 +35,11 @@ from config import ModelConfig
 # ---------------------------------------------------------------------------
 class CausalSelfAttention(nn.Module):
     """
-    Multi-head causal (masked) self-attention.
+    Multi-head causal (masked) self-attention with RoPE.
 
     Uses PyTorch's scaled_dot_product_attention when available (PyTorch >= 2.0),
-    which automatically dispatches to Flash Attention on supported hardware,
-    giving a significant speed and memory improvement.
+    which automatically dispatches to Flash Attention on supported hardware.
+    RoPE is applied to Q and K after projection, before attention computation.
     """
 
     def __init__(self, cfg: ModelConfig) -> None:
@@ -58,6 +59,13 @@ class CausalSelfAttention(nn.Module):
         # Dropout after attention softmax and after output projection
         self.attn_drop = nn.Dropout(cfg.dropout)
         self.resid_drop = nn.Dropout(cfg.dropout)
+
+        # RoPE (replaces learned positional embeddings)
+        self.rope = RotaryPositionalEmbedding(
+            dim=self.head_dim,
+            max_seq_len=cfg.context_length * 2,
+            base=cfg.rope_base,
+        )
 
         # Detect whether scaled_dot_product_attention is available
         self._use_sdpa = hasattr(F, "scaled_dot_product_attention")
@@ -82,6 +90,9 @@ class CausalSelfAttention(nn.Module):
             return t.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
 
         q, k, v = reshape(q), reshape(k), reshape(v)
+
+        # ── Apply RoPE to Q and K ─────────────────────────────────────────────
+        q, k = self.rope(q, k, seq_len=T)
 
         # ── Attention ─────────────────────────────────────────────────────
         if self._use_sdpa:
@@ -162,7 +173,7 @@ class TransformerBlock(nn.Module):
 # ---------------------------------------------------------------------------
 class DizelLM(nn.Module):
     """
-    Dizel: A tiny causal language model (~20 M parameters).
+    Dizel: A causal language model (~252 M parameters, v1.2).
 
     Forward pass
     ------------
@@ -182,11 +193,9 @@ class DizelLM(nn.Module):
         self.transformer = nn.ModuleDict({
             # Token embedding table
             "tok_emb": nn.Embedding(cfg.vocab_size, cfg.d_model),
-            # Learnable positional embedding (one vector per position)
-            "pos_emb": nn.Embedding(cfg.context_length, cfg.d_model),
-            # Input dropout (applied to embedding sum)
+            # Input dropout (applied to token embeddings)
             "emb_drop": nn.Dropout(cfg.dropout),
-            # Stack of transformer blocks
+            # Stack of transformer blocks (RoPE is inside each attention layer)
             "blocks": nn.ModuleList([
                 TransformerBlock(cfg) for _ in range(cfg.n_layers)
             ]),
@@ -236,14 +245,9 @@ class DizelLM(nn.Module):
         assert T <= self.cfg.context_length, \
             f"Input length {T} exceeds context_length {self.cfg.context_length}"
 
-        device = idx.device
-
-        # Token + positional embeddings
+        # Token embedding only — RoPE provides positional information inside attention
         tok = self.transformer["tok_emb"](idx)                   # (B, T, d_model)
-        pos = self.transformer["pos_emb"](
-            torch.arange(T, device=device)
-        )                                                         # (T, d_model)
-        x = self.transformer["emb_drop"](tok + pos)
+        x = self.transformer["emb_drop"](tok)
 
         # Transformer blocks
         for block in self.transformer["blocks"]:
@@ -374,7 +378,7 @@ class DizelLM(nn.Module):
 if __name__ == "__main__":
     from config import ModelConfig
 
-    cfg = ModelConfig(vocab_size=8000, d_model=384, n_layers=6, n_heads=6)
+    cfg = ModelConfig()
     model = DizelLM(cfg)
     print(model)
 

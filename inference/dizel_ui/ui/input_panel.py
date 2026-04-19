@@ -1,409 +1,697 @@
-"""
-dizel_ui/ui/input_panel.py
-───────────────────────────
-Bottom input panel containing:
-  • Multiline CTkTextbox (Enter = send, Shift+Enter = newline)
-  • Send button with icon
-  • Stop button (shown while generating)
-  • Character / token counter label
-  • Typing placeholder text
-"""
+# dizel_ui/ui/input_panel.py
 
-import tkinter as tk
-import customtkinter as ctk
-from typing import Callable
+import os
+from PySide6.QtWidgets import (QFrame, QTextEdit, QVBoxLayout, QHBoxLayout, 
+                               QPushButton, QLabel, QScrollArea, QWidget, QSizePolicy)
+from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QTimer
+from PySide6.QtGui import QIcon, QPixmap, QKeyEvent
 
 from dizel_ui.utils.icons import get_icon
-from ..theme.colors import (
+from dizel_ui.theme.colors import (
     BG_INPUT, BG_INPUT_FIELD, SEND_BTN, SEND_BTN_HOVER,
     BORDER, BORDER_FOCUS, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
-    ACCENT, ACCENT_HOVER, WELCOME_CARD_HOVER
+    ACCENT, ACCENT_HOVER, WELCOME_CARD_HOVER, resolve
 )
-from ..theme.fonts import INPUT_TEXT, BTN_LABEL, LABEL_DIM
+from dizel_ui.theme.fonts import INPUT_TEXT, BTN_LABEL, LABEL_DIM, NAV_ITEM
+from dizel_ui.theme.stylesheets import get_frame_style, get_button_style, get_scrollbar_style
+from dizel_ui.ui.action_menu import ActionMenu
+from dizel_ui.ui.animated_button import AnimatedIconButton
+
+class ModelSelectorPopup(QFrame):
+    selected = Signal(str)
+    
+    def __init__(self, current: str, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedWidth(200)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        
+        container = QFrame(self)
+        base_style = get_frame_style(BG_INPUT, radius=12, border_color=BORDER)
+        container.setStyleSheet(base_style + "\nQLabel { border: none; background: transparent; }")
+        c_layout = QVBoxLayout(container)
+        c_layout.setContentsMargins(6, 6, 6, 6)
+        c_layout.setSpacing(4)
+        
+        # Format: Name, Icon
+        models = [
+            ("Dizel Lite", "zap"),
+            ("Dizel Pro", "cpu"),
+            ("Mila Lite", "zap"),
+            ("Mila Pro", "cpu")
+        ]
+        for name, ico_name in models:
+            btn = QPushButton(container)
+            btn.setFixedHeight(36)
+            is_active = (name == current)
+            
+            b_layout = QHBoxLayout(btn)
+            b_layout.setContentsMargins(10, 0, 10, 0)
+            b_layout.setSpacing(10)
+            
+            c_text = resolve(ACCENT) if is_active else resolve(TEXT_PRIMARY)
+            
+            # Icon
+            ico_lbl = QLabel(btn)
+            i_obj = get_icon(ico_name, size=(16, 16), color=ACCENT if is_active else TEXT_DIM)
+            if i_obj: ico_lbl.setPixmap(i_obj.pixmap(16, 16))
+            ico_lbl.setStyleSheet("background: transparent;")
+            b_layout.addWidget(ico_lbl)
+            
+            # Text
+            t_lbl = QLabel(name, btn)
+            t_lbl.setFont(NAV_ITEM)
+            t_lbl.setStyleSheet(f"color: {c_text}; background: transparent;")
+            b_layout.addWidget(t_lbl)
+            
+            b_layout.addStretch(1)
+            
+            # Checkmark
+            if is_active:
+                chk = QLabel(btn)
+                c_obj = get_icon("check", size=(16, 16), color=ACCENT)
+                if c_obj: chk.setPixmap(c_obj.pixmap(16, 16))
+                chk.setStyleSheet("background: transparent;")
+                b_layout.addWidget(chk)
+            
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                    border-radius: 8px;
+                }}
+                QPushButton:hover {{
+                    background-color: {resolve(WELCOME_CARD_HOVER)};
+                }}
+            """)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked, n=name: self._on_choose(n))
+            c_layout.addWidget(btn)
+            
+        layout.addWidget(container)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setWindowOpacity(0.0)
+        self._anim = QPropertyAnimation(self, b"windowOpacity")
+        self._anim.setDuration(150)
+        self._anim.setStartValue(0.0)
+        self._anim.setEndValue(1.0)
+        self._anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._anim.start()
+
+    def _on_choose(self, name):
+        self.selected.emit(name)
+        self._out_anim = QPropertyAnimation(self, b"windowOpacity")
+        self._out_anim.setDuration(100)
+        self._out_anim.setStartValue(self.windowOpacity())
+        self._out_anim.setEndValue(0.0)
+        self._out_anim.finished.connect(lambda: self.close())
+        self._out_anim.start()
+
+class ModelModePopup(QFrame):
+    selected = Signal(str)
+    
+    def __init__(self, current: str, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedWidth(320)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
+        
+        container = QFrame(self)
+        base_style = get_frame_style(BG_INPUT, radius=12, border_color=BORDER)
+        container.setStyleSheet(base_style + "\nQLabel { border: none; background: transparent; }")
+        c_layout = QVBoxLayout(container)
+        c_layout.setContentsMargins(6, 6, 6, 6)
+        c_layout.setSpacing(4)
+        
+        # Format: Name, Icon, Description
+        modes = [
+            ("Fast", "zap", "For standard queries and chat"),
+            ("Planning", "command", "Deep analytical thinking and planning")
+        ]
+        for name, ico_name, desc in modes:
+            btn = QPushButton(container)
+            btn.setFixedHeight(48)
+            is_active = (name == current)
+            
+            b_layout = QHBoxLayout(btn)
+            b_layout.setContentsMargins(10, 8, 10, 8)
+            b_layout.setSpacing(12)
+            
+            c_text = resolve(ACCENT) if is_active else resolve(TEXT_PRIMARY)
+            
+            # Icon
+            ico_lbl = QLabel(btn)
+            i_obj = get_icon(ico_name, size=(18, 18), color=ACCENT if is_active else TEXT_DIM)
+            if i_obj: ico_lbl.setPixmap(i_obj.pixmap(18, 18))
+            ico_lbl.setStyleSheet("background: transparent;")
+            ico_lbl.setAlignment(Qt.AlignTop)
+            b_layout.addWidget(ico_lbl)
+            
+            # Text container
+            t_cont = QWidget(btn)
+            t_cont.setStyleSheet("background: transparent;")
+            t_layout = QVBoxLayout(t_cont)
+            t_layout.setContentsMargins(0, 0, 0, 0)
+            t_layout.setSpacing(2)
+            
+            t_lbl = QLabel(name, t_cont)
+            t_lbl.setFont(NAV_ITEM)
+            t_lbl.setStyleSheet(f"color: {c_text}; background: transparent; font-weight: 600;")
+            t_layout.addWidget(t_lbl)
+            
+            d_lbl = QLabel(desc, t_cont)
+            d_lbl.setFont(LABEL_DIM)
+            d_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent;")
+            t_layout.addWidget(d_lbl)
+            
+            b_layout.addWidget(t_cont)
+            b_layout.addStretch(1)
+            
+            # Checkmark
+            if is_active:
+                chk = QLabel(btn)
+                c_obj = get_icon("check", size=(16, 16), color=ACCENT)
+                if c_obj: chk.setPixmap(c_obj.pixmap(16, 16))
+                chk.setStyleSheet("background: transparent;")
+                chk.setAlignment(Qt.AlignTop)
+                b_layout.addWidget(chk)
+            
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: transparent;
+                    border: none;
+                    outline: none;
+                    border-radius: 8px;
+                }}
+                QPushButton:hover {{
+                    background-color: {resolve(WELCOME_CARD_HOVER)};
+                }}
+            """)
+            btn.setFocusPolicy(Qt.NoFocus)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked, n=name: self._on_choose(n))
+            c_layout.addWidget(btn)
+            
+        layout.addWidget(container)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.setWindowOpacity(0.0)
+        self._anim = QPropertyAnimation(self, b"windowOpacity")
+        self._anim.setDuration(150)
+        self._anim.setStartValue(0.0)
+        self._anim.setEndValue(1.0)
+        self._anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._anim.start()
+
+    def _on_choose(self, name):
+        self.selected.emit(name)
+        self._out_anim = QPropertyAnimation(self, b"windowOpacity")
+        self._out_anim.setDuration(100)
+        self._out_anim.setStartValue(self.windowOpacity())
+        self._out_anim.setEndValue(0.0)
+        self._out_anim.finished.connect(lambda: self.close())
+        self._out_anim.start()
 
 PLACEHOLDER = "Message Dizel…"
 
+class _InputTextEdit(QTextEdit):
+    enter_pressed = Signal(bool) # True if shift held
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFont(INPUT_TEXT)
+        self.setAcceptRichText(False)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        c_text = resolve(TEXT_PRIMARY)
+        # Transparent background so it blends with the container
+        self.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: transparent; 
+                color: {c_text};
+                border: none;
+            }}
+        """)
 
-class InputPanel(ctk.CTkFrame):
-    """
-    Bottom input bar.
+    def keyPressEvent(self, e: QKeyEvent):
+        if e.key() == Qt.Key_Return or e.key() == Qt.Key_Enter:
+            if e.modifiers() & Qt.ShiftModifier:
+                # Insert newline
+                super().keyPressEvent(e)
+            else:
+                self.enter_pressed.emit(False)
+            return
+        super().keyPressEvent(e)
 
-    Callbacks
-    ---------
-    on_send(text: str)  : called when the user submits a message
-    on_stop()           : called when the user clicks Stop Generation
-    """
-
-    def __init__(
-        self,
-        parent,
-        on_send: Callable[[str], None],
-        on_stop: Callable[[], None],
-        on_settings: Callable[[], None] = lambda: None,
-        on_attach: Callable[[], None] = lambda: None,
-        on_options: Callable[[], None] = lambda: None,
-        on_voice: Callable[[], None] = lambda: None,
-        **kwargs,
-    ) -> None:
-        super().__init__(
-            parent,
-            fg_color=BG_INPUT,
-            corner_radius=0,
-            **kwargs,
-        )
+class InputPanel(QFrame):
+    def __init__(self, on_send, on_stop, on_settings=lambda: None, on_attach=lambda: None, 
+                 on_options=lambda: None, on_voice=lambda: None, parent=None):
+        super().__init__(parent)
         self._on_send_msg = on_send
-        self._on_stop    = on_stop
-        self._on_settings = on_settings
-        self._on_attach   = on_attach
-        self._on_options  = on_options
-        self._on_voice    = on_voice
+        self._on_stop = on_stop
+        self._on_attach_cb = on_attach # keep reference if needed
+        self._on_voice = on_voice
         self._generating = False
-        self._placeholder_active = True
-
-        self._build()
-
-    # ── Layout ────────────────────────────────────────────────────────────
-
-    def _build(self) -> None:
-        # Wrap the whole panel in a padded transparent container
-        self.configure(fg_color="transparent")
-        outer = ctk.CTkFrame(self, fg_color="transparent")
-        outer.pack(fill="both", expand=True, padx=24, pady=(0, 24))
-
-        # Floating rounded box
-        box = ctk.CTkFrame(outer, fg_color=BG_INPUT, corner_radius=18, border_color=BORDER, border_width=1)
-        box.pack(fill="x", expand=True)
-
-        # ── Attachment Preview Area (Hidden by default) ───────────────────
-        self._preview_area = ctk.CTkFrame(box, fg_color="transparent", height=96)
-        self._preview_area.pack_propagate(False)
-        # Don't pack it initially until an attachment is added
-        
-        # We need a scrollable row inside it in case of many attachments
-        self._preview_scroll = ctk.CTkScrollableFrame(
-            self._preview_area, fg_color="transparent", orientation="horizontal", height=76,
-            scrollbar_button_color=BORDER, scrollbar_button_hover_color=ACCENT
-        )
-        self._preview_scroll.pack(fill="x", padx=16, pady=(8, 0))
-
-        # Keep track of attached widgets to destroy them later
-        self._attachment_widgets = []
         self._attachments = []
+        self._active_contexts = set()
+        self._current_model = "Dizel Lite"
+        self._current_mode = "Fast"
 
-        # ── Text input field (Middle of box) ────────────────────────────
-        self._input = ctk.CTkTextbox(
-            box,
-            font=INPUT_TEXT,
-            fg_color="transparent",
-            text_color=TEXT_DIM,
-            border_width=0,
-            wrap="word",
-            height=60,
-            activate_scrollbars=True,
-        )
-        self._input.pack(fill="both", expand=True, padx=16, pady=(12, 4))
-        self._input.insert("0.0", PLACEHOLDER)
+        self.setStyleSheet(f"background-color: transparent; border: none;")
+        self._build()
+        self._setup_action_menu()
 
-        self._input.bind("<FocusIn>",  self._on_focus_in)
-        self._input.bind("<FocusOut>", self._on_focus_out)
-        self._input.bind("<Button-1>", self._on_click)
-        self._input.bind("<Return>",   self._on_return)
-        self._input.bind("<Key>",       self._on_key_press)
-        self._input.bind("<KeyRelease>", self._on_key_release)
+    def _build(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(24, 0, 24, 24)
+        main_layout.setSpacing(8)
 
-        # ── Inline Action Row (Bottom half of box) ────────────────────────
-        self._action_row = ctk.CTkFrame(box, fg_color="transparent", height=40)
-        self._action_row.pack(fill="x", padx=12, pady=(0, 12))
+        # 1. Floating Box
+        self.box = QFrame(self)
+        self.box.setObjectName("InputBox")
+        self._apply_box_style(focused=False)
         
-        # Left Actions
-        left_actions = ctk.CTkFrame(self._action_row, fg_color="transparent")
-        left_actions.pack(side="left")
+        box_layout = QVBoxLayout(self.box)
+        box_layout.setContentsMargins(12, 12, 12, 12)
+        box_layout.setSpacing(4)
+
+        # 1a. Attachment Chips Row (inline)
+        self._preview_area = QScrollArea(self.box)
+        self._preview_area.setFixedHeight(32)
+        self._preview_area.setWidgetResizable(True)
+        self._preview_area.setStyleSheet(get_scrollbar_style(BG_INPUT, BORDER, ACCENT) + "QScrollArea { border: none; background: transparent; }")
         
-        for ico_name, lbl, cmd in [
-            ("link", "Attach", self._on_attach),
-            ("settings", "Settings", self._on_settings),
-            ("grid", "Options", self._on_options)
-        ]:
-            ico = get_icon(ico_name, size=(16, 16), color=TEXT_DIM)
-            btn = ctk.CTkButton(
-                left_actions, text=f"  {lbl}", image=ico, font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM, 
-                hover_color=WELCOME_CARD_HOVER, width=60, height=28, corner_radius=14,
-                command=cmd
-            )
-            btn.pack(side="left", padx=4)
+        self._preview_content = QWidget()
+        self._preview_content.setStyleSheet("background: transparent;")
+        self._preview_layout = QHBoxLayout(self._preview_content)
+        self._preview_layout.setContentsMargins(0, 0, 0, 0)
+        self._preview_layout.setSpacing(8)
+        self._preview_layout.setAlignment(Qt.AlignLeft)
+        self._preview_area.setWidget(self._preview_content)
+        
+        self._preview_area.hide()
+        box_layout.addWidget(self._preview_area)
 
-        # Right Actions
-        right_actions = ctk.CTkFrame(self._action_row, fg_color="transparent")
-        right_actions.pack(side="right")
+        # 1b. Active Tool Chips Row
+        self._chip_row = QFrame(self.box)
+        self._chip_row.setStyleSheet("background: transparent; border: none;")
+        self._chip_layout = QHBoxLayout(self._chip_row)
+        self._chip_layout.setContentsMargins(0, 0, 0, 0)
+        self._chip_layout.setSpacing(8)
+        self._chip_layout.setAlignment(Qt.AlignLeft)
+        self._chip_row.hide()
+        box_layout.addWidget(self._chip_row)
 
-        mic_ico = get_icon("mic", size=(18, 18), color=TEXT_DIM)
-        voice_btn = ctk.CTkButton(
-            right_actions, text="", image=mic_ico, font=BTN_LABEL, fg_color="transparent", text_color=TEXT_DIM,
-            hover_color=WELCOME_CARD_HOVER, width=32, height=32, corner_radius=16,
-            command=self._on_voice
-        )
-        voice_btn.pack(side="left", padx=4)
+        # 1c. Text input
+        self._input = _InputTextEdit(self.box)
+        self._input.setPlaceholderText(PLACEHOLDER)
+        self._input.setFixedHeight(44)
+        self._input.textChanged.connect(self._on_text_changed)
+        self._input.enter_pressed.connect(self._on_return)
+        
+        # Focus events for glow ring
+        self._input.focusInEvent = self._wrap_focus_in(self._input.focusInEvent)
+        self._input.focusOutEvent = self._wrap_focus_out(self._input.focusOutEvent)
+        
+        box_layout.addWidget(self._input)
 
-        send_ico = get_icon("arrow-up", size=(20, 20), color="#ffffff")
-        self._send_btn = ctk.CTkButton(
-            right_actions,
-            text="",
-            image=send_ico,
-            font=BTN_LABEL,
-            width=36,
-            height=36,
-            fg_color=SEND_BTN,
-            hover_color=SEND_BTN_HOVER,
-            text_color="#ffffff",
-            corner_radius=18,
-            command=self._do_submit,
-        )
-        self._send_btn.pack(side="left", padx=(4, 0))
+        # 1d. Action Row
+        self._action_row = QFrame(self.box)
+        self._action_row.setStyleSheet("background: transparent; border: none;")
+        action_layout = QHBoxLayout(self._action_row)
+        action_layout.setContentsMargins(0, 4, 0, 0)
 
-        stop_ico = get_icon("square", size=(16, 16), color="#f87171")
-        self._stop_btn = ctk.CTkButton(
-            right_actions,
-            text="",
-            image=stop_ico,
-            font=BTN_LABEL,
-            width=36,
-            height=36,
-            fg_color="#3a1a1a",
-            hover_color="#5a2a2a",
-            text_color="#f87171",
-            corner_radius=18,
-            command=self._on_stop,
-        )
+        # Plus Menu Button
+        self._plus_btn = AnimatedIconButton("", self._action_row)
+        ico_plus = get_icon("plus", size=(20, 20), color=TEXT_DIM)
+        if ico_plus: self._plus_btn.set_custom_icon(ico_plus, 20)
+        self._plus_btn.setFixedSize(32, 32)
+        self._plus_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=16))
+        self._plus_btn.setCursor(Qt.PointingHandCursor)
+        self._plus_btn.clicked.connect(self._toggle_action_menu)
+        action_layout.addWidget(self._plus_btn)
 
-        # ── Char counter (below floated box) ──────────────────────────────
-        footer = ctk.CTkFrame(outer, fg_color="transparent")
-        footer.pack(fill="x", pady=(8, 0), padx=8)
+        # Model Selection toggle (Standalone, modern)
+        self._model_btn = QPushButton(f"  {self._current_model}", self._action_row)
+        ico_mod = get_icon("chevron-up", size=(14,14), color=TEXT_DIM)
+        if ico_mod: self._model_btn.setIcon(ico_mod)
+        self._model_btn.setFont(BTN_LABEL)
+        self._model_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=8))
+        self._model_btn.setCursor(Qt.PointingHandCursor)
+        self._model_btn.clicked.connect(self._show_model_menu)
+        action_layout.addWidget(self._model_btn)
 
-        self._counter_lbl = ctk.CTkLabel(
-            footer, text="", font=LABEL_DIM, text_color=TEXT_DIM, anchor="e"
-        )
-        self._counter_lbl.pack(side="right")
+        # Model Mode Selection toggle
+        self._mode_btn = QPushButton(f"  {self._current_mode}", self._action_row)
+        ico_name = "command" if self._current_mode == "Planning" else "zap"
+        ico_mode = get_icon(ico_name, size=(14,14), color=TEXT_DIM)
+        if ico_mode: self._mode_btn.setIcon(ico_mode)
+        self._mode_btn.setFont(BTN_LABEL)
+        self._mode_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=8))
+        self._mode_btn.setCursor(Qt.PointingHandCursor)
+        self._mode_btn.clicked.connect(self._show_mode_menu)
+        action_layout.addWidget(self._mode_btn)
 
-        self._hint_lbl = ctk.CTkLabel(
-            footer, text="Enter to send  •  Shift+Enter for new line", font=LABEL_DIM, text_color=TEXT_DIM, anchor="w"
-        )
-        self._hint_lbl.pack(side="left")
+        action_layout.addStretch(1)
 
-    # ── Placeholder logic ─────────────────────────────────────────────────
+        # Right actions
+        self._voice_btn = QPushButton("", self._action_row)
+        v_ico = get_icon("mic", size=(18,18), color=TEXT_DIM)
+        if v_ico: self._voice_btn.setIcon(v_ico)
+        self._voice_btn.setFixedSize(32, 32)
+        self._voice_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=16))
+        self._voice_btn.setCursor(Qt.PointingHandCursor)
+        self._voice_btn.clicked.connect(self._on_voice)
+        action_layout.addWidget(self._voice_btn)
 
-    def _clear_placeholder(self) -> None:
-        """Clear the placeholder text if it's currently showing."""
-        if self._placeholder_active:
-            self._input.delete("0.0", "end")
-            self._input.configure(text_color=TEXT_PRIMARY)
-            self._placeholder_active = False
+        self._send_btn = AnimatedIconButton("", self._action_row)
+        s_ico = get_icon("arrow-up", size=(20,20), color="#ffffff")
+        if s_ico: self._send_btn.set_custom_icon(s_ico, 20)
+        self._send_btn.setFixedSize(32, 32)
+        self._send_btn.setStyleSheet(get_button_style(SEND_BTN, SEND_BTN_HOVER, "#ffffff", radius=16))
+        self._send_btn.setCursor(Qt.PointingHandCursor)
+        self._send_btn.clicked.connect(self._do_submit)
+        
+        # Send btn press anim
+        self._send_btn.pressed.connect(self._animate_send_press)
+        self._send_btn.released.connect(self._animate_send_release)
+        action_layout.addWidget(self._send_btn)
 
-    def _on_focus_in(self, _evt=None) -> None:
-        self._clear_placeholder()
-        self._input.configure(border_color=BORDER_FOCUS)
+        self._stop_btn = QPushButton("", self._action_row)
+        st_ico = get_icon("square", size=(16,16), color="#f87171")
+        if st_ico: self._stop_btn.setIcon(st_ico)
+        self._stop_btn.setFixedSize(32, 32)
+        self._stop_btn.setStyleSheet(get_button_style("#3a1a1a", "#5a2a2a", "#ffffff", radius=16))
+        self._stop_btn.setCursor(Qt.PointingHandCursor)
+        self._stop_btn.clicked.connect(self._on_stop)
+        self._stop_btn.hide()
+        action_layout.addWidget(self._stop_btn)
 
-    def _on_click(self, _evt=None) -> None:
-        self._clear_placeholder()
+        box_layout.addWidget(self._action_row)
+        main_layout.addWidget(self.box)
 
-    def _on_focus_out(self, _evt=None) -> None:
-        text = self._input.get("0.0", "end").strip()
-        if not text:
-            self._input.insert("0.0", PLACEHOLDER)
-            self._input.configure(text_color=TEXT_DIM)
-            self._placeholder_active = True
-        self._input.configure(border_color=BORDER)
+        # 2. Footer hints
+        footer = QFrame(self)
+        footer.setStyleSheet("background: transparent;")
+        f_layout = QHBoxLayout(footer)
+        f_layout.setContentsMargins(8, 0, 8, 0)
+        
+        self._hint_lbl = QLabel("Enter to send  •  Shift+Enter for new line  •  Dizel can make mistakes. Please verify important information.", footer)
+        self._hint_lbl.setFont(LABEL_DIM)
+        self._hint_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+        
+        self._counter_lbl = QLabel("", footer)
+        self._counter_lbl.setFont(LABEL_DIM)
+        self._counter_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
 
-    # ── Key handlers ─────────────────────────────────────────────────────
+        f_layout.addWidget(self._hint_lbl, alignment=Qt.AlignLeft)
+        f_layout.addWidget(self._counter_lbl, alignment=Qt.AlignRight)
+        main_layout.addWidget(footer)
 
-    def _on_key_press(self, evt) -> None:
-        """Clear placeholder on any printable key press."""
-        if evt.keysym in ('Shift_L', 'Shift_R', 'Control_L', 'Control_R',
-                          'Alt_L', 'Alt_R', 'Caps_Lock', 'Tab',
-                          'Up', 'Down', 'Left', 'Right', 'Escape'):
+    def _setup_action_menu(self):
+        self._action_menu = ActionMenu(self.window())
+        self._action_menu.tool_toggled.connect(self._on_tool_toggled_from_menu)
+        self._action_menu.action_triggered.connect(self._on_menu_action)
+        self._action_menu.menu_hidden.connect(self._on_menu_hidden)
+
+    def _apply_box_style(self, focused: bool):
+        bg = resolve(BG_INPUT)
+        border = resolve(BORDER_FOCUS) if focused else resolve(BORDER)
+        style = get_frame_style(bg, radius=20, border_color=border)
+        # Thicker border on focus for glow effect
+        if focused:
+            style += f" QFrame#InputBox {{ border: 1.5px solid {border}; }}"
+        self.box.setStyleSheet(style.replace("QFrame", "QFrame#InputBox"))
+
+    def _wrap_focus_in(self, original_event_handler):
+        def focusInEvent(event):
+            self._apply_box_style(focused=True)
+            original_event_handler(event)
+        return focusInEvent
+
+    def _wrap_focus_out(self, original_event_handler):
+        def focusOutEvent(event):
+            self._apply_box_style(focused=False)
+            original_event_handler(event)
+        return focusOutEvent
+
+    def _animate_send_press(self):
+        self._send_btn.animate_scale(0.85, duration=100)
+
+    def _animate_send_release(self):
+        self._send_btn.animate_scale(1.0, duration=150)
+
+    def _toggle_action_menu(self):
+        if self._action_menu.isVisible():
+            self._action_menu.close()
+            # _on_menu_hidden handles the icon reset
+        else:
+            self._action_menu.sync_state(self._active_contexts)
+            self._action_menu.show_above(self._plus_btn)
+            # Rotate plus into an X
+            self._plus_btn.animate_rotation(45.0, duration=150)
+            
+    def _on_menu_hidden(self):
+        # Reset rotation back to plus sign
+        self._plus_btn.animate_rotation(0.0, duration=150)
+    
+    def _on_tool_toggled_from_menu(self, tool_id: str, active: bool):
+        if active:
+            self._active_contexts.add(tool_id)
+        else:
+            self._active_contexts.discard(tool_id)
+            
+        self._rebuild_active_chips()
+
+    def _on_menu_action(self, action_id: str):
+        if action_id == "upload_image" or action_id == "upload_file":
+            # Fire old attach callback which triggers file dialog in main.py
+            if self._on_attach_cb:
+                self._on_attach_cb()
+        elif action_id == "reset_all":
+            self.clear_attachments()
+            self._active_contexts.clear()
+            self._rebuild_active_chips()
+            
+    def _rebuild_active_chips(self):
+        # Clear existing
+        while self._chip_layout.count():
+            item = self._chip_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        if not self._active_contexts:
+            self._chip_row.hide()
             return
-        self._clear_placeholder()
+            
+        self._chip_row.show()
+        
+        labels = {
+            "web": ("  Web Search", "globe"),
+            "deep": ("  Deep Think", "cpu"),
+            "thinking": ("  Thinking", "light-bulb"),
+            "files": ("  Parse Files", "file-text"),
+        }
+        
+        for cid in sorted(self._active_contexts):
+            if cid not in labels: continue
+            lbl, ico_name = labels[cid]
+            
+            chip = QFrame(self._chip_row)
+            chip.setStyleSheet(f"background: {resolve(ACCENT)}; border-radius: 12px;")
+            chip.setFixedHeight(24)
+            
+            cl = QHBoxLayout(chip)
+            cl.setContentsMargins(8, 2, 8, 2)
+            cl.setSpacing(4)
+            
+            ico = get_icon(ico_name, size=(12,12), color="#ffffff")
+            if ico:
+                i_lbl = QLabel(chip)
+                i_lbl.setPixmap(ico.pixmap(12,12))
+                i_lbl.setStyleSheet("background: transparent;")
+                cl.addWidget(i_lbl)
+                
+            t_lbl = QLabel(lbl, chip)
+            t_lbl.setFont(LABEL_DIM)
+            t_lbl.setStyleSheet("color: #ffffff; background: transparent;")
+            cl.addWidget(t_lbl)
+            
+            close_btn = QPushButton("✕", chip)
+            close_btn.setFixedSize(16, 16)
+            close_btn.setStyleSheet("""
+                QPushButton { background: transparent; color: #ffffff; border: none; }
+                QPushButton:hover { color: #f87171; }
+            """)
+            close_btn.setFont(LABEL_DIM)
+            close_btn.setCursor(Qt.PointingHandCursor)
+            close_btn.clicked.connect(lambda _, x=cid: self._remove_tool_chip(x))
+            cl.addWidget(close_btn)
+            
+            self._chip_layout.addWidget(chip)
+            
+        self._chip_layout.addStretch(1)
 
-    def _on_return(self, evt) -> str:
-        """Enter = send; Shift+Enter = newline."""
-        if evt.state & 0x1:   # Shift held
-            return              # allow default newline insertion
-        self._do_submit()
-        return "break"         # prevent default newline
+    def _remove_tool_chip(self, cid):
+        self._active_contexts.discard(cid)
+        self._rebuild_active_chips()
+        if self._action_menu.isVisible():
+            self._action_menu.sync_state(self._active_contexts)
 
-    def _on_key_release(self, _evt=None) -> None:
-        """Update character counter."""
-        if self._placeholder_active:
-            self._counter_lbl.configure(text="")
-            return
-        text = self._input.get("0.0", "end").rstrip("\n")
-        n    = len(text)
-        self._counter_lbl.configure(text=f"{n} chars")
-
-        # Auto-expand height (max ~5 lines)
+    def _on_text_changed(self):
+        text = self._input.toPlainText()
+        n = len(text)
+        self._counter_lbl.setText(f"{n} chars" if n > 0 else "")
+        
         lines = text.count("\n") + 1
-        h = max(48, min(lines * 24 + 8, 120))
-        self._input.configure(height=h)
+        h = max(44, min(lines * 22 + 20, 150))
+        self._input.setFixedHeight(h)
 
-    # ── Submit / state control ────────────────────────────────────────────
+    def _on_return(self, shift):
+        if not shift:
+            self._do_submit()
 
-    def _do_submit(self, _evt=None) -> None:
+    def _do_submit(self):
         if self._generating:
             return
-
-        text = self._input.get("0.0", "end").strip()
+            
+        text = self._input.toPlainText().strip()
         files = self.get_attachments()
         
-        # We need either text or an attachment to send
         if not text and not files:
             return
-
-        if self._placeholder_active and not files:
-            return
-
-        # Clear input box FIRST (before disabling it)
-        self._input.delete("0.0", "end")
-        self._input.insert("0.0", PLACEHOLDER)
-        self._input.configure(text_color=TEXT_DIM)
-        self._placeholder_active = True
-        self._counter_lbl.configure(text="")
-        self._input.configure(height=48)
-        
-        # Clear attachment previews
-        self.clear_attachments()
-
-        # Disable input while generating
-        self.set_generating(True)
-
-        # Notify ChatWindow (via main app callback)
-        if self._on_send_msg:
-            self._on_send_msg(text)
-
-    def clear(self) -> None:
-        """Clear the input field and reset to placeholder."""
-        self._input.delete("0.0", "end")
-        self._input.configure(text_color=TEXT_DIM)
-        self._placeholder_active = True
-        self._input.insert("0.0", PLACEHOLDER)
-        self._counter_lbl.configure(text="")
-        self._input.configure(height=48)
-
-    def add_attachment(self, file_path: str) -> None:
-        import os
-        from PIL import Image, ImageOps
-        
-        # If this is the first attachment, repack everything to insert the preview area at the top
-        if not self._attachments:
-            self._input.pack_forget()
-            self._action_row.pack_forget()
             
-            self._preview_area.pack(fill="x", pady=(4, 0))
-            self._input.pack(fill="both", expand=True, padx=16, pady=(4, 4))
-            self._action_row.pack(fill="x", padx=12, pady=(0, 12))
+        self.clear()
+        self.set_generating(True)
+        if self._on_send_msg:
+            self._on_send_msg(text, files)
+
+    def clear(self):
+        self._input.clear()
+        self._input.setFixedHeight(44)
+        self.clear_attachments()
+        self._counter_lbl.setText("")
+
+    def add_attachment(self, file_path: str):
+        if not self._attachments:
+            self._preview_area.show()
             
         self._attachments.append(file_path)
-        
         ext = os.path.splitext(file_path)[1].lower()
+        name = os.path.basename(file_path)
         
-        # Determine icon and styling
-        bg_color = BG_INPUT_FIELD if 'BG_INPUT_FIELD' in globals() else "#1a1a24"
+        pill = QFrame(self._preview_content)
+        pill.setFixedHeight(26)
+        pill.setStyleSheet(get_frame_style(BG_INPUT_FIELD, radius=13, border_color=BORDER))
         
+        p_layout = QHBoxLayout(pill)
+        p_layout.setContentsMargins(8,0,8,0)
+        p_layout.setSpacing(6)
+        
+        ico_lbl = QLabel(pill)
+        ico_lbl.setStyleSheet("background: transparent;")
         if ext in [".png", ".jpg", ".jpeg", ".gif", ".webp"]:
-            ico_name = "image"
-            thumb_img = None
-            try:
-                from PIL import ImageDraw
-                pil_img = Image.open(file_path).convert("RGBA")
-                pil_img = ImageOps.fit(pil_img, (62, 62))
-                
-                # apply rounded mask
-                mask = Image.new('L', (62, 62), 0)
-                draw = ImageDraw.Draw(mask)
-                draw.rounded_rectangle((0, 0, 62, 62), radius=8, fill=255)
-                
-                img_masked = Image.new("RGBA", (62, 62), (0,0,0,0))
-                img_masked.paste(pil_img, (0,0), mask)
-                
-                thumb_img = ctk.CTkImage(light_image=img_masked, dark_image=img_masked, size=(62, 62))
-            except Exception as e:
-                pass
-        elif ext in [".zip", ".tar", ".gz", ".rar", ".7z"]:
-            ico_name = "archive"
-            bg_color = "#2a1e1e" # slightly reddish/brown for zips
-            thumb_img = None
+            ico = get_icon("image", size=(14,14), color=ACCENT)
         else:
-            ico_name = "file"
-            thumb_img = None
+            i_name = "archive" if ext in ['.zip', '.tar', '.gz', '.rar', '.7z'] else "file"
+            ico = get_icon(i_name, size=(14,14), color=ACCENT)
+        if ico: ico_lbl.setPixmap(ico.pixmap(14,14))
+        p_layout.addWidget(ico_lbl)
+        
+        t_lbl = QLabel(name if len(name) < 15 else name[:12]+"...", pill)
+        t_lbl.setFont(LABEL_DIM)
+        t_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent;")
+        p_layout.addWidget(t_lbl)
+        
+        rm_btn = QPushButton("✕", pill)
+        rm_btn.setFixedSize(16, 16)
+        rm_btn.setFont(LABEL_DIM)
+        rm_btn.setStyleSheet("""
+            QPushButton { background: transparent; color: """ + resolve(TEXT_DIM) + """; border: none; }
+            QPushButton:hover { color: #f87171; }
+        """)
+        rm_btn.setCursor(Qt.PointingHandCursor)
+        rm_btn.clicked.connect(lambda: self._remove_attachment(pill, file_path))
+        p_layout.addWidget(rm_btn)
 
-        pill = ctk.CTkFrame(self._preview_scroll, fg_color="transparent")
-        pill.pack(side="left", padx=(0, 12), pady=0)
-        
-        content = ctk.CTkFrame(pill, width=64, height=64, fg_color=bg_color, corner_radius=8, border_width=1, border_color=BORDER)
-        content.pack_propagate(False)
-        content.pack(side="left")
-        
-        if thumb_img:
-            img_lbl = ctk.CTkLabel(content, text="", image=thumb_img)
-            img_lbl.pack(fill="both", expand=True)
-        else:
-            type_ico = get_icon(ico_name, size=(24, 24), color=ACCENT)
-            ico_lbl = ctk.CTkLabel(content, text="", image=type_ico)
-            ico_lbl.pack(pady=(8, 0))
-            
-            ext_str = ext[1:].upper() if ext else "FILE"
-            if len(ext_str) > 5: ext_str = ext_str[:5]
-            name_lbl = ctk.CTkLabel(content, text=ext_str, font=LABEL_DIM, text_color=TEXT_PRIMARY)
-            name_lbl.pack(pady=(0, 0))
-            
-        # Top-right X button packed cleanly next to the tile
-        x_ico = get_icon("x", size=(14, 14), color=TEXT_DIM)
-        rm_btn = ctk.CTkButton(
-            pill, text="", image=x_ico, width=20, height=20, corner_radius=0, 
-            fg_color="transparent", hover_color=BORDER, border_width=0, cursor="hand2",
-            command=lambda p=pill, f=file_path: self._remove_attachment(p, f)
-        )
-        rm_btn.pack(side="left", anchor="n", padx=(4, 0))
-        
-        self._attachment_widgets.append(pill)
+        self._preview_layout.addWidget(pill)
 
-    def _remove_attachment(self, pill: ctk.CTkFrame, file_path: str) -> None:
-        pill.destroy()
-        if pill in self._attachment_widgets:
-            self._attachment_widgets.remove(pill)
+    def _remove_attachment(self, pill, file_path):
+        pill.deleteLater()
         if file_path in self._attachments:
             self._attachments.remove(file_path)
-            
         if not self._attachments:
-            self._preview_area.pack_forget()
+            self._preview_area.hide()
 
-    def get_attachments(self) -> list[str]:
+    def get_attachments(self) -> list:
         return self._attachments.copy()
 
-    def clear_attachments(self) -> None:
-        for w in self._attachment_widgets:
-            w.destroy()
-        self._attachment_widgets.clear()
+    def clear_attachments(self):
+        while self._preview_layout.count():
+            item = self._preview_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
         self._attachments.clear()
-        self._preview_area.pack_forget()
+        self._preview_area.hide()
 
-    def set_generating(self, generating: bool) -> None:
-        """Toggle between Send and Stop button."""
+    def get_active_contexts(self) -> set:
+        return self._active_contexts.copy()
+
+    def _show_model_menu(self):
+        self._popup = ModelSelectorPopup(self._current_model, self.window())
+        self._popup.selected.connect(self._on_model_selected)
+        
+        btn_pos = self._model_btn.mapToGlobal(self._model_btn.rect().topLeft())
+        self._popup.move(btn_pos.x(), btn_pos.y() - self._popup.sizeHint().height() - 5)
+        self._popup.show()
+
+    def _on_model_selected(self, model_name):
+        self._current_model = model_name
+        self._model_btn.setText(f"  {model_name}")
+        brand = "Mila" if "Mila" in model_name else "Dizel"
+        self._input.setPlaceholderText(f"Message {brand}…")
+
+    def _show_mode_menu(self):
+        self._mode_popup = ModelModePopup(self._current_mode, self.window())
+        self._mode_popup.selected.connect(self._on_mode_selected)
+        
+        btn_pos = self._mode_btn.mapToGlobal(self._mode_btn.rect().topLeft())
+        self._mode_popup.move(btn_pos.x(), btn_pos.y() - self._mode_popup.sizeHint().height() - 5)
+        self._mode_popup.show()
+
+    def _on_mode_selected(self, mode_name):
+        self._current_mode = mode_name
+        self._mode_btn.setText(f"  {mode_name}")
+        ico_name = "command" if mode_name == "Planning" else "zap"
+        ico_mode = get_icon(ico_name, size=(14,14), color=TEXT_DIM)
+        if ico_mode: self._mode_btn.setIcon(ico_mode)
+
+
+    def set_generating(self, generating: bool):
         self._generating = generating
         if generating:
-            self._send_btn.pack_forget()
-            self._stop_btn.pack()
-            self._input.configure(state="disabled")
+            self._send_btn.hide()
+            self._stop_btn.show()
+            self._plus_btn.setDisabled(True)
+            self._input.setReadOnly(True)
         else:
-            self._stop_btn.pack_forget()
-            self._send_btn.pack()
-            self._input.configure(state="normal")
-            
-            # Restore placeholder if empty
-            content = self._input.get("0.0", "end").strip()
-            if not content or content == PLACEHOLDER:
-                self._input.delete("0.0", "end")
-                self._input.insert("0.0", PLACEHOLDER)
-                self._input.configure(text_color=TEXT_DIM)
-                self._placeholder_active = True
+            self._stop_btn.hide()
+            self._send_btn.show()
+            self._plus_btn.setDisabled(False)
+            self._input.setReadOnly(False)
 
-    def focus_input(self) -> None:
-        self._input.focus_set()
+    def focus_input(self):
+        self._input.setFocus()
