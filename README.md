@@ -17,13 +17,13 @@ required.
 
 | Component | Details |
 |---|---|
-| **Architecture** | Causal Transformer (Pre-LayerNorm, GELU MLP, multi-head self-attention) |
-| **Parameters** | ~110 M (configurable 10–250 M) |
-| **Tokenizer** | SentencePiece BPE, 8 000 vocab |
-| **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation |
+| **Architecture** | Causal Transformer (Pre-LayerNorm, RoPE, SwiGLU MLP, multi-head self-attention) |
+| **Parameters** | ~253 M (configurable 10–250 M) |
+| **Tokenizer** | SentencePiece BPE, 32 000 vocab |
+| **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
 | **SFT** | Basic chat format, prompt-loss masking |
 | **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty |
-| **Inference (GUI)** | Full Desktop App (CustomTkinter) with dark theme, history, and persistent settings |
+| **Inference (GUI)** | Full Desktop App (PySide6) with dark/light themes, history, persistent settings, and first-run tutorial |
 
 ---
 
@@ -39,49 +39,65 @@ dizel/
 │
 ├── tokenizer/
 │   ├── train_tokenizer.py       ← Train SentencePiece BPE tokenizer
+│   ├── train_mila_tokenizer.py  ← Train Mila variant tokenizer
 │   ├── corpus.txt               ← (generated) plain texts
 │   ├── dizel.model              ← (generated) tokenizer model
 │   └── dizel.vocab              ← (generated) vocabulary
 │
 ├── model/
-│   ├── __init__.py              ← Null (Package loader)
-│   ├── dizel_info.py            ← Model full specs and info
-│   └── architecture.py          ← DizelLM: full Transformer implementation
+│   ├── __init__.py              ← Package loader
+│   ├── architecture.py          ← DizelLM: full Transformer implementation
+│   ├── registry.py              ← Model size presets (Lite, Base, Large)
+│   └── rope.py                  ← Rotary position embedding (RoPE)
 │
 ├── core/
 │   ├── agents/                  ← Content Dict and Lily agents config
 │   ├── tools/                   ← Tools and functions of Dict and Lily
-│   ├── __init__.py              ← Null (Package loader)
-│   ├── prompt_builder.py        ← Format agent results into clean text context for Dizel
+│   ├── __init__.py              ← Package loader
+│   ├── prompt_builder.py        ← Format agent results into clean text context
 │   └── router.py                ← Detect input type and dispatch to the correct agent
 │
 ├── training/
-│   ├── __init__.py              ← Null (Package loader)
+│   ├── __init__.py              ← Package loader
 │   ├── dataset.py               ← PretrainDataset, SFTDataset, Tokenizer wrapper
 │   ├── pretrain.py              ← Pre-training loop (AMP, grad accum, LR schedule)
-│   └── sft.py                   ← Supervised fine-tuning for chat format
+│   ├── sft.py                   ← Supervised fine-tuning for chat format
+│   ├── shard_utils.py           ← Memory-efficient corpus sharding (100 MB shards)
+│   ├── tokenizer_utils.py       ← Fast batch tokenization utilities
+│   ├── cache_utils.py           ← Per-shard .pt caching for instant resume
+│   ├── data_mixing.py           ← Multi-dataset mixing utilities
+│   ├── mila_pretrain.py         ← Mila variant pre-training driver
+│   └── mila_sft.py              ← Mila variant SFT driver
+│
+├── scripts/
+│   ├── colab_train.py           ← Google Colab training notebook helper
+│   ├── migrate_datasets.py      ← HuggingFace dataset downloader and converter
+│   ├── prepare_v11.py           ← v1.1 data preparation pipeline
+│   └── prepare_v12.py           ← v1.2 data preparation pipeline
 │
 ├── sft_data/
 │   ├── generate_sft_data.py     ← Generate synthetic chat JSONL data
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   ├── cli_ui
+│   ├── cli_ui/
 │   │   └── cmd_ui.py            ← CLI chat / completion / JSON inference
 │   │
 │   └── dizel_ui/                ← Full Desktop GUI Application!
 │       ├── main.py              ← Run this to start the desktop app
-│       ├── __init__.py          ← Null (Package loader)
-│       ├── theme/               ← Theme manager and logic
+│       ├── __init__.py          ← Package loader
+│       ├── theme/               ← Theme manager, colors, fonts, stylesheets
 │       ├── history/             ← Saved chats via JSON    (auto-created)
 │       ├── .dizel/              ← Saved settings via JSON (auto-created)
-│       ├── ui/                  ← PySide6 UI components
-│       ├── utils                ← Icons loader and Dict and Lily logic
-│       ├── logic/               ← Async generation and config/history managers
+│       ├── ui/                  ← PySide6 UI components (sidebar, chat, input, settings...)
+│       ├── utils/               ← Icons loader and agent logic
+│       ├── logic/               ← Async generation, config/history/tutorial managers
 │       └── assets/              ← Logo and avatar images
 │       
+├── docs/                        ← Landing page website (vanilla HTML/CSS/JS)
+│
 ├── utils/
-│   ├── __init__.py              ← Null (Package loader)
+│   ├── __init__.py              ← Package loader
 │   ├── data_cleaner.py          ← Clean the training data
 │   ├── test_model.py            ← Test the model
 │   └── verify.py                ← Sanity checks (no GPU required)
@@ -189,14 +205,14 @@ difference.
 python tokenizer/train_tokenizer.py
 ```
 
-This reads `data/english.md`, trains a BPE SentencePiece model with 8 000
+This reads `data/english.md`, trains a BPE SentencePiece model with 32 000
 vocabulary entries, and writes `tokenizer/dizel.model` and `tokenizer/dizel.vocab`.
 
 **Output:**
 
 ```text
 [tokenizer] Wrote plain text to tokenizer/corpus.txt (45,123 chars)
-[tokenizer] Training SentencePiece BPE (vocab=8,000) ...
+[tokenizer] Training SentencePiece BPE (vocab=32,000) ...
 [tokenizer] Trained BPE model → tokenizer/dizel.model
 [tokenizer] Round-trip OK ✓
 ```
@@ -227,10 +243,9 @@ python training/pretrain.py --max_steps 6000 --lr 5e-4 --d_model 256
 
 **What to expect:**
 
-
 | Step | Train Loss | Notes |
 |------|------------|-------|
-| 0    | ~9.0       | Random initialisation (~ln(8000)) |
+| 0    | ~10.4      | Random initialisation (~ln(32000)) |
 | 200  | ~5.0–6.0   | Starting to learn common words |
 | 1000 | ~3.5–4.5   | Coherent word sequences |
 | 4000 | ~2.5–3.5   | Reasonable sentences on training data |
@@ -256,6 +271,8 @@ python training/pretrain.py --resume checkpoints/dizel-pretrain-best.pt
 **Approximate training time (RTX 3060, 12 GB VRAM):**
 - 4 000 steps, d_model=384, ctx=512: ~1.5–2 hours
 - 4 000 steps, d_model=256, ctx=512: ~45–60 minutes
+
+**Google Colab:** Use `scripts/colab_train.py` for a streamlined notebook experience. The tokenization pipeline uses memory-efficient numpy arrays to stay within Colab's ~12.7 GB RAM limit.
 
 ---
 
@@ -288,20 +305,20 @@ python training/sft.py --base_checkpoint checkpoints/dizel-pretrain-best.pt
 
 SFT runs for 500 steps (default) at a lower learning rate (1e-4). It:
 - Loads the pretrained weights
-- Teaches the model the `<|user|>` / `<|assistant|>` conversation format
+- Teaches the model the user / assistant conversation format
 - Computes loss **only on assistant tokens** (prompt masking)
 
 Output checkpoint:
 - `checkpoints/dizel-sft-step{N}.pt`
 - `checkpoints/dizel-sft-best.pt`
 
-Resume sft from a checkpoint:
+Resume SFT from a checkpoint:
 ```bash
 # 1st Option
-python training/pretrain.py --resume checkpoints/dizel-sft-step{N}.pt
+python training/sft.py --resume checkpoints/dizel-sft-step{N}.pt
 
 # 2nd Option (Recommended)
-python training/pretrain.py --resume checkpoints/dizel-sft-best.pt
+python training/sft.py --resume checkpoints/dizel-sft-best.pt
 ```
 
 ---
@@ -361,20 +378,22 @@ python inference/dizel_ui/main.py
 
 **(Optional)** Pass a checkpoint right from the command line:
 ```bash
-python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda | cpu
+python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
 **Features of the Desktop App:**
-- **Persistent Settings:** Your temperature, top-p, checkpoints, and UI preferences are saved automatically bridging sessions.
+- **First-Run Tutorial:** Interactive onboarding overlay that highlights key UI elements with a spotlight effect and step-by-step tooltip instructions.
+- **Action Pill Carousel:** Quick-action buttons (Create Image, Brainstorm, Write Code, etc.) displayed as a scrollable, paginated carousel on the welcome screen.
+- **Persistent Settings:** Your temperature, top-p, checkpoints, and UI preferences are saved automatically across sessions.
 - **Chat History:** Seamlessly manage multiple conversations from the left sidebar.
 - **Attachment Previews:** Visually queue up reference items for your prompts.
-- **Model Switcher:** Switch from Dizel and Mila model versions.
+- **Model Switcher:** Switch between Dizel and Mila model versions.
 - **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` modes.
-- **Hardware Info:** Live UI tracking of Generation Tokens/sec and Context windows.
-- **KeyBoard Shortcut:** `CTRL+K` with open the shortcut for alot of options.
-- **Contexts Limiter:** Live UI tracking of context limits.
+- **Hardware Info:** Live UI tracking of generation tokens/sec and context windows.
+- **Keyboard Shortcut:** `Ctrl+K` opens the command palette with a lot of options.
+- **Context Limiter:** Live UI tracking of context limits.
 - **Dark/Light Themes:** Premium colors for Dark and Light mode 
-  *(WARNING! Light mode can cause a flashbang when switch from Dark mode, so please be careful)*.
+  *(WARNING! Light mode can cause a flashbang when switching from Dark mode, so please be careful)*.
 
 ---
 
@@ -403,6 +422,8 @@ input x (B, T, d_model)
    │       split into Q, K, V
    │
    ├─ reshape to (B, n_heads, T, head_dim)
+   │
+   ├─ RoPE: apply rotary position embeddings to Q and K
    │
    ├─ attn = softmax(Q @ K.T / √head_dim + causal_mask)
    │        (Flash Attention via PyTorch 2.x SDPA if available)
@@ -499,7 +520,7 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 > Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature`.
 
 **Q: Why is the output nonsensical?**  
-> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more data. The more dataset it gets, the more it'll respond with less nonsensial texts.
+> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more data. The more dataset it gets, the more it'll respond with less nonsensical texts.
 
 **Q: Can I run this on CPU?**  
 > Yes — set `device = "cpu"`. Training will be ~50× slower. Inference is fine for short generations.
@@ -511,10 +532,10 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 > Add more JSON examples to `sft_data/chat.jsonl` and re-run SFT. Lower temperature to 0.2–0.4.
 
 **Q: Is the model free-to-use?**  
-> Yes, it is! — As if right now, this model has the MIT license, things may change in the future.
+> Yes, it is! — As of right now, this model has the MIT license, things may change in the future.
 
-**Q: How can i report any errors/issues?**  
-> Very simple! — Just go to the model Github Res and create an *Issue* request.
+**Q: How can I report any errors/issues?**  
+> Very simple! — Just go to the model GitHub Repo and create an *Issue* request.
 
 ---
 
