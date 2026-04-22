@@ -1,7 +1,7 @@
 <div align="center">
   <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
-    width="100%"
-    height="100%"/>
+    width="50%"
+    height="50%"/>
 </div>
 
 > *Dizel — Distributed Intelligent Zero-shot Execution Layer*
