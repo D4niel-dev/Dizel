@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dizel AI | Local Intelligence</title>
+    <meta name="description" content="Dizel AI: High accuracy, localized execution, and intelligent workspaces right on your machine. No cloud, zero latency.">
+    
+    <!-- Open Graph for SEO -->
+    <meta property="og:title" content="Dizel AI | Local Intelligence">
+    <meta property="og:description" content="Experience high accuracy, localized AI workspaces without the cloud.">
+    <meta property="og:image" content="assets/app/Dizel_banner.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/app/Dizel.ico">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/effects.css">
+</head>
+<body>
+
+    <nav class="navbar glass animate-slide-up" aria-label="Main Navigation">
+        <a href="#" class="nav-brand" aria-label="Dizel AI Home">Dizel<span>.ai</span></a>
+        <div class="nav-links">
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#workspaces" class="nav-link">Workspaces</a>
+            <a href="#pricing" class="nav-link">Compute</a>
+            <button class="nav-link" id="cmd-k-trigger" style="background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:0.5rem;">
+                Search <kbd style="background:var(--bg-root);padding:2px 6px;border:1px solid var(--border-color);border-radius:4px;font-family:var(--font-mono);font-size:0.7rem;">Ctrl K</kbd>
+            </button>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="bg-grid"></div>
+        <div class="ambient-glow"></div>
+        <div class="hero-content">
+            <h1 class="hero-title animate-slide-up delay-100">AI Computing, <br><span class="highlight">Unleashed</span></h1>
+            <p class="hero-subtitle animate-slide-up delay-200">
+                100% locally executed models. High-accuracy zero-latency processing. Encrypted AI Workspaces.
+            </p>
+            <div class="hero-actions animate-slide-up delay-300">
+                <a href="#download" class="btn btn-primary" aria-label="Download for Windows">Download v1.2</a>
+                <a href="#github" class="btn btn-secondary" aria-label="Github Repo">GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <section id="mockup" class="container" style="padding-top: 40px; padding-bottom: 60px;">
+        <div class="app-mockup-window animate-slide-up delay-300">
+            <div class="app-mockup-main">
+                <h2 class="welcome-text">From concept to perfection.</h2>
+                
+                <div class="pills-carousel" aria-hidden="true">
+                    <button class="mock-chevron">&lt;</button>
+                    <div class="pills-viewport">
+                        <div class="mock-pill"><span>🖼️</span> Create Image</div>
+                        <div class="mock-pill"><span>⚡</span> Brainstorm</div>
+                        <div class="mock-pill"><span>📄</span> Make a plan</div>
+                    </div>
+                    <button class="mock-chevron">&gt;</button>
+                </div>
+            </div>
+            
+            <div class="app-mockup-input">
+                <div class="mock-input-field">Message Dizel...</div>
+                <div class="mock-input-controls">
+                    <div class="mock-input-left">
+                        <span class="mock-icon">+</span>
+                        <span class="mock-icon meta">⚙ Dizel Lite</span>
+                    </div>
+                    <button class="mock-send-btn">↑</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="marquee-container animate-slide-up delay-100" aria-hidden="true">
+        <div class="marquee-content">
+            <span>LLAMA-3</span>
+            <span>MISTRAL-NEMO</span>
+            <span>DEEPSEEK-V2</span>
+            <span>QWEN-2</span>
+            <span>PHI-3</span>
+            <span>GEMMA-2</span>
+            <span>LLAMA-3</span>
+            <span>MISTRAL-NEMO</span>
+            <span>DEEPSEEK-V2</span>
+            <span>QWEN-2</span>
+            <span>PHI-3</span>
+            <span>GEMMA-2</span>
+        </div>
+    </div>
+
+    <section id="features" class="container" style="padding-top: 60px; padding-bottom: 100px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Built for Performance</h2>
+            <p class="section-subtitle">No compromises. The power of advanced models running entirely on your local hardware.</p>
+        </div>
+        
+        <div class="feature-grid" id="feature-grid">
+            <div class="feature-card glow-card scroll-observe delay-100">
+                <div class="feature-icon">01</div>
+                <h3>100% Local Execution</h3>
+                <p>Your data never leaves your machine. Full privacy ensures enterprise-grade security with absolutely zero telemetry or external API dependencies.</p>
+            </div>
+            
+            <div class="feature-card glow-card scroll-observe delay-200">
+                <div class="feature-icon">02</div>
+                <h3>Fast Context Loading</h3>
+                <p>Hardware-accelerated tokenization mapped natively to your GPU and CPU for blazingly fast context comprehension and response generation.</p>
+            </div>
+            
+            <div class="feature-card glow-card scroll-observe delay-300">
+                <div class="feature-icon">03</div>
+                <h3>AI Workspaces</h3>
+                <p>Segment your prompts, files, and knowledge bases into isolated workspaces. Seamlessly switch contexts without losing data or flow.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="performance" class="container" style="padding-top: 60px; padding-bottom: 100px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Zero Trust. Zero Latency.</h2>
+            <p class="section-subtitle">Comparing traditional Cloud API connections versus hardware-accelerated local execution.</p>
+        </div>
+        
+        <div class="performance-grid scroll-observe delay-100">
+            <div class="perf-card">
+                <h3>Standard Cloud Target</h3>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Data Privacy</span><span>15%</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="15%"></div></div>
+                </div>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Latency Floor</span><span>250ms+</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="100%"></div></div>
+                </div>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Uptime Dependency</span><span>API Status</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="80%"></div></div>
+                </div>
+            </div>
+            
+            <div class="perf-card highlight">
+                <h3>Dizel AI Local</h3>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Data Privacy</span><span>100%</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="100%"></div></div>
+                </div>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Latency Floor</span><span>&lt; 5ms</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="5%"></div></div>
+                </div>
+                <div class="perf-metric">
+                    <div class="perf-label"><span>Uptime Dependency</span><span>None</span></div>
+                    <div class="perf-bar-bg"><div class="perf-bar-fill fill-target" data-width="100%"></div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="architecture" class="container" style="padding-top: 60px; padding-bottom: 60px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Natively Deep Optimized</h2>
+            <p class="section-subtitle">A direct hardware-to-application pipeline. No abstraction layers. No bloatware overhead.</p>
+        </div>
+        
+        <div class="architecture-container scroll-observe delay-100">
+            <div class="architecture-stack">
+                <div class="arch-layer">
+                    <span>LAYER 4</span>
+                    <h4>Dizel Graph API / Python Client</h4>
+                </div>
+                <div class="arch-layer">
+                    <span>LAYER 3</span>
+                    <h4>Secure Context Workspace Isolation</h4>
+                </div>
+                <div class="arch-layer">
+                    <span>LAYER 2</span>
+                    <h4>C++ Optimized Tensor Execution</h4>
+                </div>
+                <div class="arch-layer">
+                    <span>LAYER 1</span>
+                    <h4>Metal / CUDA / DirectML Host</h4>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="live-logs" class="container" style="padding-top: 20px; padding-bottom: 100px;">
+        <div class="live-log-window scroll-observe">
+            <div class="log-lines-container" id="terminal-logs">
+                <div class="log-line"><span class="log-inf">[sys]</span> Awaiting initialization pipeline...</div>
+            </div>
+        </div>
+    </section>
+
+    <section id="workspaces" class="container" style="padding-top: 60px; padding-bottom: 100px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Contextual Isolation</h2>
+            <p class="section-subtitle">Switch seamlessly between different environments. AI Workspaces partition your models, data, and memory natively.</p>
+        </div>
+        
+        <div class="workspace-mockup scroll-observe delay-100">
+            <div class="workspace-layout">
+                <div class="workspace-sidebar">
+                    <div class="mock-channel active">
+                        <span class="status"></span> Local Coding
+                    </div>
+                    <div class="mock-channel">
+                        <span class="status"></span> Data Analysis
+                    </div>
+                    <div class="mock-channel">
+                        <span class="status"></span> Creative Writing
+                    </div>
+                </div>
+                <div class="workspace-main">
+                    <h4>Local Coding</h4>
+                    <span class="mock-meta">Model: deepseek-coder-v2 &nbsp;&bull;&nbsp; Context: 32k</span>
+                    <p class="mock-p">
+                        Active file directory linked: <code>C:\Projects\dizel-core</code><br><br>
+                        Ready to process commands. Codebase embeddings loaded onto local VRAM perfectly. Memory partition completely secured.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="use-cases" class="container" style="padding-top: 60px; padding-bottom: 100px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Built for Your Stack</h2>
+            <p class="section-subtitle">Drop Dizel natively into your backend, your analytical kernels, or your automation shell.</p>
+        </div>
+
+        <div class="usecases-container scroll-observe delay-100">
+            <div class="usecases-tabs">
+                <button class="usecases-tab active" data-tab="tab-python">Python (Data)</button>
+                <button class="usecases-tab" data-tab="tab-rust">Rust (Backend)</button>
+                <button class="usecases-tab" data-tab="tab-bash">Bash (Security)</button>
+            </div>
+            
+            <pre class="usecases-content active" id="tab-python"><code><span class="hljs-cmt"># Local DataFrame analysis with DeepSeek-Coder</span>
+<span class="hljs-kw">import</span> dizel
+<span class="hljs-kw">import</span> pandas <span class="hljs-kw">as</span> pd
+
+client = dizel.Client(workspace=<span class="hljs-str">"data-analysis"</span>)
+df = pd.read_csv(<span class="hljs-str">"financial_q3.csv"</span>)
+
+<span class="hljs-cmt"># Guaranteed privacy, zero cloud transmission</span>
+response = client.generate(
+    model=<span class="hljs-str">"deepseek-coder-v2"</span>,
+    prompt=<span class="hljs-str">f"Find anomalies in this dataframe: <span class="hljs-kw">{</span>df.head()<span class="hljs-kw">}</span>"</span>
+)
+<span class="hljs-func">print</span>(response.text)</code></pre>
+
+            <pre class="usecases-content" id="tab-rust"><code><span class="hljs-cmt">// Low-latency local generation in Rust</span>
+<span class="hljs-kw">use</span> dizel_rs::Client;
+
+<span class="hljs-kw">#[tokio::main]</span>
+<span class="hljs-kw">async fn</span> <span class="hljs-func">main</span>() -&gt; <span class="hljs-predefined">Result</span>&lt;(), Box&lt;<span class="hljs-kw">dyn</span> std::error::Error&gt;&gt; {
+    <span class="hljs-kw">let</span> client = Client::new(<span class="hljs-str">"local-env"</span>);
+    
+    <span class="hljs-kw">let</span> completion = client
+        .model(<span class="hljs-str">"llama-3-8b"</span>)
+        .prompt(<span class="hljs-str">"Sanitize this backend payload..."</span>)
+        .stream()
+        .<span class="hljs-func">await</span>?;
+
+    <span class="hljs-func">println!</span>(<span class="hljs-str">"{:?}"</span>, completion);
+    <span class="hljs-predefined">Ok</span>(())
+}</code></pre>
+
+            <pre class="usecases-content" id="tab-bash"><code><span class="hljs-cmt">#!/bin/bash</span>
+<span class="hljs-cmt"># Zero-latency security triage across logs</span>
+
+# Pipe arbitrary logs directly to localized model via CLI
+cat /var/log/auth.log | dizel run mistral-nemo <span class="hljs-str">\
+    "Extract all unauthorized IPs and format as JSON list. \
+     Do not output any markdown or conversational text."</span> > banned_ips.json
+
+<span class="hljs-func">echo</span> <span class="hljs-str">"Local triage complete. Pipeline protected."</span></code></pre>
+        </div>
+    </section>
+
+    <section id="social-proof" class="container" style="padding-top: 60px; padding-bottom: 60px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Loved by Core Engineers</h2>
+            <p class="section-subtitle">Real feedback from developers running isolated local models.</p>
+        </div>
+        <div class="testimonial-grid scroll-observe delay-100">
+            <div class="testimonial-card">
+                <div class="test-user">
+                    <div class="test-avatar" style="background: url('https://api.dicebear.com/7.x/avataaars/svg?seed=Felix') center/cover;"></div>
+                    <div><span class="test-name">Alex M.</span><span class="test-handle">@alexcodes</span></div>
+                </div>
+                <p>"The absolute lack of latency when asking deepseek-coder to parse my Rust files over local VRAM feels like magic. Completely killed my cloud API usage."</p>
+            </div>
+            <div class="testimonial-card">
+                <div class="test-user">
+                    <div class="test-avatar" style="background: url('https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah') center/cover;"></div>
+                    <div><span class="test-name">Sarah J.</span><span class="test-handle">@data_sarah</span></div>
+                </div>
+                <p>"Being able to drop a 15GB internal healthcare dataset into a workspace natively on my Mac Studio and query it knowing it doesn't leave the machine is a godsend."</p>
+            </div>
+            <div class="testimonial-card">
+                <div class="test-user">
+                    <div class="test-avatar" style="background: url('https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus') center/cover;"></div>
+                    <div><span class="test-name">Marcus D.</span><span class="test-handle">@cyber_marc</span></div>
+                </div>
+                <p>"Using the CLI to pipe auth logs instantly to Mistral locally. Zero external footprint for my infosec requirements."</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="container" style="padding-top: 60px; padding-bottom: 60px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Transparent Pricing</h2>
+            <p class="section-subtitle">Free forever for hackers. Dedicated support for massive enterprise clusters.</p>
+        </div>
+        <div class="pricing-grid scroll-observe delay-100">
+            <div class="pricing-card">
+                <h3>Community</h3>
+                <div class="pricing-price">$0 <span>/ forever</span></div>
+                <ul class="pricing-list">
+                    <li>Unlimited Local Executions</li>
+                    <li>Full Open Source Codebase</li>
+                    <li>Community Discord Access</li>
+                    <li>NVIDIA, AMD, Apple Silicon</li>
+                </ul>
+                <a href="#download" class="btn btn-secondary w-100">Download Free</a>
+            </div>
+            <div class="pricing-card enterprise">
+                <h3>Enterprise</h3>
+                <div class="pricing-price">Custom <span>/ cluster</span></div>
+                <ul class="pricing-list">
+                    <li>Everything in Community</li>
+                    <li>SAML / SSO Authentication</li>
+                    <li>Direct Slack Connect Support</li>
+                    <li>Custom Hardware Compilation Optimization</li>
+                </ul>
+                <a href="mailto:enterprise@dizel.ai" class="btn btn-primary w-100">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="cta" class="container" style="padding-top: 40px; padding-bottom: 100px;">
+        <div class="cta-section scroll-observe">
+            <div class="cta-content">
+                <h2 class="cta-title">Build the Future, <br>Locally.<br></h2>
+                <p class="cta-subtitle">Join thousands of developers prioritizing speed, privacy, and full control over their AI infrastructure.</p>
+                <div class="hero-actions">
+                    <a href="https://github.com/dizel-ai/dizel" class="btn btn-primary" target="_blank" rel="noopener">Star on GitHub</a>
+                    <a href="#" class="btn btn-secondary">Join Discord</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="container" style="padding-top: 60px; padding-bottom: 120px;">
+        <div class="section-header scroll-observe">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+        </div>
+        
+        <div class="faq-container scroll-observe delay-100">
+            <div class="faq-item">
+                <button class="faq-question">
+                    Do I absolutely need a dedicated GPU?
+                    <span class="faq-icon">+</span>
+                </button>
+                <div class="faq-answer">
+                    <div class="faq-answer-inner">
+                        No. While Dizel AI is highly optimized for NVIDIA and Apple Silicon environments to achieve maximum tokens-per-second, our core runtime provides seamless CPU fallback natively mapped to your hardware.
+                    </div>
+                </div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">
+                    How is context partitioned in Workspaces?
+                    <span class="faq-icon">+</span>
+                </button>
+                <div class="faq-answer">
+                    <div class="faq-answer-inner">
+                        Each Workspace loads an isolated branch of KV cache and embeddings. When you swap workspaces, the memory blocks are efficiently swapped in/out of VRAM locally, meaning no cross-contamination of your system prompts or RAG files.
+                    </div>
+                </div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">
+                    Is Dizel completely open-source?
+                    <span class="faq-icon">+</span>
+                </button>
+                <div class="faq-answer">
+                    <div class="faq-answer-inner">
+                        The core processing engine is MIT licensed. We believe developer tools must be fully transparent, strictly guaranteeing that your data remains 100% on your device, disconnected from the cloud.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer" aria-label="Site Footer">
+        <div class="container footer-content">
+            <div class="footer-brand">
+                <a href="#" class="nav-brand">Dizel<span>.ai</span></a>
+                <p>High-accuracy local intelligence.</p>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/dizel-ai/dizel" target="_blank" rel="noopener">GitHub</a>
+                <a href="#docs">Documentation</a>
+                <a href="#privacy">Privacy</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Dizel AI. Open Source under MIT License.</p>
+        </div>
+    </footer>
+
+    <!-- Ctrl+K Command Palette Modal -->
+    <div class="palette-overlay" id="cmd-palette" aria-hidden="true">
+        <div class="palette-modal">
+            <div class="palette-input-wrap">
+                <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <input type="text" class="palette-input" id="cmd-input" placeholder="Search documentation, API refs..." autocomplete="off">
+                <kbd style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);border:1px solid var(--border-color);padding:2px 6px;border-radius:4px;">ESC</kbd>
+            </div>
+            <div class="palette-results">
+                <div class="palette-item"><span>Getting Started Guide</span><span style="font-family:var(--font-mono);opacity:0.5;">docs</span></div>
+                <div class="palette-item"><span>Python Client Reference</span><span style="font-family:var(--font-mono);opacity:0.5;">api</span></div>
+                <div class="palette-item"><span>Workspace Isolation Architecture</span><span style="font-family:var(--font-mono);opacity:0.5;">core</span></div>
+                <div class="palette-item"><span>Hardware GPU Fallbacks</span><span style="font-family:var(--font-mono);opacity:0.5;">config</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script src="js/app.js"></script>
+</body>
+</html>

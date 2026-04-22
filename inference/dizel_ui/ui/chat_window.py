@@ -25,13 +25,18 @@ from dizel_ui.theme.fonts import (
     WELCOME_TITLE, WELCOME_SUB, CARD_TITLE, CARD_BODY, BTN_LABEL
 )
 from dizel_ui.logic.config_manager import ConfigManager
-from dizel_ui.theme.stylesheets import get_scrollbar_style, get_frame_style
+from dizel_ui.theme.stylesheets import get_scrollbar_style, get_frame_style, get_button_style
 
 # ── Action Pills ──────────────────────────────────────────────────────────────
 ACTION_PILLS = [
     ("image", "Create Image", "Generate an image of a futuristic city."),
     ("zap", "Brainstorm", "Give me 5 ideas for a new web project."),
     ("file-text", "Make a plan", "Create a structured study plan for Python."),
+    ("code", "Write Code", "Write a FastAPI boilerplate with JWT auth."),
+    ("search", "Web Search", "Search for the latest Next.js 14 features."),
+    ("edit-3", "Draft Email", "Draft a professional email to my boss asking for vacation."),
+    ("database", "Design Schema", "Design a SQL schema for a blog application."),
+    ("headphones", "Recommend Music", "Give me a playlist of 5 lo-fi hip hop tracks for coding."),
 ]
 
 class ChatState(Enum):
@@ -172,43 +177,121 @@ class ChatWindow(QFrame):
         title_lbl.setAlignment(Qt.AlignCenter)
         welcome_layout.addWidget(title_lbl)
 
-        # Action Pills Row
+        # Action Pills Row (Carousel)
         pills_row = QFrame(self._welcome_frame)
         pills_layout = QHBoxLayout(pills_row)
         pills_layout.setAlignment(Qt.AlignCenter)
-        pills_layout.setSpacing(16)
+        pills_layout.setSpacing(8)
         
-        for (icon_name, label, prompt) in ACTION_PILLS:
-            btn = QPushButton(f"{label}  ", pills_row)
-            btn.setLayoutDirection(Qt.RightToLeft)
-            ico = get_icon(icon_name, size=(16, 16), color=TEXT_PRIMARY)
-            if ico: btn.setIcon(ico)
-            btn.setFont(BTN_LABEL)
-            # PySide styled buttons
-            c_text = resolve(TEXT_PRIMARY)
-            c_bg = resolve(BG_CARD)
-            c_border = resolve(BORDER)
-            c_hover = resolve(WELCOME_CARD_HOVER)
-            c_hover_border = resolve(BORDER)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {c_bg};
-                    color: {c_text};
-                    border: 1px solid {c_border};
-                    border-radius: 18px;
-                    padding: 10px 20px;
-                    font-weight: 500;
-                }}
-                QPushButton:hover {{ 
-                    background-color: {c_hover}; 
-                    border: 1px solid {c_hover_border};
-                    color: #ffffff;
-                }}
-            """)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda checked=False, p=prompt: self._on_quick_action(p))
-            pills_layout.addWidget(btn)
+        # Carousel fixed constraints
+        page_width = 480
+        
+        # Left Button
+        self._pill_left_btn = QPushButton(pills_row)
+        self._pill_left_btn.setFixedSize(36, 36)
+        left_ico = get_icon("chevron-left", size=(18, 18), color=TEXT_PRIMARY)
+        if left_ico: self._pill_left_btn.setIcon(left_ico)
+        self._pill_left_btn.setCursor(Qt.PointingHandCursor)
+        self._pill_left_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_PRIMARY, radius=18))
+        pills_layout.addWidget(self._pill_left_btn)
+        
+        # Scroll Area
+        self._pill_scroll = QScrollArea(pills_row)
+        self._pill_scroll.setWidgetResizable(True)
+        self._pill_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._pill_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._pill_scroll.setStyleSheet("background: transparent; border: none;")
+        self._pill_scroll.setFixedHeight(60)
+        self._pill_scroll.setFixedWidth(page_width)
+        
+        self._pill_inner = QWidget()
+        self._pill_inner.setStyleSheet("background: transparent;")
+        inner_lyt = QHBoxLayout(self._pill_inner)
+        inner_lyt.setSpacing(0)
+        inner_lyt.setContentsMargins(0, 0, 0, 0)
+        
+        # Render pills in pages
+        c_text = resolve(TEXT_PRIMARY)
+        c_bg = resolve(BG_CARD)
+        c_border = resolve(BORDER)
+        c_hover = resolve(WELCOME_CARD_HOVER)
+        c_hover_border = resolve(BORDER)
+        
+        chunk_size = 3
+        chunks = [ACTION_PILLS[i:i + chunk_size] for i in range(0, len(ACTION_PILLS), chunk_size)]
+        
+        for chunk in chunks:
+            page = QWidget()
+            page.setFixedWidth(page_width)
+            page.setStyleSheet("background: transparent;")
+            page_lyt = QHBoxLayout(page)
+            page_lyt.setAlignment(Qt.AlignCenter)
+            page_lyt.setSpacing(12)
+            page_lyt.setContentsMargins(0, 0, 0, 0)
             
+            for (icon_name, label, prompt) in chunk:
+                btn = QPushButton(f"{label}  ", page)
+                btn.setFixedHeight(40)
+                btn.setLayoutDirection(Qt.RightToLeft)
+                ico = get_icon(icon_name, size=(16, 16), color=TEXT_PRIMARY)
+                if ico: btn.setIcon(ico)
+                btn.setFont(BTN_LABEL)
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {c_bg};
+                        color: {c_text};
+                        border: 1px solid {c_border};
+                        border-radius: 18px;
+                        padding: 0 20px;
+                        font-weight: 500;
+                    }}
+                    QPushButton:hover {{ 
+                        background-color: {c_hover}; 
+                        border: 1px solid {c_hover_border};
+                        color: #ffffff;
+                    }}
+                """)
+                btn.setCursor(Qt.PointingHandCursor)
+                btn.clicked.connect(lambda checked=False, p=prompt: self._on_quick_action(p))
+                page_lyt.addWidget(btn)
+                
+            inner_lyt.addWidget(page)
+            
+        self._pill_scroll.setWidget(self._pill_inner)
+        pills_layout.addWidget(self._pill_scroll)
+        
+        # Right Button
+        self._pill_right_btn = QPushButton(pills_row)
+        self._pill_right_btn.setFixedSize(36, 36)
+        right_ico = get_icon("chevron-right", size=(18, 18), color=TEXT_PRIMARY)
+        if right_ico: self._pill_right_btn.setIcon(right_ico)
+        self._pill_right_btn.setCursor(Qt.PointingHandCursor)
+        self._pill_right_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_PRIMARY, radius=18))
+        pills_layout.addWidget(self._pill_right_btn)
+        
+        # Animation logic for carousel
+        self._pill_anim = QPropertyAnimation(self._pill_scroll.horizontalScrollBar(), b"value")
+        self._pill_anim.setDuration(400) # Slightly slower for smoother page transition
+        self._pill_anim.setEasingCurve(QEasingCurve.OutCubic)
+        
+        self._current_page = 0
+        self._max_pages = len(chunks) - 1
+        
+        def _scroll_carousel(direction):
+            # Evaluate new page index
+            self._current_page = max(0, min(self._max_pages, self._current_page + direction))
+            
+            # Scroll scrollbar to absolute multiples of page_width
+            target = self._current_page * page_width
+            
+            self._pill_anim.stop()
+            self._pill_anim.setStartValue(self._pill_scroll.horizontalScrollBar().value())
+            self._pill_anim.setEndValue(target)
+            self._pill_anim.start()
+            
+        self._pill_left_btn.clicked.connect(lambda: _scroll_carousel(-1))
+        self._pill_right_btn.clicked.connect(lambda: _scroll_carousel(1))
+        
         welcome_layout.addWidget(pills_row)
         
         welcome_layout.addStretch(1)

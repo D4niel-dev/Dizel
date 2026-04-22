@@ -695,3 +695,11 @@ class InputPanel(QFrame):
 
     def focus_input(self):
         self._input.setFocus()
+
+    @property
+    def current_model(self) -> str:
+        return self._current_model
+
+    @property
+    def current_mode(self) -> str:
+        return self._current_mode

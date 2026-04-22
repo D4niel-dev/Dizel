@@ -117,6 +117,12 @@ class PretrainConfig:
     # Overfitting mitigation on small data
     reshuffle_every_n_steps: int = 500
 
+    # v1.2 pipeline optimizations
+    shard_size_mb:  int   = 100          # tokenization shard size
+    cache_dir:      str   = ".cache/tokenized"
+    num_workers:    int   = 2            # DataLoader CPU workers
+    resume_enabled: bool  = True         # resume from cached shards
+
 
 # ---------------------------------------------------------------------------
 # Supervised Fine-Tuning (SFT / basic chat)
@@ -243,6 +249,12 @@ class MilaPretrainConfig:
     log_dir:        str   = "logs"
     run_name:       str   = "mila-pretrain"
     reshuffle_every_n_steps: int = 500
+
+    # v1.2 pipeline optimizations
+    shard_size_mb:  int   = 100
+    cache_dir:      str   = ".cache/tokenized"
+    num_workers:    int   = 2
+    resume_enabled: bool  = True
 
 
 @dataclass

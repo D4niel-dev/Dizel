@@ -41,6 +41,21 @@ class ConfigManager:
         "user_profile": {
             "username": "User",
             "avatar": ""
+        },
+        "token_budget": {
+            "chat_budget": 150,
+            "coding_budget": 350,
+            "complex_budget": 500,
+            "factual_budget": 100,
+            "tool_budget": 300,
+            "max_context_tokens": 3500,
+            "verbosity": "normal",
+            "hard_output_limit": 600,
+        },
+        "tutorial": {
+            "completed": False,
+            "skipped": False,
+            "rating": 0
         }
     }
 

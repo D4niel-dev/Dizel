@@ -112,6 +112,11 @@ class ChatManager:
         self.system_prompt:   str        = self._cfg.get("system_prompt", SYSTEM_PROMPT)
         self.session_id:      Optional[str] = None
 
+        # Active model variant & mode (set via apply_profile)
+        self._active_model: str = "Dizel Lite"
+        self._active_mode:  str = "Fast"
+        self._active_profile = None  # ModelProfile, set by apply_profile()
+
         # Sampling defaults (from disk)
         samp = self._cfg.get("sampling", {})
         self.temperature         = samp.get("temperature", 0.8)
@@ -119,6 +124,23 @@ class ChatManager:
         self.top_p               = samp.get("top_p", 0.92)
         self.repetition_penalty  = samp.get("repetition_penalty", 1.15)
         self.max_new_tokens      = samp.get("max_new_tokens", 200)
+
+    def apply_profile(self, model_name: str, mode_name: str) -> None:
+        """
+        Apply a model variant + mode profile.
+
+        Changes the system prompt and stores the profile so that
+        _generate_worker can use its sampling overrides and budget multiplier.
+        """
+        from .token_budget import get_model_profile
+        profile = get_model_profile(model_name, mode_name)
+
+        self._active_model   = model_name
+        self._active_mode    = mode_name
+        self._active_profile = profile
+        self.system_prompt   = profile.system_prompt
+
+        print(f"[ChatManager] Profile applied: {profile.label}", flush=True)
 
     # ── Model loading ──────────────────────────────────────────────────
 
@@ -391,25 +413,94 @@ class ChatManager:
         self._stop_requested = False
 
         try:
-            # Clamp max_new_tokens to leave room for the prompt
-            ctx = self._model.cfg.context_length
-            effective_max = min(self.max_new_tokens, ctx - 50)
-            if effective_max < 1:
-                effective_max = 50
-            if effective_max != self.max_new_tokens:
-                print(f"[ChatManager] Clamped max_new_tokens from {self.max_new_tokens} → {effective_max} (ctx={ctx})", flush=True)
+            from .token_budget import (
+                classify_task, allocate_token_budget, get_task_sampling,
+                log_budget_decision, TaskType,
+            )
+            from .context_trimmer import trim_context_if_needed, estimate_history_tokens
 
-            # Add user turn to history
+            ctx = self._model.cfg.context_length
+
+            # ── Step 1: Classify the task ────────────────────────────────
+            has_tools = bool(attachments)
+            task_type = classify_task(user_text, has_tools_active=has_tools)
+
+            # ── Step 2: Add user turn to history ─────────────────────────
             msg_dict = {"role": "user", "content": user_text}
             if attachments:
                 msg_dict["attachments"] = attachments
             self.history.append(msg_dict)
             print(f"[ChatManager] Generating response for: {user_text[:60]}...", flush=True)
 
-            prompt_ids  = self._build_prompt_ids()
-            print(f"[ChatManager] Raw prompt length: {len(prompt_ids)} tokens", flush=True)
-            prompt_ids  = self._trim_history_if_needed(prompt_ids, effective_max)
-            print(f"[ChatManager] Final prompt length: {len(prompt_ids)} tokens", flush=True)
+            # ── Step 3: Smart context trimming ───────────────────────────
+            budget_cfg = self._cfg.get("token_budget", {})
+            max_ctx_tokens = budget_cfg.get("max_context_tokens", ctx - 100)
+            trimmed_history, n_trimmed = trim_context_if_needed(
+                self.history, max_ctx_tokens,
+            )
+
+            # ── Step 4: Build prompt from (potentially trimmed) history ──
+            prompt_ids = self._build_prompt_ids(trimmed_history)
+            print(f"[ChatManager] Prompt length: {len(prompt_ids)} tokens (trimmed {n_trimmed} msgs)", flush=True)
+
+            # ── Step 5: Allocate dynamic token budget ────────────────────
+            verbosity = budget_cfg.get("verbosity", "normal")
+            hard_limit = budget_cfg.get("hard_output_limit", 0)
+            custom_budgets = {
+                "chat":       budget_cfg.get("chat_budget", 150),
+                "coding":     budget_cfg.get("coding_budget", 350),
+                "complex":    budget_cfg.get("complex_budget", 500),
+                "factual":    budget_cfg.get("factual_budget", 100),
+                "tool_based": budget_cfg.get("tool_budget", 300),
+            }
+
+            effective_max = allocate_token_budget(
+                task_type=task_type,
+                input_token_count=len(self._tokenizer.encode(user_text)),
+                context_tokens=len(prompt_ids),
+                model_ctx_length=ctx,
+                verbosity=verbosity,
+                custom_budgets=custom_budgets,
+                hard_output_limit=hard_limit,
+            )
+
+            # Apply model profile budget multiplier (Pro/Planning = more tokens)
+            if self._active_profile:
+                effective_max = int(effective_max * self._active_profile.budget_multiplier)
+                effective_max = max(30, min(effective_max, ctx - len(prompt_ids) - 10))
+
+            # ── Step 6: Apply sampling overrides ─────────────────────────
+            # Profile sampling takes priority, task sampling is the fallback
+            if self._active_profile:
+                sampling = self._active_profile.sampling
+            else:
+                sampling = get_task_sampling(task_type)
+
+            saved_temp   = self.temperature
+            saved_top_k  = self.top_k
+            saved_top_p  = self.top_p
+            saved_rep    = self.repetition_penalty
+
+            self.temperature        = sampling.temperature
+            self.top_k              = sampling.top_k
+            self.top_p              = sampling.top_p
+            self.repetition_penalty = sampling.repetition_penalty
+
+            # ── Step 7: Log the decision ─────────────────────────────────
+            profile_label = self._active_profile.label if self._active_profile else "default"
+            log_budget_decision(
+                task_type=task_type,
+                budget=effective_max,
+                context_tokens=len(prompt_ids),
+                model_ctx_length=ctx,
+                verbosity=verbosity,
+                trimmed_msgs=n_trimmed,
+                sampling=sampling,
+            )
+            print(f"[budget] profile={profile_label}", flush=True)
+
+            # Trim prompt if it still exceeds context window
+            prompt_ids = self._trim_history_if_needed(prompt_ids, effective_max)
 
             # Build end-token set (stop generation at these ids)
             end_ids = [self._tokenizer.eos_id]
@@ -529,6 +620,14 @@ class ChatManager:
             traceback.print_exc()
             on_error(f"Generation error: {exc}")
         finally:
+            # Restore original sampling params (undo task-specific overrides)
+            try:
+                self.temperature        = saved_temp
+                self.top_k              = saved_top_k
+                self.top_p              = saved_top_p
+                self.repetition_penalty = saved_rep
+            except NameError:
+                pass  # saved_* vars not yet assigned if error happened early
             self._is_generating  = False
             self._stop_requested = False
             print("[ChatManager] Generation finished, _is_generating = False", flush=True)

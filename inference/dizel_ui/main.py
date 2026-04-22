@@ -226,27 +226,27 @@ class DizelApp(QMainWindow):
         
         status_layout.addSpacing(16)
         
-        export_btn = QPushButton(" Export  ", self._status_bar)
-        export_btn.setFixedHeight(32)
-        export_btn.setLayoutDirection(Qt.RightToLeft)
+        self._export_btn = QPushButton(" Export  ", self._status_bar)
+        self._export_btn.setFixedHeight(32)
+        self._export_btn.setLayoutDirection(Qt.RightToLeft)
         export_ico = get_icon("external-link", size=(14, 14), color=TEXT_PRIMARY)
-        if export_ico: export_btn.setIcon(export_ico)
-        export_btn.setFont(LABEL_SM)
-        export_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
-        export_btn.setCursor(Qt.PointingHandCursor)
-        export_btn.clicked.connect(self._export_chat)
-        status_layout.addWidget(export_btn)
+        if export_ico: self._export_btn.setIcon(export_ico)
+        self._export_btn.setFont(LABEL_SM)
+        self._export_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
+        self._export_btn.setCursor(Qt.PointingHandCursor)
+        self._export_btn.clicked.connect(self._export_chat)
+        status_layout.addWidget(self._export_btn)
         
-        config_btn = QPushButton(" Configuration  ", self._status_bar)
-        config_btn.setFixedHeight(32)
-        config_btn.setLayoutDirection(Qt.RightToLeft)
+        self._config_btn = QPushButton(" Configuration  ", self._status_bar)
+        self._config_btn.setFixedHeight(32)
+        self._config_btn.setLayoutDirection(Qt.RightToLeft)
         config_ico = get_icon("settings", size=(14, 14), color=TEXT_PRIMARY)
-        if config_ico: config_btn.setIcon(config_ico)
-        config_btn.setFont(LABEL_SM)
-        config_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
-        config_btn.setCursor(Qt.PointingHandCursor)
-        config_btn.clicked.connect(self._open_settings)
-        status_layout.addWidget(config_btn)
+        if config_ico: self._config_btn.setIcon(config_ico)
+        self._config_btn.setFont(LABEL_SM)
+        self._config_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
+        self._config_btn.setCursor(Qt.PointingHandCursor)
+        self._config_btn.clicked.connect(self._open_settings)
+        status_layout.addWidget(self._config_btn)
         
         right_layout.addWidget(self._status_clip)
 
@@ -300,6 +300,101 @@ class DizelApp(QMainWindow):
         # Removed Avatar typing state tracking
 
         main_layout.addWidget(right_area, stretch=1)
+        self._setup_tutorial()
+
+    # ── Tutorial / Onboarding System ─────────────────────────────────────────
+
+    def _setup_tutorial(self):
+        from dizel_ui.logic.tutorial_manager import TutorialManager
+        
+        self._tut_mgr = TutorialManager()
+        if not self._tut_mgr.should_show():
+            return
+            
+        from dizel_ui.ui.tutorial_overlay import TutorialOverlay
+        from dizel_ui.ui.tutorial_tooltip import TutorialTooltip
+        
+        # Create overlay as a child of central_widget so it covers everything
+        self._tut_overlay = TutorialOverlay(self.central_widget)
+        self._tut_overlay.resize(self.central_widget.size())
+        self._tut_overlay.show()
+        
+        # Tooltip
+        self._tut_tooltip = TutorialTooltip(self.central_widget)
+        self._tut_tooltip.skip_clicked.connect(self._skip_tutorial)
+        self._tut_tooltip.prev_clicked.connect(self._prev_tutorial_step)
+        self._tut_tooltip.next_clicked.connect(self._next_tutorial_step)
+        self._tut_tooltip.finish_clicked.connect(self._finish_tutorial)
+        self._tut_tooltip.show()
+        
+        # Define targets for each step
+        self._tutorial_targets = {
+            "welcome":  self._chat_window,
+            "sidebar":  self._sidebar,
+            "config":   self._config_btn,
+            "input":    self._input_panel.box,
+            "tools":    self._input_panel._plus_btn,
+            "modes":    self._input_panel._model_btn,
+            "finish":   self._chat_window,
+        }
+        
+        self._update_tutorial_ui()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "_tut_overlay") and self._tut_overlay.isVisible():
+            self._tut_overlay.resize(self.central_widget.size())
+            self._update_tutorial_ui(animate=False)
+
+    def _update_tutorial_ui(self, animate: bool = True):
+        step = self._tut_mgr.get_current_step()
+        idx = self._tut_mgr.state.current_step_index
+        tot = self._tut_mgr.get_total_steps()
+        
+        # Update tooltip
+        self._tut_tooltip.set_step(step, idx, tot)
+        
+        # Update overlay target
+        target = self._tutorial_targets.get(step.target_widget_id)
+        if target and step.spotlight:
+            target_rect = self._tut_overlay.set_target(target, animate=animate)
+            self._tut_tooltip.move_adjacent_to(target_rect.toRect(), margin=20)
+        else:
+            self._tut_overlay.set_no_spotlight(animate=animate)
+            # Center tooltip
+            r = self.central_widget.rect()
+            w, h = self._tut_tooltip.width(), self._tut_tooltip.height()
+            self._tut_tooltip.move(r.width() // 2 - w // 2, r.height() // 2 - h // 2)
+
+    def _next_tutorial_step(self):
+        if self._tut_mgr.next_step():
+            self._update_tutorial_ui()
+
+    def _prev_tutorial_step(self):
+        if self._tut_mgr.prev_step():
+            self._update_tutorial_ui()
+            
+    def _skip_tutorial(self):
+        self._tut_mgr.skip()
+        self._close_tutorial()
+        
+    def _finish_tutorial(self, rating: int):
+        self._tut_mgr.complete(rating)
+        self._close_tutorial()
+        
+    def _close_tutorial(self):
+        # Fade out
+        self._tut_anim1 = QPropertyAnimation(self._tut_overlay, b"windowOpacity")
+        self._tut_anim1.setDuration(250)
+        self._tut_anim1.setEndValue(0.0)
+        self._tut_anim1.finished.connect(self._tut_overlay.deleteLater)
+        self._tut_anim1.start()
+        
+        self._tut_anim2 = QPropertyAnimation(self._tut_tooltip, b"windowOpacity")
+        self._tut_anim2.setDuration(250)
+        self._tut_anim2.setEndValue(0.0)
+        self._tut_anim2.finished.connect(self._tut_tooltip.deleteLater)
+        self._tut_anim2.start()
 
     # ── PySide6 Drag & Drop natively ───────────────────────────────────────
     def dragEnterEvent(self, event):
@@ -431,6 +526,12 @@ class DizelApp(QMainWindow):
         if self._chat_mgr.is_generating:
             self._show_status("⚠ Still generating — please wait or press Stop.")
             return
+
+        # Apply the selected model variant + mode profile before generating
+        self._chat_mgr.apply_profile(
+            self._input_panel.current_model,
+            self._input_panel.current_mode,
+        )
 
         self._input_panel.set_generating(True)
 

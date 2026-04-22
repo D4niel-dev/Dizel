@@ -56,7 +56,7 @@ data/raw/
 .vscode/
 .idea/
 node_modules/
-docs/
+#docs/
 
 # -----------------------
 # OS junk
@@ -86,3 +86,4 @@ checkpoints/
 # -----------------------
 .agent/
 .shared/
+plans/

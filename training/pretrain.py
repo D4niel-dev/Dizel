@@ -202,6 +202,10 @@ def train(cfg: DizelConfig, resume_from: str = None) -> None:
         batch_size     = pc.batch_size,
         train_split    = pc.train_split,
         seed           = pc.seed,
+        num_workers    = getattr(pc, "num_workers", 0),
+        shard_size_mb  = getattr(pc, "shard_size_mb", 100),
+        cache_dir      = getattr(pc, "cache_dir", ".cache/tokenized"),
+        resume_enabled = getattr(pc, "resume_enabled", True),
     )
 
     # -- Model -----------------------------------------------------------

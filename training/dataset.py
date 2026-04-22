@@ -30,6 +30,7 @@ import sys
 import os
 
 import torch
+import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -99,13 +100,16 @@ class PretrainDataset(Dataset):
 
     def __init__(
         self,
-        token_ids: list,           # full flat list of integer token ids
+        token_ids,                 # numpy array or list of integer token ids
         context_length: int,
         stride: int = None,        # step between windows; default = context_length // 2
         shuffle: bool = True,
         seed: int = 42,
     ) -> None:
-        self.data    = torch.tensor(token_ids, dtype=torch.long)
+        if isinstance(token_ids, np.ndarray):
+            self.data = torch.from_numpy(token_ids.astype(np.int64))
+        else:
+            self.data = torch.tensor(token_ids, dtype=torch.long)
         self.ctx     = context_length
         self.stride  = stride if stride is not None else context_length // 2
         self.shuffle = shuffle
@@ -147,38 +151,85 @@ def build_pretrain_loaders(
     train_split: float = 0.90,
     seed: int = 42,
     num_workers: int = 0,
+    shard_size_mb: int = 100,
+    cache_dir: str = ".cache/tokenized",
+    resume_enabled: bool = True,
 ):
     """
     Tokenise the corpus, split into train/val, return DataLoaders.
+
+    v1.2 pipeline upgrades:
+      - Large shards (~100MB) instead of 5MB micro-chunks
+      - Per-shard .pt caching for instant resume
+      - Batch tokenization (2MB text batches to SentencePiece)
 
     Returns
     -------
     train_loader, val_loader, train_dataset
     (train_dataset is returned so you can call reshuffle() each epoch)
     """
-    # ── Read and tokenise in chunks (avoids OOM on large corpora) ────────
+    from training.shard_utils import shard_corpus, read_shard
+    from training.cache_utils import (
+        get_cache_dir, load_manifest, save_manifest,
+        is_shard_cached, save_shard_tokens, load_shard_tokens,
+        load_all_cached_tokens,
+    )
+    from training.tokenizer_utils import tokenize_shard_batched
+
     file_size = os.path.getsize(data_path)
     file_mb = file_size / (1024 * 1024)
-    CHUNK_SIZE = 5 * 1024 * 1024   # 5 MB per chunk
+    corpus_name = os.path.splitext(os.path.basename(data_path))[0]
+    c_dir = get_cache_dir(cache_dir, corpus_name)
 
-    print(f"[dataset] Tokenising corpus ({file_mb:.1f} MB) in {CHUNK_SIZE // (1024*1024)} MB chunks ...")
+    # ── Compute shard boundaries ────────────────────────────────────────
+    boundaries = shard_corpus(data_path, shard_size_mb=shard_size_mb)
+    num_shards = len(boundaries)
+    print(f"[dataset] Corpus: {file_mb:.1f} MB → {num_shards} shards ({shard_size_mb} MB each)")
 
-    all_ids = []
-    bytes_read = 0
-    with open(data_path, "r", encoding="utf-8") as f:
-        while True:
-            chunk = f.read(CHUNK_SIZE)
-            if not chunk:
-                break
-            # Add BOS only at the very start
-            add_bos = (bytes_read == 0)
-            ids = tokenizer.encode(chunk, add_bos=add_bos)
-            all_ids.extend(ids)
-            bytes_read += len(chunk.encode("utf-8"))
-            pct = min(100, int(bytes_read / file_size * 100))
-            print(f"\r[dataset] Tokenising... {pct}%  ({len(all_ids):,} tokens)", end="", flush=True)
+    # ── Try loading entire cache first ──────────────────────────────────
+    if resume_enabled:
+        cached = load_all_cached_tokens(c_dir, num_shards)
+        if cached is not None:
+            print(f"[dataset] ✓ Loaded {len(cached):,} tokens from cache ({c_dir})")
+            all_ids = cached
+        else:
+            all_ids = None
+    else:
+        all_ids = None
 
-    print(f"\n[dataset] Total tokens: {len(all_ids):,}")
+    # ── Tokenize shards (with per-shard resume) ─────────────────────────
+    if all_ids is None:
+        manifest = load_manifest(c_dir)
+        shard_arrays = []
+        for idx, (start, end) in enumerate(boundaries):
+            shard_mb = (end - start) / (1024 * 1024)
+
+            if resume_enabled and is_shard_cached(c_dir, idx, manifest):
+                ids = load_shard_tokens(c_dir, idx)
+                print(f"  shard {idx+1}/{num_shards} ({shard_mb:.0f} MB) → cached ({len(ids):,} tokens)")
+            else:
+                text = read_shard(data_path, start, end)
+                ids = tokenize_shard_batched(
+                    text,
+                    encode_fn=tokenizer.encode,
+                    add_bos_first=(idx == 0),
+                )
+                ids = np.array(ids, dtype=np.int32)
+                # Persist for future runs
+                if resume_enabled:
+                    save_shard_tokens(c_dir, idx, ids)
+                    manifest.setdefault("completed_shards", []).append(idx)
+                    manifest["total_tokens"] = manifest.get("total_tokens", 0) + len(ids)
+                    save_manifest(c_dir, manifest)
+                print(f"  shard {idx+1}/{num_shards} ({shard_mb:.0f} MB) → tokenized ({len(ids):,} tokens)")
+
+            shard_arrays.append(ids if isinstance(ids, np.ndarray) else np.array(ids, dtype=np.int32))
+            del ids  # free shard memory immediately
+
+        all_ids = np.concatenate(shard_arrays)
+        del shard_arrays  # free the list of arrays
+
+    print(f"[dataset] Total tokens: {len(all_ids):,}")
 
     # ── Train / val split ───────────────────────────────────────────────
     split_at  = int(len(all_ids) * train_split)
@@ -189,7 +240,6 @@ def build_pretrain_loaders(
     print(f"[dataset] Val   tokens : {len(val_ids):,}")
 
     if len(val_ids) < context_length + 1:
-        # Small corpus: use last 10% of train as val
         fallback_split = int(len(train_ids) * 0.90)
         val_ids        = train_ids[fallback_split:]
         train_ids      = train_ids[:fallback_split]
@@ -203,13 +253,13 @@ def build_pretrain_loaders(
     )
     val_ds = PretrainDataset(
         val_ids, context_length,
-        stride=context_length,       # no overlap for val (cleaner estimate)
+        stride=context_length,
         shuffle=False,
     )
 
     train_loader = DataLoader(
         train_ds, batch_size=batch_size,
-        shuffle=False,               # PretrainDataset shuffles internally
+        shuffle=False,
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=True,

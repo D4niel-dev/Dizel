@@ -559,8 +559,46 @@ class SettingsDialog(QDialog):
         dc_row2.addWidget(ack_val)
         dc_lyt.addLayout(dc_row2)
         
+        dc_lyt.addSpacing(16)
+        
+        # Replay tutorial button
+        dc_row3 = QHBoxLayout()
+        tut_lbl = QLabel("First-run Onboarding")
+        tut_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        dc_row3.addWidget(tut_lbl)
+        dc_row3.addStretch(1)
+        
+        replay_btn = QPushButton("Replay Tutorial")
+        replay_btn.setFixedHeight(28)
+        replay_btn.setStyleSheet(get_button_style("transparent", "#334155", TEXT_DIM, radius=4) + "border: 1px solid #334155;")
+        replay_btn.setCursor(Qt.PointingHandCursor)
+        replay_btn.clicked.connect(self._reset_tutorial)
+        dc_row3.addWidget(replay_btn)
+        dc_lyt.addLayout(dc_row3)
+        
         layout.addWidget(data_card)
         layout.addStretch(1)
+
+    def _reset_tutorial(self):
+        from dizel_ui.logic.config_manager import ConfigManager
+        cfg = ConfigManager.load()
+        if "tutorial" not in cfg:
+            cfg["tutorial"] = {}
+        cfg["tutorial"]["completed"] = False
+        cfg["tutorial"]["skipped"] = False
+        ConfigManager.save(cfg)
+        
+        # Show toast message
+        import PySide6.QtWidgets as QtWidgets
+        from PySide6.QtCore import Qt
+        toast = QtWidgets.QLabel("Tutorial reset. Please restart the app.", self)
+        toast.setStyleSheet(f"background: {resolve(ACCENT)}; color: white; padding: 8px 16px; border-radius: 4px;")
+        toast.adjustSize()
+        toast.move(self.width() // 2 - toast.width() // 2, self.height() - toast.height() - 20)
+        toast.show()
+        
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(3000, toast.deleteLater)
 
     def _load_current(self):
         cfg = ConfigManager.load()

@@ -1,0 +1,46 @@
+/* docs/css/theme.css */
+:root {
+  /* Dizel GUI python vars mapped to CSS tokens (Dark Blue Theme) */
+  --bg-root: #0a0f18; 
+  --bg-sidebar: #06090f;
+  --bg-chat: #0f1725;
+  --bg-input: #182438;
+  --bg-card: #121a28;
+  
+  --accent: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.3);
+  --accent-hover: #0ea5e9;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --border-color: #1e293b;
+  --border-bright: #38bdf8;
+
+  --radius-sharp: 0px; 
+  --radius-button: 18px; /* Standardize with native app pills/buttons */
+  --radius-card: 16px;
+
+  /* Font settings - using geometric sans */
+  --font-main: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Roboto Mono', monospace;
+  
+  /* Dimensions */
+  --nav-height: 80px;
+}
+
+body {
+  background-color: var(--bg-root);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--text-primary);
+}
