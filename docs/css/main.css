@@ -29,7 +29,8 @@ a {
     align-items: center;
     padding: 0 2rem;
     z-index: 1000;
-    border: 1px solid var(--border-bright);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
     background: var(--bg-surface);
 }
 
@@ -66,13 +67,13 @@ a {
 
 /* Hero Section */
 .hero {
-    min-height: 100vh;
+    min-height: 90vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     position: relative;
-    padding-top: var(--nav-height);
+    padding-top: calc(var(--nav-height) + 2rem);
 }
 
 .hero-content {
@@ -661,8 +662,13 @@ a {
     /* App Mockup UI Mobile */
     .app-mockup-window {
         margin: 1.5rem auto 0;
-        height: 400px;
+        height: auto;
+        min-height: 400px;
+        width: 100%;
+        max-width: 100%;
     }
+    .app-mockup-main { padding: 1.5rem 1rem; }
+    .app-mockup-input { padding: 1.5rem 1rem; }
     .welcome-text {
         font-size: 1.6rem;
     }
@@ -700,10 +706,19 @@ a {
     .cta-section { padding: 4rem 1.5rem; }
 
     /* Phase 5 Updates */
-    .testimonial-grid { column-count: 1; }
+    .testimonial-grid { grid-template-columns: 1fr; }
     .pricing-grid { grid-template-columns: 1fr; }
     .architecture-stack { transform: rotateX(20deg) rotateZ(0deg) !important; }
     .arch-layer { width: 100%; padding: 1.5rem; }
+}
+
+/* Tablet breakpoint */
+@media (max-width: 1024px) {
+    .testimonial-grid { grid-template-columns: 1fr 1fr; }
+    .performance-grid { grid-template-columns: 1fr; }
+    .workspace-sidebar { width: 200px; }
+    .workspace-main h4 { font-size: 1.5rem; }
+    .hero-title { font-size: clamp(3rem, 8vw, 6rem); }
 }
 
 /* Use Cases Tabs */
@@ -904,7 +919,8 @@ a {
     background: rgba(20, 20, 30, 0.8);
     border: 1px solid var(--accent);
     padding: 2rem 4rem;
-    width: 400px;
+    width: 100%;
+    max-width: 400px;
     text-align: center;
     backdrop-filter: blur(4px);
     box-shadow: -20px 20px 40px rgba(0,0,0,0.5), inset 0 0 20px rgba(14, 165, 233, 0.1);
@@ -955,16 +971,15 @@ a {
 
 /* Testimonials */
 .testimonial-grid {
-    column-count: 3;
-    column-gap: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
     margin-top: 3rem;
 }
 .testimonial-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     padding: 2rem;
-    break-inside: avoid;
-    margin-bottom: 1.5rem;
     border-radius: var(--radius-sharp);
     transition: border-color 0.3s;
 }
@@ -1102,11 +1117,4 @@ a {
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--text-muted);
     font-size: 0.85rem;
-}
-
-@media (max-width: 768px) {
-    .nav-links { display: none; }
-    .hero-actions { flex-direction: column; }
-    .btn { width: 100%; }
-    .footer-content { flex-direction: column; align-items: center; text-align: center; }
 }

@@ -6,6 +6,7 @@
   --bg-chat: #0f1725;
   --bg-input: #182438;
   --bg-card: #121a28;
+  --bg-surface: rgba(10, 15, 24, 0.7); /* Added for glass effects */
   
   --accent: #38bdf8;
   --accent-glow: rgba(56, 189, 248, 0.3);
@@ -16,9 +17,9 @@
   --text-muted: #64748b;
   
   --border-color: #1e293b;
-  --border-bright: #38bdf8;
+  --border-bright: rgba(56, 189, 248, 0.4); /* Less intense for borders */
 
-  --radius-sharp: 0px; 
+  --radius-sharp: 8px; /* Was 0px, UI looks better with slightly rounded sharp corners */
   --radius-button: 18px; /* Standardize with native app pills/buttons */
   --radius-card: 16px;
 
