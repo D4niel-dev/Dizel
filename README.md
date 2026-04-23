@@ -323,7 +323,7 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 
 ---
 
-### Step 8 — Chat with Dizel
+### Step 8 — Chat with Dizel (Disable)
 
 **Interactive chat:**
 ```bash
