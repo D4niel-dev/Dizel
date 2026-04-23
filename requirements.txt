@@ -12,6 +12,13 @@ rich>=13.7.0
 # GUI Interface (Desktop App)
 pyside6>=6.6.0
 
+# API Provider SDKs (BYOK Router)
+httpx>=0.27.0
+openai>=1.30.0
+anthropic>=0.30.0
+google-genai>=1.0.0
+cryptography>=42.0.0
+
 # Optional: faster training logging
 # tensorboard>=2.14.0
 # tqdm>=4.66.0

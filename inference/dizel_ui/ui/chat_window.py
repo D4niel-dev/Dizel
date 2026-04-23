@@ -62,10 +62,12 @@ class ChatWindow(QFrame):
         self._token_count: int = 0
         self._state = ChatState.IDLE
         self._skip_animations = False
+
+        # Provider state for avatar/model display
+        self._provider_slug = "local"
+        self._model_name = ""
         
         self._build()
-
-
 
     def _build(self):
         layout = QVBoxLayout(self)
@@ -398,6 +400,11 @@ class ChatWindow(QFrame):
         self._scroll_to_bottom()
         return bubble
 
+    def set_provider_info(self, slug: str, model_name: str):
+        """Set the active provider info for bubble rendering."""
+        self._provider_slug = slug
+        self._model_name = model_name
+
     def add_assistant_message_instant(self, text: str) -> MessageBubble:
         """For loading history instantly."""
         self._dismiss_welcome()
@@ -406,6 +413,8 @@ class ChatWindow(QFrame):
             content=text, 
             bubble_width=self._bubble_width(), 
             on_regenerate=self._on_regenerate,
+            provider_slug=self._provider_slug,
+            model_name=self._model_name,
             parent=self._content_widget
         )
         bubble.finalise(text, "") # Skip action bar fade in for history
@@ -428,7 +437,13 @@ class ChatWindow(QFrame):
                         self._typing_indicator = None
                         self._typing_indicator_container = None
                     
-                    self._active_bubble = MessageBubble(role="assistant", content="", bubble_width=self._bubble_width(), parent=self._content_widget)
+                    self._active_bubble = MessageBubble(
+                        role="assistant", content="", 
+                        bubble_width=self._bubble_width(),
+                        provider_slug=self._provider_slug,
+                        model_name=self._model_name,
+                        parent=self._content_widget
+                    )
                     self._content_layout.addWidget(self._active_bubble)
                     self._active_bubble.append_text(piece)
                     self._token_count += 1
@@ -448,6 +463,8 @@ class ChatWindow(QFrame):
                     content="", 
                     bubble_width=self._bubble_width(), 
                     on_regenerate=self._on_regenerate,
+                    provider_slug=self._provider_slug,
+                    model_name=self._model_name,
                     parent=self._content_widget
                 )
                 self._content_layout.addWidget(self._active_bubble)

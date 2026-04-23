@@ -55,7 +55,20 @@ class MessageBubble(QFrame):
     """
     A single chat message rendered as a styled PySide6 bubble.
     """
-    def __init__(self, role: str, content: str, meta: str = "", attachments: list = None, bubble_width: int = 500, on_regenerate=None, parent=None):
+
+    _PROVIDER_AVATARS = {
+        "ollama": "ollama.png", "openai": "chatgpt.png",
+        "anthropic": "claude.png", "google": "gemini.png",
+        "groq": "Groq.png", "mistral": "mistral-ai.png",
+        "xai": "xai.png", "ai21": "ai21-labs.png",
+        "azure": "microsoft-azure-openaI.png",
+        "cohere": "cohere.png", "meta": "meta.png",
+    }
+
+    def __init__(self, role: str, content: str, meta: str = "", attachments: list = None,
+                 bubble_width: int = 500, on_regenerate=None,
+                 provider_slug: str = "local", model_name: str = "",
+                 parent=None):
         super().__init__(parent)
         self._on_regenerate = on_regenerate
 
@@ -65,7 +78,14 @@ class MessageBubble(QFrame):
         
         bg_color = BUBBLE_USER if self._is_user else BUBBLE_ASST
         txt_color = BUBBLE_USER_TXT if self._is_user else BUBBLE_ASST_TXT
-        role_label = "You" if self._is_user else "Dizel"
+
+        # Determine the display name for assistant
+        if self._is_user:
+            role_label = "You"
+        elif model_name:
+            role_label = model_name
+        else:
+            role_label = "Dizel"
 
         # Bubble alignment:
         # User = right aligned, Assistant = left aligned
@@ -91,7 +111,6 @@ class MessageBubble(QFrame):
         bubble_layout.setContentsMargins(16, 12, 16, 12)
         bubble_layout.setSpacing(4)
 
-        # Role label
         # Role + Avatar Container
         role_container = QFrame(self._bubble_frame)
         role_container.setStyleSheet("background: transparent;")
@@ -102,15 +121,44 @@ class MessageBubble(QFrame):
         self._avatar_lbl = None
         if not self._is_user:
             import os
-            from PySide6.QtGui import QPixmap
+            from PySide6.QtGui import QPixmap, QPainter, QPainterPath
             self._avatar_lbl = QLabel(role_container)
             self._avatar_lbl.setFixedSize(24, 24)
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            avatar_path = os.path.join(base_dir, "assets", "app", "Dizel.png")
+
+            # Choose avatar based on provider
+            avatar_path = None
+            needs_rounding = False
+            if provider_slug and provider_slug != "local":
+                fname = self._PROVIDER_AVATARS.get(provider_slug)
+                if fname:
+                    candidate = os.path.join(base_dir, "assets", "avatars", "providers", fname)
+                    if os.path.exists(candidate):
+                        avatar_path = candidate
+                        needs_rounding = True
+
+            if not avatar_path:
+                avatar_path = os.path.join(base_dir, "assets", "app", "Dizel.png")
+
             if os.path.exists(avatar_path):
                 original = QPixmap(avatar_path)
                 if not original.isNull():
-                    self._avatar_lbl.setPixmap(original.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    if needs_rounding:
+                        # Render as circle
+                        size = 24
+                        scaled = original.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+                        result = QPixmap(size, size)
+                        result.fill(Qt.transparent)
+                        painter = QPainter(result)
+                        painter.setRenderHint(QPainter.Antialiasing)
+                        clip = QPainterPath()
+                        clip.addEllipse(0, 0, size, size)
+                        painter.setClipPath(clip)
+                        painter.drawPixmap(0, 0, scaled)
+                        painter.end()
+                        self._avatar_lbl.setPixmap(result)
+                    else:
+                        self._avatar_lbl.setPixmap(original.scaled(24, 24, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             role_layout.addWidget(self._avatar_lbl)
 
         role_lbl = QLabel(role_label, role_container)

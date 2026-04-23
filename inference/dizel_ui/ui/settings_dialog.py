@@ -3,15 +3,15 @@
 import os
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, 
                                QWidget, QLabel, QPushButton, QLineEdit, QComboBox, 
-                               QTextEdit, QSlider, QCheckBox, QFileDialog, QScrollArea, QFrame, QSizePolicy)
+                               QTextEdit, QSlider, QCheckBox, QFileDialog, QScrollArea, QFrame, QSizePolicy, QGridLayout)
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QPainterPath
 
 from dizel_ui.utils.icons import get_icon
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, ACCENT, ACCENT_HOVER, BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
-    BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT, resolve
+    BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT, WELCOME_CARD_HOVER, resolve
 )
 from dizel_ui.theme.fonts import LOGO, BTN_LABEL, LABEL, LABEL_SM
 from dizel_ui.logic.config_manager import ConfigManager
@@ -27,6 +27,66 @@ except ImportError:
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _INFERENCE_DIR = os.path.dirname(_HERE)
+
+class ProviderCard(QPushButton):
+    def __init__(self, name, slug, avatar_path, parent=None):
+        super().__init__(parent)
+        self.name = name
+        self.slug = slug
+        self.setFixedHeight(84)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setCheckable(True)
+        
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 8px;
+            }}
+            QPushButton:hover {{
+                background-color: {resolve(WELCOME_CARD_HOVER)};
+            }}
+            QPushButton:checked {{
+                border: 2px solid {resolve(ACCENT)};
+                background-color: {resolve(WELCOME_CARD_HOVER)};
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 12, 8, 8)
+        layout.setSpacing(6)
+        
+        # Avatar
+        self.avatar_lbl = QLabel()
+        size = 28
+        self.avatar_lbl.setFixedSize(size, size)
+        
+        if avatar_path and os.path.exists(avatar_path):
+            pix = QPixmap(avatar_path)
+            scaled = pix.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            result = QPixmap(size, size)
+            result.fill(Qt.transparent)
+            painter = QPainter(result)
+            painter.setRenderHint(QPainter.Antialiasing)
+            clip = QPainterPath()
+            clip.addEllipse(0, 0, size, size)
+            painter.setClipPath(clip)
+            painter.drawPixmap(0, 0, scaled)
+            painter.end()
+            self.avatar_lbl.setPixmap(result)
+        else:
+            self.avatar_lbl.setText("?")
+            self.avatar_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-weight: bold; font-size: 14px;")
+            self.avatar_lbl.setAlignment(Qt.AlignCenter)
+            
+        layout.addWidget(self.avatar_lbl, alignment=Qt.AlignCenter)
+        
+        # Label
+        self.name_lbl = QLabel(name)
+        self.name_lbl.setFont(LABEL_SM)
+        self.name_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; border: none; background: transparent;")
+        self.name_lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.name_lbl, alignment=Qt.AlignCenter)
 
 class SettingsDialog(QDialog):
     def __init__(self, parent, chat_mgr, on_reload):
@@ -92,12 +152,12 @@ class SettingsDialog(QDialog):
 
         # Buttons Row
         btn_layout = QHBoxLayout()
-        back_btn = QPushButton("< Back")
+        back_btn = QPushButton("Back")
         back_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, border_color=BORDER))
         back_btn.setCursor(Qt.PointingHandCursor)
         back_btn.clicked.connect(self.reject)
         
-        close_btn = QPushButton("Save & Close")
+        close_btn = QPushButton("Save/Close")
         close_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff"))
         close_btn.setCursor(Qt.PointingHandCursor)
         close_btn.clicked.connect(self._save_and_reload)
@@ -137,7 +197,10 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(tab, "Chat")
 
         # Base Model
-        self._section(layout, "CHECKPOINT LOADER")
+        self._ckpt_label = QLabel("CHECKPOINT LOADER")
+        self._ckpt_label.setFont(LABEL)
+        self._ckpt_label.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-weight: 600; margin-top: 14px; margin-bottom: 8px; letter-spacing: 0.5px;")
+        layout.addWidget(self._ckpt_label)
         card = QFrame()
         card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
         card_l = QVBoxLayout(card)
@@ -170,7 +233,63 @@ class SettingsDialog(QDialog):
         row2.addWidget(self._device_combo)
         card_l.addLayout(row2)
         
+        self._ckpt_card = card
         layout.addWidget(card)
+
+        # ── API ROUTER ─────────────────────────────────────────────────
+        self._section(layout, "API ROUTER (BYOK)")
+        api_card = QFrame()
+        api_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        api_l = QVBoxLayout(api_card)
+        api_l.setContentsMargins(16, 16, 16, 16)
+        api_l.setSpacing(12)
+
+        # Provider selector grid
+        self._provider_cards = []
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(8)
+        
+        _providers = [
+            ("Local (Dizel)", "local"), ("Ollama", "ollama"), ("OpenAI", "openai"), ("Anthropic", "anthropic"),
+            ("Google (Gemini)", "google"), ("Groq", "groq"), ("Mistral AI", "mistral"), ("xAI", "xai"),
+            ("AI21 Labs", "ai21"), ("Azure OpenAI", "azure"), ("Cohere", "cohere"), ("Meta (Llama)", "meta")
+        ]
+        
+        for i, (name, slug) in enumerate(_providers):
+            avatar_path = None
+            if slug == "local":
+                avatar_path = os.path.join(_INFERENCE_DIR, "assets", "app", "Dizel.png")
+            else:
+                fname = self._SLUG_AVATAR_MAP.get(slug)
+                if fname:
+                    avatar_path = os.path.join(_INFERENCE_DIR, "assets", "avatars", "providers", fname)
+            
+            card_btn = ProviderCard(name, slug, avatar_path)
+            card_btn.clicked.connect(lambda checked, c=card_btn: self._on_provider_card_clicked(c))
+            self._provider_cards.append(card_btn)
+            grid_layout.addWidget(card_btn, i // 4, i % 4)
+            
+        api_l.addLayout(grid_layout)
+
+        # Status row
+        status_row = QHBoxLayout()
+        self._api_status = QLabel("Select a provider to get started")
+        self._api_status.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
+        status_row.addWidget(self._api_status)
+        status_row.addStretch(1)
+
+        configure_btn = QPushButton("Configure")
+        configure_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff", radius=8))
+        configure_btn.setCursor(Qt.PointingHandCursor)
+        configure_btn.setFixedHeight(32)
+        configure_btn.clicked.connect(self._open_api_config)
+        status_row.addWidget(configure_btn)
+        api_l.addLayout(status_row)
+
+        layout.addWidget(api_card)
+
+        # Load saved provider preference
+        self._sync_provider_ui()
 
         # System Card
         self._section(layout, "SYSTEM PROMPT")
@@ -695,3 +814,103 @@ class SettingsDialog(QDialog):
             self._mgr._device = self._device_combo.currentText()
         self.accept()
         self._on_reload()
+
+    # ── API Router handlers ────────────────────────────────────────────
+
+    _PROVIDER_SLUG_MAP = {
+        "Local (Dizel)": "local",
+        "Ollama": "ollama",
+        "OpenAI": "openai",
+        "Anthropic": "anthropic",
+        "Google (Gemini)": "google",
+        "Groq": "groq",
+        "Mistral AI": "mistral",
+        "xAI": "xai",
+        "AI21 Labs": "ai21",
+        "Azure OpenAI": "azure",
+        "Cohere": "cohere",
+        "Meta (Llama)": "meta",
+    }
+
+    _SLUG_AVATAR_MAP = {
+        "ollama": "ollama.png",
+        "openai": "chatgpt.png",
+        "anthropic": "claude.png",
+        "google": "gemini.png",
+        "groq": "Groq.png",
+        "mistral": "mistral-ai.png",
+        "xai": "xai.png",
+        "ai21": "ai21-labs.png",
+        "azure": "microsoft-azure-openaI.png",
+        "cohere": "cohere.png",
+        "meta": "meta.png",
+    }
+
+    def _on_provider_card_clicked(self, clicked_card):
+        # Uncheck all others
+        for card in self._provider_cards:
+            if card != clicked_card:
+                card.setChecked(False)
+        # Ensure clicked stays checked
+        clicked_card.setChecked(True)
+
+        self._selected_provider_slug = clicked_card.slug
+        slug = clicked_card.slug
+
+        # Show/hide checkpoint section (label + card)
+        is_local = slug == "local"
+        self._ckpt_label.setVisible(is_local)
+        self._ckpt_card.setVisible(is_local)
+
+        # Update status
+        if slug == "local":
+            self._api_status.setText("Using local Dizel checkpoint")
+        else:
+            cfg = ConfigManager.load()
+            api_cfg = cfg.get("api_router", {})
+            if api_cfg.get("provider") == slug and api_cfg.get("available_models"):
+                count = len(api_cfg["available_models"])
+                self._api_status.setText(f"🟢 Connected — {count} model{'s' if count != 1 else ''} available")
+                self._api_status.setStyleSheet("color: #10b981; font-size: 13px;")
+            else:
+                self._api_status.setText("Click Configure to set up this provider")
+                self._api_status.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
+
+    def _sync_provider_ui(self):
+        """Load saved provider from config and update the UI."""
+        cfg = ConfigManager.load()
+        api_cfg = cfg.get("api_router", {})
+        saved_slug = api_cfg.get("provider", "local")
+
+        for card in self._provider_cards:
+            if card.slug == saved_slug:
+                self._on_provider_card_clicked(card)
+                break
+
+    def _open_api_config(self):
+        slug = getattr(self, "_selected_provider_slug", "local")
+
+        if slug == "local":
+            self._api_status.setText("Local mode uses the checkpoint loader above")
+            self._api_status.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
+            return
+
+        from dizel_ui.logic.providers import get_provider
+        provider = get_provider(slug)
+
+        from dizel_ui.ui.api_key_dialog import APIKeyDialog
+        dlg = APIKeyDialog(provider.info, parent=self)
+        dlg.connection_validated.connect(self._on_api_validated)
+        dlg.exec()
+
+    def _on_api_validated(self, slug, models):
+        count = len(models)
+        self._api_status.setText(f"🟢 Connected — {count} model{'s' if count != 1 else ''} available")
+        self._api_status.setStyleSheet("color: #10b981; font-size: 13px;")
+
+        # Also save provider selection
+        cfg = ConfigManager.load()
+        api_cfg = cfg.get("api_router", {})
+        api_cfg["provider"] = slug
+        cfg["api_router"] = api_cfg
+        ConfigManager.save(cfg)

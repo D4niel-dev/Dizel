@@ -37,7 +37,6 @@ tokenizer/*.txt
 datasets/
 inference/dizel_ui/history/
 inference/dizel_ui/.dizel/
-inference/dizel_ui/assets/
 *.csv
 *.json
 *.jsonl
@@ -56,7 +55,6 @@ data/raw/
 .vscode/
 .idea/
 node_modules/
-#docs/
 
 # -----------------------
 # OS junk

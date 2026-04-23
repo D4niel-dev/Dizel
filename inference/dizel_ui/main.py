@@ -521,7 +521,7 @@ class DizelApp(QMainWindow):
 
     def _on_send(self, text: str, files: list = None):
         if not self._chat_mgr.is_ready:
-            self._show_status("⚠ Model not loaded — open Settings (⚙) to select a checkpoint.")
+            self._show_status("⚠ No model available — open Settings (⚙) to configure a provider or checkpoint.")
             return
         if self._chat_mgr.is_generating:
             self._show_status("⚠ Still generating — please wait or press Stop.")
@@ -532,6 +532,15 @@ class DizelApp(QMainWindow):
             self._input_panel.current_model,
             self._input_panel.current_mode,
         )
+
+        # Set provider info for avatar/model display in bubbles
+        provider_slug = self._input_panel.provider_slug
+        model_name = self._input_panel.current_model
+        self._chat_window.set_provider_info(provider_slug, model_name)
+
+        # Update api_model on chat manager if external provider
+        if provider_slug != "local":
+            self._chat_mgr._api_model = model_name
 
         self._input_panel.set_generating(True)
 
@@ -843,6 +852,10 @@ class DizelApp(QMainWindow):
         if Theme.mode != old_mode:
             self._apply_theme()
 
+        # Reload provider state after settings dialog closes
+        self._chat_mgr.reload_provider()
+        self._input_panel._load_provider_state()
+
     def _on_profile_click(self):
         cfg = ConfigManager.load()
         current_profile = cfg.get("user_profile", {"username": "User", "avatar": ""})
@@ -898,6 +911,14 @@ class DizelApp(QMainWindow):
                 self._chat_window.set_skip_animations(False)
 
     def _reload_model(self):
+        # Reload provider state first
+        self._chat_mgr.reload_provider()
+
+        # If using an external API provider, no local checkpoint needed
+        if self._chat_mgr.active_provider_slug != "local":
+            self._show_status(f"✓ Connected to {self._chat_mgr.active_provider_slug} provider.", dim=True)
+            return
+
         ckpt = getattr(self._chat_mgr, "_pending_checkpoint", "")
         device = getattr(self._chat_mgr, "_device", "cpu")
         if ckpt:

@@ -125,6 +125,39 @@ class ChatManager:
         self.repetition_penalty  = samp.get("repetition_penalty", 1.15)
         self.max_new_tokens      = samp.get("max_new_tokens", 200)
 
+        # ── API Provider state ──────────────────────────────────────
+        self._provider_slug  = "local"
+        self._api_provider   = None   # BaseProvider instance
+        self._api_key        = ""
+        self._api_model      = ""
+        self._load_provider_state()
+
+    def _load_provider_state(self) -> None:
+        """Load API provider config from disk."""
+        from .config_manager import decrypt_key
+        api_cfg = self._cfg.get("api_router", {})
+        self._provider_slug = api_cfg.get("provider", "local")
+        self._api_model = api_cfg.get("model", "")
+        self._api_key = decrypt_key(api_cfg.get("api_key", ""))
+
+        if self._provider_slug != "local":
+            try:
+                from .providers import get_provider
+                kwargs = {}
+                if self._provider_slug == "ollama":
+                    kwargs["ollama_url"] = api_cfg.get("ollama_url", "http://localhost:11434")
+                self._api_provider = get_provider(self._provider_slug, **kwargs)
+                print(f"[ChatManager] API provider loaded: {self._provider_slug}", flush=True)
+            except Exception as e:
+                print(f"[ChatManager] Failed to load provider '{self._provider_slug}': {e}", flush=True)
+                self._api_provider = None
+                self._provider_slug = "local"
+
+    def reload_provider(self) -> None:
+        """Re-read provider config (called after settings change)."""
+        self._cfg = ConfigManager.load()
+        self._load_provider_state()
+
     def apply_profile(self, model_name: str, mode_name: str) -> None:
         """
         Apply a model variant + mode profile.
@@ -254,11 +287,22 @@ class ChatManager:
 
     @property
     def is_ready(self) -> bool:
+        # Ready if local model loaded OR an API provider is configured
+        if self._provider_slug != "local" and self._api_provider is not None:
+            return True
         return self._model is not None and self._tokenizer is not None
 
     @property
     def is_generating(self) -> bool:
         return self._is_generating
+
+    @property
+    def active_provider_slug(self) -> str:
+        return self._provider_slug
+
+    @property
+    def active_api_model(self) -> str:
+        return self._api_model
 
     @property
     def model_info(self) -> dict:
@@ -328,27 +372,97 @@ class ChatManager:
         """
         Send a user message and generate a response asynchronously.
 
-        Callbacks are called from the background thread — use
-        root.after(0, callback) if you need to update CTk widgets.
+        Routes to API provider or local torch inference based on active provider.
+        Callbacks are called from the background thread.
         """
         if not self.is_ready:
-            on_error("Model not loaded. Please select a checkpoint in Settings.")
+            on_error("Model not loaded. Configure a provider or checkpoint in Settings.")
             return
 
         if self._is_generating:
             on_error("Already generating. Please wait.")
             return
 
-        thread = threading.Thread(
-            target=self._generate_worker,
-            args=(user_text, attachments, on_token, on_done, on_error),
-            daemon=True,
-        )
+        # Route: API provider or local inference
+        if self._provider_slug != "local" and self._api_provider is not None:
+            thread = threading.Thread(
+                target=self._generate_via_api,
+                args=(user_text, on_token, on_done, on_error),
+                daemon=True,
+            )
+        else:
+            thread = threading.Thread(
+                target=self._generate_worker,
+                args=(user_text, attachments, on_token, on_done, on_error),
+                daemon=True,
+            )
         thread.start()
 
     def stop_generation(self) -> None:
         """Request early stop of the current generation."""
         self._stop_requested = True
+
+    # ── API provider generation ────────────────────────────────────────
+
+    def _generate_via_api(
+        self,
+        user_text: str,
+        on_token:  Callable[[str], None],
+        on_done:   Callable[[str], None],
+        on_error:  Callable[[str], None],
+    ) -> None:
+        """Background thread: stream from an external API provider."""
+        self._is_generating  = True
+        self._stop_requested = False
+
+        try:
+            # Record user message
+            self.history.append({"role": "user", "content": user_text})
+
+            # Build messages for the API (OpenAI format)
+            messages = []
+            if self.system_prompt:
+                messages.append({"role": "system", "content": self.system_prompt})
+            for msg in self.history:
+                messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"],
+                })
+
+            # Get provider-specific kwargs
+            kwargs = {}
+            api_cfg = self._cfg.get("api_router", {})
+            if self._provider_slug == "ollama":
+                kwargs["ollama_url"] = api_cfg.get("ollama_url", "http://localhost:11434")
+            elif self._provider_slug == "azure":
+                kwargs["azure_resource"] = api_cfg.get("azure_resource", "")
+                kwargs["azure_deployment"] = api_cfg.get("azure_deployment", "")
+
+            full_response = []
+            for token in self._api_provider.chat_stream(
+                messages=messages,
+                model=self._api_model,
+                key=self._api_key,
+                temperature=self.temperature,
+                max_tokens=self.max_new_tokens,
+                **kwargs,
+            ):
+                if self._stop_requested:
+                    break
+                full_response.append(token)
+                on_token(token)
+
+            response_text = "".join(full_response)
+            self.history.append({"role": "assistant", "content": response_text})
+            on_done(response_text)
+
+        except (ConnectionError, RuntimeError, ImportError) as e:
+            on_error(str(e))
+        except Exception as e:
+            on_error(f"API error: {e}")
+        finally:
+            self._is_generating  = False
+            self._stop_requested = False
 
     # ── Internal generation ────────────────────────────────────────────
 

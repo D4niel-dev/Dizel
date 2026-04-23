@@ -81,6 +81,8 @@ def append_tokens_to_bin(cache_dir: str, token_ids: np.ndarray) -> int:
     arr = token_ids.astype(np.int32)
     with open(path, "ab") as f:
         f.write(arr.tobytes())
+        f.flush()
+        os.fsync(f.fileno())
     return len(arr)
 
 
@@ -88,8 +90,18 @@ def build_memmap(cache_dir: str, total_tokens: int) -> np.ndarray:
     """
     Open the flat binary file as a read-only memory-mapped int32 array.
     This uses virtually ZERO RAM — the OS pages data from disk on demand.
+    
+    If the file is smaller than expected (e.g. disk pressure truncated it),
+    we clamp to the actual token count derived from the file size.
     """
     path = tokens_bin_path(cache_dir)
+    actual_bytes = os.path.getsize(path)
+    expected_bytes = total_tokens * 4  # int32 = 4 bytes
+    if actual_bytes < expected_bytes:
+        actual_tokens = actual_bytes // 4
+        print(f"[cache] ⚠ tokens.bin is {actual_bytes:,} bytes but expected {expected_bytes:,}")
+        print(f"[cache]   Clamping from {total_tokens:,} → {actual_tokens:,} tokens")
+        total_tokens = actual_tokens
     return np.memmap(path, dtype=np.int32, mode="r", shape=(total_tokens,))
 
 

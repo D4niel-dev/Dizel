@@ -20,11 +20,19 @@ from dizel_ui.ui.animated_button import AnimatedIconButton
 class ModelSelectorPopup(QFrame):
     selected = Signal(str)
     
-    def __init__(self, current: str, parent=None):
+    # Default local models (used when provider == "local")
+    _LOCAL_MODELS = [
+        ("Dizel Lite", "zap"),
+        ("Dizel Pro", "cpu"),
+        ("Mila Lite", "zap"),
+        ("Mila Pro", "cpu"),
+    ]
+
+    def __init__(self, current: str, parent=None, models=None, provider_slug="local"):
         super().__init__(parent)
         self.setWindowFlags(Qt.Popup | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setFixedWidth(200)
+        self.setFixedWidth(240)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -36,15 +44,17 @@ class ModelSelectorPopup(QFrame):
         c_layout = QVBoxLayout(container)
         c_layout.setContentsMargins(6, 6, 6, 6)
         c_layout.setSpacing(4)
+
+        # Build model list
+        if provider_slug == "local" or not models:
+            entries = self._LOCAL_MODELS
+        else:
+            entries = [(m["name"] if isinstance(m, dict) else m.name, None) for m in models]
         
-        # Format: Name, Icon
-        models = [
-            ("Dizel Lite", "zap"),
-            ("Dizel Pro", "cpu"),
-            ("Mila Lite", "zap"),
-            ("Mila Pro", "cpu")
-        ]
-        for name, ico_name in models:
+        for item in entries:
+            name = item[0] if isinstance(item, tuple) else item
+            ico_name = item[1] if isinstance(item, tuple) and len(item) > 1 else None
+            
             btn = QPushButton(container)
             btn.setFixedHeight(36)
             is_active = (name == current)
@@ -55,10 +65,13 @@ class ModelSelectorPopup(QFrame):
             
             c_text = resolve(ACCENT) if is_active else resolve(TEXT_PRIMARY)
             
-            # Icon
+            # Icon: provider avatar (rounded) or feather icon
             ico_lbl = QLabel(btn)
-            i_obj = get_icon(ico_name, size=(16, 16), color=ACCENT if is_active else TEXT_DIM)
-            if i_obj: ico_lbl.setPixmap(i_obj.pixmap(16, 16))
+            if provider_slug != "local" and provider_slug:
+                self._set_provider_icon(ico_lbl, provider_slug, 16)
+            elif ico_name:
+                i_obj = get_icon(ico_name, size=(16, 16), color=ACCENT if is_active else TEXT_DIM)
+                if i_obj: ico_lbl.setPixmap(i_obj.pixmap(16, 16))
             ico_lbl.setStyleSheet("background: transparent;")
             b_layout.addWidget(ico_lbl)
             
@@ -95,6 +108,38 @@ class ModelSelectorPopup(QFrame):
             c_layout.addWidget(btn)
             
         layout.addWidget(container)
+
+    @staticmethod
+    def _set_provider_icon(label, slug, size):
+        """Load a provider avatar as a rounded pixmap into a QLabel."""
+        from PySide6.QtGui import QPainter, QPainterPath
+        _AVATAR_MAP = {
+            "ollama": "ollama.png", "openai": "chatgpt.png",
+            "anthropic": "claude.png", "google": "gemini.png",
+            "groq": "Groq.png", "mistral": "mistral-ai.png",
+            "xai": "xai.png", "ai21": "ai21-labs.png",
+            "azure": "microsoft-azure-openaI.png",
+            "cohere": "cohere.png", "meta": "meta.png",
+        }
+        fname = _AVATAR_MAP.get(slug)
+        if not fname:
+            return
+        base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "avatars", "providers")
+        path = os.path.join(base, fname)
+        if not os.path.exists(path):
+            return
+        pix = QPixmap(path)
+        scaled = pix.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        result = QPixmap(size, size)
+        result.fill(Qt.transparent)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+        clip = QPainterPath()
+        clip.addEllipse(0, 0, size, size)
+        painter.setClipPath(clip)
+        painter.drawPixmap(0, 0, scaled)
+        painter.end()
+        label.setPixmap(result)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -269,6 +314,9 @@ class InputPanel(QFrame):
         self._active_contexts = set()
         self._current_model = "Dizel Lite"
         self._current_mode = "Fast"
+        self._provider_slug = "local"
+        self._provider_models = []
+        self._load_provider_state()
 
         self.setStyleSheet(f"background-color: transparent; border: none;")
         self._build()
@@ -650,8 +698,44 @@ class InputPanel(QFrame):
     def get_active_contexts(self) -> set:
         return self._active_contexts.copy()
 
+    def _load_provider_state(self):
+        """Load active provider and cached models from config."""
+        from dizel_ui.logic.config_manager import ConfigManager
+        cfg = ConfigManager.load()
+        api_cfg = cfg.get("api_router", {})
+        self._provider_slug = api_cfg.get("provider", "local")
+        self._provider_models = api_cfg.get("available_models", [])
+        # If a provider model was saved, restore it
+        saved_model = api_cfg.get("model", "")
+        if saved_model and self._provider_slug != "local":
+            self._current_model = saved_model
+            if hasattr(self, '_model_btn'):
+                self._model_btn.setText(f"  {saved_model}")
+
+    def refresh_provider(self, slug=None, models=None):
+        """Called externally when the provider/models change (e.g., from settings)."""
+        if slug is not None:
+            self._provider_slug = slug
+        if models is not None:
+            self._provider_models = models
+        if self._provider_slug != "local" and self._provider_models:
+            first = self._provider_models[0]
+            name = first["name"] if isinstance(first, dict) else first.name
+            self._current_model = name
+            if hasattr(self, '_model_btn'):
+                self._model_btn.setText(f"  {name}")
+        elif self._provider_slug == "local":
+            self._current_model = "Dizel Lite"
+            if hasattr(self, '_model_btn'):
+                self._model_btn.setText("  Dizel Lite")
+
     def _show_model_menu(self):
-        self._popup = ModelSelectorPopup(self._current_model, self.window())
+        self._popup = ModelSelectorPopup(
+            self._current_model,
+            self.window(),
+            models=self._provider_models if self._provider_slug != "local" else None,
+            provider_slug=self._provider_slug,
+        )
         self._popup.selected.connect(self._on_model_selected)
         
         btn_pos = self._model_btn.mapToGlobal(self._model_btn.rect().topLeft())
@@ -661,7 +745,18 @@ class InputPanel(QFrame):
     def _on_model_selected(self, model_name):
         self._current_model = model_name
         self._model_btn.setText(f"  {model_name}")
-        brand = "Mila" if "Mila" in model_name else "Dizel"
+        # Save selected model to config
+        from dizel_ui.logic.config_manager import ConfigManager
+        cfg = ConfigManager.load()
+        api_cfg = cfg.get("api_router", {})
+        api_cfg["model"] = model_name
+        cfg["api_router"] = api_cfg
+        ConfigManager.save(cfg)
+        # Update placeholder
+        if self._provider_slug == "local":
+            brand = "Mila" if "Mila" in model_name else "Dizel"
+        else:
+            brand = model_name
         self._input.setPlaceholderText(f"Message {brand}…")
 
     def _show_mode_menu(self):
@@ -703,3 +798,7 @@ class InputPanel(QFrame):
     @property
     def current_mode(self) -> str:
         return self._current_mode
+
+    @property
+    def provider_slug(self) -> str:
+        return self._provider_slug
