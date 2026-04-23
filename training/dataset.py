@@ -100,16 +100,19 @@ class PretrainDataset(Dataset):
 
     def __init__(
         self,
-        token_ids,                 # numpy array or list of integer token ids
+        token_ids,                 # numpy array (or memmap) or list of token ids
         context_length: int,
         stride: int = None,        # step between windows; default = context_length // 2
         shuffle: bool = True,
         seed: int = 42,
     ) -> None:
+        # Keep as numpy/memmap — do NOT convert the whole thing to a torch tensor.
+        # This is critical for memory-mapped arrays where the data lives on disk.
         if isinstance(token_ids, np.ndarray):
-            self.data = torch.from_numpy(token_ids.astype(np.int64))
+            self.data = token_ids  # keep as numpy (could be memmap)
         else:
-            self.data = torch.tensor(token_ids, dtype=torch.long)
+            self.data = np.array(token_ids, dtype=np.int32)
+        self._is_memmap = isinstance(self.data, np.memmap)
         self.ctx     = context_length
         self.stride  = stride if stride is not None else context_length // 2
         self.shuffle = shuffle
@@ -138,8 +141,9 @@ class PretrainDataset(Dataset):
 
     def __getitem__(self, idx: int):
         start = self._starts[idx]
-        x = self.data[start     : start + self.ctx]
-        y = self.data[start + 1 : start + self.ctx + 1]
+        # Only convert the small window to tensor (not the whole array)
+        x = torch.from_numpy(self.data[start     : start + self.ctx].astype(np.int64).copy())
+        y = torch.from_numpy(self.data[start + 1 : start + self.ctx + 1].astype(np.int64).copy())
         return x, y
 
 
@@ -158,10 +162,10 @@ def build_pretrain_loaders(
     """
     Tokenise the corpus, split into train/val, return DataLoaders.
 
-    v1.2 pipeline upgrades:
-      - Large shards (~100MB) instead of 5MB micro-chunks
-      - Per-shard .pt caching for instant resume
-      - Batch tokenization (2MB text batches to SentencePiece)
+    v1.3 pipeline — memory-mapped approach:
+      - Each shard is tokenized and immediately written to a flat binary file
+      - The binary file is memory-mapped for training (near-zero RAM usage)
+      - Supports incremental resume via per-shard .pt cache + manifest
 
     Returns
     -------
@@ -172,7 +176,8 @@ def build_pretrain_loaders(
     from training.cache_utils import (
         get_cache_dir, load_manifest, save_manifest,
         is_shard_cached, save_shard_tokens, load_shard_tokens,
-        load_all_cached_tokens,
+        is_bin_complete, append_tokens_to_bin, build_memmap,
+        tokens_bin_path,
     )
     from training.tokenizer_utils import tokenize_shard_batched
 
@@ -186,21 +191,24 @@ def build_pretrain_loaders(
     num_shards = len(boundaries)
     print(f"[dataset] Corpus: {file_mb:.1f} MB → {num_shards} shards ({shard_size_mb} MB each)")
 
-    # ── Try loading entire cache first ──────────────────────────────────
+    # ── Check if tokens.bin is already complete ─────────────────────────
+    total_tokens = None
     if resume_enabled:
-        cached = load_all_cached_tokens(c_dir, num_shards)
-        if cached is not None:
-            print(f"[dataset] ✓ Loaded {len(cached):,} tokens from cache ({c_dir})")
-            all_ids = cached
-        else:
-            all_ids = None
-    else:
-        all_ids = None
+        total_tokens = is_bin_complete(c_dir, num_shards)
 
-    # ── Tokenize shards (with per-shard resume) ─────────────────────────
-    if all_ids is None:
+    if total_tokens is not None:
+        print(f"[dataset] ✓ tokens.bin complete: {total_tokens:,} tokens (memory-mapped)")
+        all_ids = build_memmap(c_dir, total_tokens)
+    else:
+        # ── Stream tokenize → tokens.bin (one shard at a time) ──────────
         manifest = load_manifest(c_dir)
-        shard_arrays = []
+
+        # Remove stale tokens.bin if it exists (we're rebuilding)
+        bin_path = tokens_bin_path(c_dir)
+        if os.path.exists(bin_path):
+            os.remove(bin_path)
+
+        total_tokens = 0
         for idx, (start, end) in enumerate(boundaries):
             shard_mb = (end - start) / (1024 * 1024)
 
@@ -215,19 +223,25 @@ def build_pretrain_loaders(
                     add_bos_first=(idx == 0),
                 )
                 ids = np.array(ids, dtype=np.int32)
-                # Persist for future runs
+                # Persist .pt for future resume
                 if resume_enabled:
                     save_shard_tokens(c_dir, idx, ids)
                     manifest.setdefault("completed_shards", []).append(idx)
-                    manifest["total_tokens"] = manifest.get("total_tokens", 0) + len(ids)
                     save_manifest(c_dir, manifest)
                 print(f"  shard {idx+1}/{num_shards} ({shard_mb:.0f} MB) → tokenized ({len(ids):,} tokens)")
 
-            shard_arrays.append(ids if isinstance(ids, np.ndarray) else np.array(ids, dtype=np.int32))
-            del ids  # free shard memory immediately
+            # Stream to binary file immediately, then free RAM
+            append_tokens_to_bin(c_dir, ids)
+            total_tokens += len(ids)
+            del ids  # free shard memory IMMEDIATELY
 
-        all_ids = np.concatenate(shard_arrays)
-        del shard_arrays  # free the list of arrays
+        # Update manifest with total
+        manifest["total_tokens"] = total_tokens
+        save_manifest(c_dir, manifest)
+        print(f"[dataset] ✓ tokens.bin built: {total_tokens:,} tokens")
+
+        # Open as memmap (zero RAM)
+        all_ids = build_memmap(c_dir, total_tokens)
 
     print(f"[dataset] Total tokens: {len(all_ids):,}")
 
