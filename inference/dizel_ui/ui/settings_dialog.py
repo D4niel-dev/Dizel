@@ -238,7 +238,8 @@ class SettingsDialog(QDialog):
 
         # ── API ROUTER ─────────────────────────────────────────────────
         self._section(layout, "API ROUTER (BYOK)")
-        api_card = QFrame()
+        self._api_card_widget = QFrame()
+        api_card = self._api_card_widget
         api_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
         api_l = QVBoxLayout(api_card)
         api_l.setContentsMargins(16, 16, 16, 16)

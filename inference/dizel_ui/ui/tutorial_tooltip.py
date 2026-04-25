@@ -20,18 +20,27 @@ class TutorialTooltip(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(360)
+        self.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setFixedWidth(400) # Increased slightly to account for shadow margins
         
+        # Outer layout to hold the container and shadow margins
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(20, 20, 20, 30) # Bottom needs 30px for shadow
+        
+        self.container = QFrame(self)
         bg = resolve(BG_INPUT)
         border = resolve(BORDER)
-        self.setStyleSheet(get_frame_style(bg, radius=16, border_color=border))
+        self.container.setStyleSheet(get_frame_style(bg, radius=16, border_color=border))
         
-        # Shadow
-        shadow = QGraphicsDropShadowEffect(self)
+        # Shadow applied to container, not the top-level window
+        shadow = QGraphicsDropShadowEffect(self.container)
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 60))
         shadow.setOffset(0, 8)
-        self.setGraphicsEffect(shadow)
+        self.container.setGraphicsEffect(shadow)
+        
+        outer_layout.addWidget(self.container)
 
         self._build_ui()
         
@@ -43,29 +52,29 @@ class TutorialTooltip(QFrame):
         self._anim.setEasingCurve(QEasingCurve.OutCubic)
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self.container)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
         
         # Header (Step count + Title)
-        self.step_lbl = QLabel("Step 1 of X", self)
+        self.step_lbl = QLabel("Step 1 of X", self.container)
         self.step_lbl.setFont(LABEL_SM)
         self.step_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent; border: none;")
         layout.addWidget(self.step_lbl)
         
-        self.title_lbl = QLabel("Title", self)
+        self.title_lbl = QLabel("Title", self.container)
         self.title_lbl.setFont(NAV_ITEM)
         self.title_lbl.setStyleSheet(f"color: {resolve(ACCENT)}; font-weight: bold; background: transparent; border: none;")
         layout.addWidget(self.title_lbl)
         
-        self.body_lbl = QLabel("Body text goes here...", self)
+        self.body_lbl = QLabel("Body text goes here...", self.container)
         self.body_lbl.setFont(LABEL_DIM)
         self.body_lbl.setWordWrap(True)
         self.body_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none;")
         layout.addWidget(self.body_lbl)
         
         # Rating container (hidden by default)
-        self.rating_container = QFrame(self)
+        self.rating_container = QFrame(self.container)
         self.rating_container.setStyleSheet("background: transparent; border: none;")
         r_layout = QHBoxLayout(self.rating_container)
         r_layout.setContentsMargins(0, 8, 0, 8)
@@ -88,23 +97,23 @@ class TutorialTooltip(QFrame):
         self.action_layout = QHBoxLayout()
         self.action_layout.setContentsMargins(0, 8, 0, 0)
         
-        self.skip_btn = QPushButton("Skip", self)
+        self.skip_btn = QPushButton("Skip", self.container)
         self.skip_btn.setCursor(Qt.PointingHandCursor)
         self.skip_btn.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent; border: none;")
         self.skip_btn.clicked.connect(self.skip_clicked.emit)
         
-        self.back_btn = QPushButton("← Back", self)
+        self.back_btn = QPushButton("← Back", self.container)
         self.back_btn.setCursor(Qt.PointingHandCursor)
         self.back_btn.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none;")
         self.back_btn.clicked.connect(self.prev_clicked.emit)
         
-        self.next_btn = QPushButton("Next →", self)
+        self.next_btn = QPushButton("Next →", self.container)
         self.next_btn.setCursor(Qt.PointingHandCursor)
         self.next_btn.setFixedHeight(32)
         self.next_btn.setStyleSheet(get_button_style(SEND_BTN, SEND_BTN_HOVER, "#ffffff", radius=16))
         self.next_btn.clicked.connect(self.next_clicked.emit)
         
-        self.finish_btn = QPushButton("Finish", self)
+        self.finish_btn = QPushButton("Finish", self.container)
         self.finish_btn.setCursor(Qt.PointingHandCursor)
         self.finish_btn.setFixedHeight(32)
         self.finish_btn.setStyleSheet(get_button_style(SEND_BTN, SEND_BTN_HOVER, "#ffffff", radius=16))
@@ -131,7 +140,7 @@ class TutorialTooltip(QFrame):
         self.back_btn.setVisible(index > 0)
         
         is_last = (index == total - 1)
-        self.next_btn.setVisible(not is_last)
+        self.next_btn.setVisible(not is_last and not getattr(step, "require_action", False))
         self.finish_btn.setVisible(is_last)
         self.skip_btn.setVisible(not is_last)
         
@@ -160,7 +169,8 @@ class TutorialTooltip(QFrame):
         # Determine best placement
         if not self.parentWidget(): return
         
-        parent_rect = self.parentWidget().rect()
+        parent = self.parentWidget()
+        parent_rect = parent.rect()
         w = self.width()
         h = self.height()
         
@@ -178,7 +188,7 @@ class TutorialTooltip(QFrame):
                 # Try above
                 y = target_rect.top() - h - margin
             
-        # Clamp to bounds
+        # Clamp to bounds of the parent window (but mapped to global later)
         min_x = 16
         max_x = parent_rect.width() - w - 16
         x = max(min_x, min(x, max_x))
@@ -187,13 +197,14 @@ class TutorialTooltip(QFrame):
         max_y = parent_rect.height() - h - 16
         y = max(min_y, min(y, max_y))
         
-        # Move
-        new_pos = QPoint(x, y)
+        # Convert local point to global screen coordinates so the top-level window follows it
+        local_pt = QPoint(x, y)
+        global_pt = parent.mapToGlobal(local_pt)
         
         if self.pos() == QPoint(0,0):
-            self.move(new_pos)
+            self.move(global_pt)
         else:
             self._anim.stop()
             self._anim.setStartValue(self.pos())
-            self._anim.setEndValue(new_pos)
+            self._anim.setEndValue(global_pt)
             self._anim.start()

@@ -9,7 +9,8 @@ class TutorialOverlay(QWidget):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, False) # Catch clicks unless they hit tooltip
+        # Make the overlay visually present but completely transparent to all mouse clicks
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.NoFocus)
         self.setStyleSheet("background: transparent;")
         
@@ -32,7 +33,9 @@ class TutorialOverlay(QWidget):
     def set_target(self, widget: QWidget, padding: int = 8, animate: bool = True) -> QRectF:
         # Calculate target rect relative to this overlay
         if widget and widget.isVisible():
-            pt = widget.mapTo(self.parentWidget(), widget.rect().topLeft())
+            # Use global coordinates to bridge across top-level window boundaries (like dialogs)
+            global_pt = widget.mapToGlobal(widget.rect().topLeft())
+            pt = self.parentWidget().mapFromGlobal(global_pt)
             rect = QRectF(pt.x() - padding, pt.y() - padding, 
                          widget.width() + padding*2, widget.height() + padding*2)
         else:
@@ -86,5 +89,4 @@ class TutorialOverlay(QWidget):
             painter.setPen(pen)
             painter.drawRoundedRect(self._current_rect, 12, 12)
 
-    def mousePressEvent(self, event):
-        event.accept() # Consume clicks on overlay so they don't hit underlying UI
+

@@ -6,7 +6,7 @@ import sys
 import threading
 
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QProgressBar, QFileDialog
-from PySide6.QtCore import Qt, QTimer, QSize, Slot, Signal, QPropertyAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QTimer, QSize, Slot, Signal, QPropertyAnimation, QEasingCurve, QPoint
 from PySide6.QtGui import QIcon, QPixmap
 
 # ── Make project root importable ──────────────────────────────────────────────
@@ -35,7 +35,7 @@ from dizel_ui.logic.config_manager import ConfigManager
 from dizel_ui.logic.usage_manager import UsageManager
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, BG_INPUT, ACCENT, TEXT_PRIMARY, TEXT_DIM,
-    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, resolve
+    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, resolve
 )
 from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 from dizel_ui.utils.icons import get_icon
@@ -292,6 +292,7 @@ class DizelApp(QMainWindow):
             on_voice=self._do_voice,
             parent=right_area
         )
+        self._input_panel.local_model_switch.connect(self._on_local_model_switch)
         right_layout.addWidget(self._input_panel)
         
         # Load user profile UI details
@@ -359,12 +360,54 @@ class DizelApp(QMainWindow):
         if target and step.spotlight:
             target_rect = self._tut_overlay.set_target(target, animate=animate)
             self._tut_tooltip.move_adjacent_to(target_rect.toRect(), margin=20)
+            
+            # If the target is the input panel, force keyboard focus to it automatically!
+            if step.id == "first_message" and hasattr(self._input_panel, "focus_input"):
+                self._input_panel.focus_input()
         else:
             self._tut_overlay.set_no_spotlight(animate=animate)
-            # Center tooltip
+            # Center tooltip globally relative to the window
             r = self.central_widget.rect()
-            w, h = self._tut_tooltip.width(), self._tut_tooltip.height()
-            self._tut_tooltip.move(r.width() // 2 - w // 2, r.height() // 2 - h // 2)
+            w, h = self._tut_tooltip.width(), self._tut_tooltip.height() 
+            local_center = QPoint(r.width() // 2 - w // 2, r.height() // 2 - h // 2)
+            global_center = self.central_widget.mapToGlobal(local_center)
+            self._tut_tooltip.move(global_center)
+
+        # Trigger special programmatic interactions
+        action_id = getattr(step, "action_id", None)
+        if action_id == "open_modal_settings":
+            if not hasattr(self, "_tut_settings_dlg"):
+                # Non-blocking show
+                from ui.settings_dialog import SettingsDialog
+                self._tut_settings_dlg = SettingsDialog(parent=self, chat_mgr=self._chat_mgr, on_reload=self._reload_model)
+                self._tut_settings_dlg.show()
+                # Register the new widget target
+                self._tutorial_targets["api_grid"] = self._tut_settings_dlg._api_card_widget
+                
+                # Since the tooltip now calculates target pos, we need to do this slightly after
+                # the dialog finishes showing/laying out.
+                def _recalc():
+                    self._update_tutorial_ui(animate=False)
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(50, _recalc)
+            
+        elif action_id == "close_modal_settings":
+            if hasattr(self, "_tut_settings_dlg"):
+                self._tut_settings_dlg.close()
+                del self._tut_settings_dlg
+
+        # Highlight logic for dialog elements (bypass overlay limitations)
+        if hasattr(self, "_tut_settings_dlg"):
+            api_card = getattr(self._tut_settings_dlg, "_api_card_widget", None)
+            if api_card:
+                if step.id == "api_router":
+                    api_card.setStyleSheet(get_frame_style(BG_CARD, radius=12, border_color=ACCENT))
+                else:
+                    api_card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        elif action_id == "show_tools":
+            # Slide open the tools menu programmatically without them having to click
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(400, self._input_panel._toggle_action_menu)
 
     def _next_tutorial_step(self):
         if self._tut_mgr.next_step():
@@ -520,12 +563,15 @@ class DizelApp(QMainWindow):
         self._on_send(prompt)
 
     def _on_send(self, text: str, files: list = None):
-        if not self._chat_mgr.is_ready:
-            self._show_status("⚠ No model available — open Settings (⚙) to configure a provider or checkpoint.")
-            return
         if self._chat_mgr.is_generating:
             self._show_status("⚠ Still generating — please wait or press Stop.")
             return
+
+        # Advance tutorial if we were waiting for the first message
+        if getattr(self, "_tut_mgr", None) and self._tut_mgr.should_show():
+            step = self._tut_mgr.get_current_step()
+            if getattr(step, "id", "") == "first_message":
+                self._next_tutorial_step()
 
         # Apply the selected model variant + mode profile before generating
         self._chat_mgr.apply_profile(
@@ -551,6 +597,17 @@ class DizelApp(QMainWindow):
         state = ToolState.from_ui(active, text, files)
 
         def _do_generate():
+            if not self._chat_mgr.is_ready:
+                # The fallback response when no model is loaded
+                def mock_reply():
+                    self._show_status("⚠ No model available.", dim=False)
+                    msg = "It's seems you forgot to load a checkpoint or provide any API key! Please, go into the Configuration and select a checkpoint or provide an API key!"
+                    self._chat_window.finish_assistant_message("")
+                    self._chat_window.add_assistant_message_instant(msg)
+                    self._input_panel.set_generating(False)
+                QTimer.singleShot(800, mock_reply)
+                return
+
             if state.has_active_tools():
                 threading.Thread(
                     target=self._tool_pipeline, args=(state,), daemon=True
@@ -560,6 +617,7 @@ class DizelApp(QMainWindow):
                 self._start_generation(text, files)
                 
         self._chat_window.begin_response_flow(text, files, on_ready=_do_generate)
+
 
         # Since it takes time for the animation, we shouldn't immediately load tools
         # until the flow reaches the processing step (handled by begin_response_flow)
@@ -927,6 +985,57 @@ class DizelApp(QMainWindow):
             self._load_model_async(ckpt, device)
         else:
             self._show_status("Settings applied.", dim=True)
+
+    def _on_local_model_switch(self, model_name: str):
+        """Resolve a local model name to a checkpoint and load it."""
+        import glob
+
+        ckpt_dir = os.path.join(_PROJ_ROOT, "checkpoints")
+        if not os.path.isdir(ckpt_dir):
+            self._show_status("No Checkpoint Found — Go to Configuration to load a checkpoint.", dim=True)
+            return
+
+        # Parse brand and variant from the display name
+        lower = model_name.lower()
+        brand = "mila" if "mila" in lower else "dizel"
+        variant = "pro" if "pro" in lower else "lite"
+
+        all_pts = sorted(glob.glob(os.path.join(ckpt_dir, "*.pt")))
+        if not all_pts:
+            self._show_status("No Checkpoint Found — Go to Configuration to load a checkpoint.", dim=True)
+            return
+
+        # 1. Exact match: filename contains both brand AND variant
+        match = None
+        for p in all_pts:
+            fn = os.path.basename(p).lower()
+            if brand in fn and variant in fn:
+                match = p
+                break
+
+        # 2. Brand match: filename contains the brand name
+        if not match:
+            for p in all_pts:
+                fn = os.path.basename(p).lower()
+                if brand in fn:
+                    match = p
+                    break
+
+        # 3. Fallback: use the currently loaded checkpoint if available
+        if not match and self._checkpoint and os.path.exists(self._checkpoint):
+            match = self._checkpoint
+
+        # 4. Last resort: any .pt file
+        if not match:
+            match = all_pts[0]
+
+        # Don't reload if it's the same checkpoint already loaded
+        if match == self._checkpoint and self._model_loaded:
+            self._show_status(f"Model ready. ({os.path.basename(match)})", dim=True)
+            return
+
+        self._show_status(f"Switching to {model_name}…")
+        self._load_model_async(match, self._device)
 
 
 def parse_args():

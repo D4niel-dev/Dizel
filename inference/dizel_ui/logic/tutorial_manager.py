@@ -9,6 +9,8 @@ class TutorialStep:
     body: str
     target_widget_id: str
     spotlight: bool
+    action_id: Optional[str] = None
+    require_action: bool = False
 
 class TutorialState:
     def __init__(self, cfg: dict):
@@ -38,23 +40,26 @@ class TutorialManager:
         TutorialStep(
             id="config",
             title="Configuration & Model",
-            body="Load your AI model checkpoint here, adjust settings, or export your conversation. Click Configuration (⚙) to get started.",
+            body="First, let's look at Configuration. That gear icon opens a beautiful control panel for models.",
             target_widget_id="config",
             spotlight=True
+            # No action_id here, just pointing at the gear icon
         ),
         TutorialStep(
-            id="input",
-            title="Start a Conversation",
-            body="Type your message here and press Enter to send. Use Shift+Enter for new lines.",
-            target_widget_id="input",
-            spotlight=True
+            id="api_router",
+            title="Meet the API Router",
+            body="Dizel natively supports cloud models right alongside local checkpoints. Choose Groq, OpenAI, Anthropic, and more right here.",
+            target_widget_id="api_grid",
+            spotlight=True,
+            action_id="open_modal_settings" # Opens settings immediately when arriving at this step
         ),
         TutorialStep(
             id="tools",
             title="Powerful Tools",
             body="Click the + button to access powerful tools: Web Search, Deep Think, file parsing, and more. Each tool changes how Dizel responds.",
             target_widget_id="tools",
-            spotlight=True
+            spotlight=True,
+            action_id="close_modal_settings" # Closes the modal returning to the main screen
         ),
         TutorialStep(
             id="modes",
@@ -62,6 +67,14 @@ class TutorialManager:
             body="Switch between model variants (Lite/Pro) and modes (Fast/Planning). Each combination has a different personality and response style.",
             target_widget_id="modes",
             spotlight=True
+        ),
+        TutorialStep(
+            id="first_message",
+            title="Send Your First Message",
+            body="Type something in the text box below and press Enter! The tutorial will wait for you to do this.",
+            target_widget_id="input",
+            spotlight=True,
+            require_action=True
         ),
         TutorialStep(
             id="finish",

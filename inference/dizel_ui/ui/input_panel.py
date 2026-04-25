@@ -302,6 +302,8 @@ class _InputTextEdit(QTextEdit):
         super().keyPressEvent(e)
 
 class InputPanel(QFrame):
+    local_model_switch = Signal(str)  # Emitted when user picks a local model variant
+
     def __init__(self, on_send, on_stop, on_settings=lambda: None, on_attach=lambda: None, 
                  on_options=lambda: None, on_voice=lambda: None, parent=None):
         super().__init__(parent)
@@ -608,6 +610,9 @@ class InputPanel(QFrame):
         h = max(44, min(lines * 22 + 20, 150))
         self._input.setFixedHeight(h)
 
+    def focus_input(self):
+        self._input.setFocus()
+
     def _on_return(self, shift):
         if not shift:
             self._do_submit()
@@ -755,6 +760,7 @@ class InputPanel(QFrame):
         # Update placeholder
         if self._provider_slug == "local":
             brand = "Mila" if "Mila" in model_name else "Dizel"
+            self.local_model_switch.emit(model_name)
         else:
             brand = model_name
         self._input.setPlaceholderText(f"Message {brand}…")

@@ -19,19 +19,19 @@ class ModelConfig:
     vocab_size: int = 32000
 
     # Maximum sequence (context) length in tokens
-    context_length: int = 4096
+    context_length: int = 2048
 
     # Transformer hidden dimension
-    d_model: int = 1024
+    d_model: int = 896
 
     # Number of transformer layers
-    n_layers: int = 20
+    n_layers: int = 18
 
     # Number of attention heads  (d_model must be divisible by n_heads)
-    n_heads: int = 16
+    n_heads: int = 14
 
     # Feed-forward expansion factor (FFN hidden dim = d_model * ffn_mult)
-    ffn_mult: int = 4
+    ffn_mult: float = 3.5
 
     # Dropout rate — lower with larger datasets
     dropout: float = 0.05
@@ -53,7 +53,7 @@ class ModelConfig:
 
     @property
     def ffn_dim(self) -> int:
-        return self.d_model * self.ffn_mult
+        return int(self.d_model * self.ffn_mult)
 
     def param_estimate(self) -> int:
         """Rough parameter count (ignoring biases and LayerNorm)."""
