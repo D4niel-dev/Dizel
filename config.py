@@ -93,8 +93,8 @@ class PretrainConfig:
     seed:           int   = 42
 
     # Optimisation (tuned for ~205M model on T4)
-    batch_size:     int   = 2           # micro-batch (halved for VRAM)
-    grad_accum:     int   = 32          # effective batch = 64 sequences
+    batch_size:     int   = 4           # micro-batch (halved for VRAM)
+    grad_accum:     int   = 16          # effective batch = 64 sequences
     max_steps:      int   = 15000       # reduced for v1.2.1 trimmed data
     warmup_steps:   int   = 1500        # proportional warmup
     lr:             float = 3e-5        # peak LR for 205M
@@ -103,7 +103,7 @@ class PretrainConfig:
     grad_clip:      float = 1.0
 
     # Mixed precision (set False if your GPU does not support fp16/bf16)
-    use_amp:        bool  = False       # disabled for CPU-only
+    use_amp:        bool  = True       # disabled for CPU-only
     amp_dtype:      str   = "float16"   # T4 only supports float16, not bfloat16
 
     # Logging & checkpoints
@@ -134,8 +134,8 @@ class SFTConfig:
     output_dir:     str   = "checkpoints"
     run_name:       str   = "dizel-sft"
 
-    batch_size:     int   = 1           # T4 VRAM constraint
-    grad_accum:     int   = 32          # effective batch = 32 sequences
+    batch_size:     int   = 2           # T4 VRAM constraint
+    grad_accum:     int   = 16          # effective batch = 32 sequences
     max_steps:      int   = 10000       # reduced for v1.2.1 trimmed mix
     warmup_steps:   int   = 400         # proportional to reduced steps
     lr:             float = 2e-5        # learning rate for 205M
@@ -143,7 +143,7 @@ class SFTConfig:
     weight_decay:   float = 0.05
     grad_clip:      float = 1.0
 
-    use_amp:        bool  = False       # disabled for CPU-only
+    use_amp:        bool  = True       # disabled for CPU-only
     amp_dtype:      str   = "float16"    # T4 only supports float16
 
     eval_interval:  int   = 250         # more frequent eval with fewer steps
