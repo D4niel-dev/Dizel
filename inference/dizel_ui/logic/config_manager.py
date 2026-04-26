@@ -114,6 +114,12 @@ class ConfigManager:
             "azure_deployment": "",
             "available_models": [],
         },
+        "nova": {
+            "model_size": "base",
+            "language": "auto",
+            "silence_timeout": 5,
+            "show_waveform": True,
+        },
     }
 
     @classmethod

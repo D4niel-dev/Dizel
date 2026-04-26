@@ -25,10 +25,10 @@ class ModelConfig:
     d_model: int = 896
 
     # Number of transformer layers
-    n_layers: int = 18
+    n_layers: int = 20
 
     # Number of attention heads  (d_model must be divisible by n_heads)
-    n_heads: int = 14
+    n_heads: int = 16
 
     # Feed-forward expansion factor (FFN hidden dim = d_model * ffn_mult)
     ffn_mult: float = 3.5
@@ -92,12 +92,12 @@ class PretrainConfig:
     train_split:    float = 0.90        # fraction used for training
     seed:           int   = 42
 
-    # Optimisation (tuned for ~252M model stability)
+    # Optimisation (tuned for ~205M model on T4)
     batch_size:     int   = 2           # micro-batch (halved for VRAM)
     grad_accum:     int   = 32          # effective batch = 64 sequences
-    max_steps:      int   = 30000       # more steps for larger model
-    warmup_steps:   int   = 2000        # longer warmup for stability
-    lr:             float = 3e-5        # lower peak LR for 252M
+    max_steps:      int   = 15000       # reduced for v1.2.1 trimmed data
+    warmup_steps:   int   = 1500        # proportional warmup
+    lr:             float = 3e-5        # peak LR for 205M
     min_lr:         float = 3e-6        # cosine decay floor
     weight_decay:   float = 0.01
     grad_clip:      float = 1.0
@@ -112,7 +112,7 @@ class PretrainConfig:
     save_interval:  int   = 1000
     checkpoint_dir: str   = "checkpoints"
     log_dir:        str   = "logs"
-    run_name:       str   = "dizel-v12-pretrain"
+    run_name:       str   = "dizel-pretrain"
 
     # Overfitting mitigation on small data
     reshuffle_every_n_steps: int = 500
@@ -129,16 +129,16 @@ class PretrainConfig:
 # ---------------------------------------------------------------------------
 @dataclass
 class SFTConfig:
-    sft_data_path:  str   = "sft_data/chat_v12.jsonl"
+    sft_data_path:  str   = "sft_data/chat_expanded.jsonl"
     base_checkpoint: str  = ""          # path to pretrained .pt file
     output_dir:     str   = "checkpoints"
-    run_name:       str   = "dizel-v12-sft"
+    run_name:       str   = "dizel-sft"
 
-    batch_size:     int   = 1           # smaller micro-batch for 252M + 4096 ctx
-    grad_accum:     int   = 64          # effective batch = 64 sequences
-    max_steps:      int   = 20000
-    warmup_steps:   int   = 800         # longer warmup for stability
-    lr:             float = 2e-5        # lower LR for larger model
+    batch_size:     int   = 1           # T4 VRAM constraint
+    grad_accum:     int   = 32          # effective batch = 32 sequences
+    max_steps:      int   = 10000       # reduced for v1.2.1 trimmed mix
+    warmup_steps:   int   = 400         # proportional to reduced steps
+    lr:             float = 2e-5        # learning rate for 205M
     min_lr:         float = 2e-6
     weight_decay:   float = 0.05
     grad_clip:      float = 1.0
@@ -146,9 +146,9 @@ class SFTConfig:
     use_amp:        bool  = False       # disabled for CPU-only
     amp_dtype:      str   = "float16"    # T4 only supports float16
 
-    eval_interval:  int   = 500
+    eval_interval:  int   = 250         # more frequent eval with fewer steps
     eval_iters:     int   = 50
-    save_interval:  int   = 1000
+    save_interval:  int   = 500         # more checkpoints to pick from
 
     # Only compute loss on the assistant turns (ignore user/system tokens)
     mask_prompt_loss: bool = True

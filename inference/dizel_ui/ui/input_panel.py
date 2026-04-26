@@ -453,6 +453,7 @@ class InputPanel(QFrame):
         box_layout.addWidget(self._action_row)
         main_layout.addWidget(self.box)
 
+
         # 2. Footer hints
         footer = QFrame(self)
         footer.setStyleSheet("background: transparent;")
@@ -470,6 +471,18 @@ class InputPanel(QFrame):
         f_layout.addWidget(self._hint_lbl, alignment=Qt.AlignLeft)
         f_layout.addWidget(self._counter_lbl, alignment=Qt.AlignRight)
         main_layout.addWidget(footer)
+
+    def set_recording_state(self, is_recording: bool):
+        """Update the voice button visual state to indicate recording."""
+        if is_recording:
+            v_ico = get_icon("mic", size=(18,18), color="#ef4444")  # Red
+            self._voice_btn.setStyleSheet(get_button_style("#fee2e2", "#fecaca", "#ef4444", radius=16))
+        else:
+            v_ico = get_icon("mic", size=(18,18), color=TEXT_DIM)
+            self._voice_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=16))
+            
+        if v_ico:
+            self._voice_btn.setIcon(v_ico)
 
     def _setup_action_menu(self):
         self._action_menu = ActionMenu(self.window())

@@ -94,25 +94,25 @@ register_model(ModelEntry(
     status="deprecated",
 ))
 
-# Dizel v1.2 (current default)
+# Dizel v1.2.1 (current default)
 register_model(ModelEntry(
-    name="Dizel v1.2",
+    name="Dizel v1.2.1",
     key="dizel-v1.2",
     config=ModelConfig(
         vocab_size=32000,
         context_length=2048,
         d_model=896,
-        n_layers=18,
-        n_heads=14,
+        n_layers=20,
+        n_heads=16,
         ffn_mult=3.5,
         dropout=0.05,
         weight_tying=True,
         bias=False,
         rope_base=10000.0,
     ),
-    description="the new and improved ~187.7M parameter model with RoPE, 2K context, and weighted dataset mixing.",
-    version="v1.2.0",
-    param_count="~187.7M",
+    description="~205.3M parameter model with RoPE, 2K context, and Code-First dataset mixing.",
+    version="v1.2.1",
+    param_count="~205.3M",
     is_default=True,
     status="available",
 ))

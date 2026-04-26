@@ -3,9 +3,9 @@
 ## Model CLI
 APP_NAME = "Dizel CLI"
 MODEL_NAME = "Dizel"
-VERSION = "v1.2.0"
-MODEL_SIZE = "284M parameters"
-CONTEXT_LENGTH = "4096 Tokens"
+VERSION = "v1.2.1"
+MODEL_SIZE = "205M parameters"
+CONTEXT_LENGTH = "2048 Tokens"
 VOCAB_SIZE = "32,000 tokens"
 AUTHOR = "D4niel-dev"
 DESCRIPTION = "A Structured Analytical Reasoning & Math LLM"
@@ -14,8 +14,8 @@ DESCRIPTION = "A Structured Analytical Reasoning & Math LLM"
 ARCHITECTURE = "Transformer (RoPE)"
 NUM_LAYERS = 20
 NUM_HEADS = 16
-HIDDEN_DIM = 1024
-MLP_SIZE = 4096
+HIDDEN_DIM = 896
+MLP_SIZE = 3136
 DROPOUT = 0.05
 CAPABILITIES = {
     "Reasoning",
@@ -43,4 +43,4 @@ SPECIAL_TOKENS = {
 ## Model Others
 REPOSITORY = "https://github.com/d4niel-dev/dizel"
 LICENSE = "MIT"
-BUILD = "2026-04-16"
+BUILD = "2026-04-26"

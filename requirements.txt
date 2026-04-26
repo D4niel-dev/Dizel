@@ -5,6 +5,8 @@
 torch>=2.1.0
 numpy>=1.24.0
 sentencepiece>=0.1.99
+openai-whisper>=20231117
+sounddevice>=0.4.6
 
 # CLI Interface
 rich>=13.7.0

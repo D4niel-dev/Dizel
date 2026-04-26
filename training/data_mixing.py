@@ -30,26 +30,26 @@ class DatasetMixConfig:
     seed: int = 42
 
 
-# Default mix for Dizel v1.2 SFT
-# Ratios: conversational 3×, code 1.5×, factual 1.5×
+# Default mix for Dizel v1.2.1 SFT
+# Identity: Code + Reasoning specialist (contrast with Mila = conversational)
+# Total: ~30K effective samples — optimized for 205M param model
 DEFAULT_MIX = DatasetMixConfig(datasets=[
-    # ── Conversational (weight 3.0) — drives chat behavior ────────────
-    DatasetMixEntry("ultrachat",    "data/processed/ultrachat.jsonl",    weight=3.0),
-    DatasetMixEntry("oasst2",       "data/processed/oasst2.jsonl",       weight=3.0),
-    DatasetMixEntry("sharegpt",     "data/processed/sharegpt.jsonl",     weight=3.0),
+    # ── Dizel Identity (weight 5.0) — personality anchor ──────────────
+    DatasetMixEntry("chat_expanded", "sft_data/chat_expanded.jsonl",     weight=5.0),
 
-    # ── Instruction following (weight 2.0) — general task completion ──
-    DatasetMixEntry("alpaca_gpt4",  "data/processed/alpaca_gpt4.jsonl",  weight=2.0),
-    DatasetMixEntry("openorca",     "data/processed/openorca.jsonl",     weight=2.0, max_samples=100000),
-    DatasetMixEntry("dolly",        "data/processed/dolly.jsonl",        weight=2.0),
+    # ── Code & Reasoning (weight 2.5–3.0) — Dizel's core skill ───────
+    DatasetMixEntry("codealpaca",    "data/processed/codealpaca.jsonl",   weight=3.0),
+    DatasetMixEntry("codefeedback",  "data/processed/codefeedback.jsonl", weight=2.5, max_samples=15000),
 
-    # ── Code (weight 1.5) ─────────────────────────────────────────────
-    DatasetMixEntry("codealpaca",   "data/processed/codealpaca.jsonl",   weight=1.5),
-    DatasetMixEntry("codefeedback", "data/processed/codefeedback.jsonl", weight=1.5),
+    # ── Conversational (weight 2.5) — natural dialogue ────────────────
+    DatasetMixEntry("oasst2",        "data/processed/oasst2.jsonl",       weight=2.5),
 
-    # ── Factual / editing (weight 1.5) ────────────────────────────────
-    DatasetMixEntry("coedit",       "data/processed/coedit.jsonl",       weight=1.5),
-    DatasetMixEntry("sciq",         "data/processed/sciq.jsonl",         weight=1.5),
+    # ── Instruction following (weight 1.5–2.0) ───────────────────────
+    DatasetMixEntry("alpaca_gpt4",   "data/processed/alpaca_gpt4.jsonl",  weight=2.0, max_samples=20000),
+    DatasetMixEntry("dolly",         "data/processed/dolly.jsonl",        weight=1.5),
+
+    # ── Editing (weight 1.0) — structural capability ─────────────────
+    DatasetMixEntry("coedit",        "data/processed/coedit.jsonl",       weight=1.0, max_samples=8000),
 ])
 
 

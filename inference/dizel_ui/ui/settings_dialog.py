@@ -148,6 +148,7 @@ class SettingsDialog(QDialog):
         self._build_chat_tab()
         self._build_model_tab()
         self._build_app_tab()
+        self._build_speech_tab()
         self._build_about_tab()
 
         # Buttons Row
@@ -574,6 +575,69 @@ class SettingsDialog(QDialog):
         
         layout.addStretch(1)
 
+    def _build_speech_tab(self):
+        tab, layout = self._create_scroll_tab()
+        
+        self._section(layout, "NOVA SPEECH RECOGNITION")
+        card = QFrame()
+        card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        lyt = QVBoxLayout(card)
+        lyt.setContentsMargins(16, 20, 16, 20)
+        
+        from PySide6.QtWidgets import QComboBox, QCheckBox, QSlider
+        
+        r1 = QHBoxLayout()
+        lbl1 = QLabel("Whisper Model Size")
+        lbl1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        r1.addWidget(lbl1)
+        r1.addStretch()
+        self._nova_model = QComboBox()
+        self._nova_model.addItems(["tiny", "base", "small"])
+        self._nova_model.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=4))
+        r1.addWidget(self._nova_model)
+        lyt.addLayout(r1)
+        
+        lyt.addSpacing(16)
+        
+        r2 = QHBoxLayout()
+        lbl2 = QLabel("Language")
+        lbl2.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        r2.addWidget(lbl2)
+        r2.addStretch()
+        self._nova_lang = QComboBox()
+        self._nova_lang.addItems(["auto", "en", "id", "ja"])
+        self._nova_lang.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=4))
+        r2.addWidget(self._nova_lang)
+        lyt.addLayout(r2)
+        
+        lyt.addSpacing(16)
+        
+        r3 = QHBoxLayout()
+        lbl3 = QLabel("Silence Timeout (sec)")
+        lbl3.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        r3.addWidget(lbl3)
+        r3.addStretch()
+        self._nova_timeout = QSlider(Qt.Horizontal)
+        self._nova_timeout.setRange(2, 10)
+        self._nova_timeout.setFixedWidth(100)
+        r3.addWidget(self._nova_timeout)
+        self._nova_timeout_lbl = QLabel()
+        self._nova_timeout_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+        self._nova_timeout_lbl.setFixedWidth(24)
+        self._nova_timeout.valueChanged.connect(lambda v: self._nova_timeout_lbl.setText(str(v)))
+        r3.addWidget(self._nova_timeout_lbl)
+        lyt.addLayout(r3)
+        
+        lyt.addSpacing(16)
+        
+        self._nova_wave = QCheckBox("Show Waveform")
+        self._nova_wave.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        lyt.addWidget(self._nova_wave)
+        
+        layout.addWidget(card)
+        layout.addStretch(1)
+        self.tabs.addTab(tab, " Speech ")
+
     def _build_about_tab(self):
         tab, layout = self._create_scroll_tab()
         self.tabs.addTab(tab, "About")
@@ -766,6 +830,16 @@ class SettingsDialog(QDialog):
         
         av_idx = self._avatar_combo.findText(app_cfg.get("avatar_display", "Show avatars"))
         if av_idx >= 0: self._avatar_combo.setCurrentIndex(av_idx)
+        
+        nova_cfg = cfg.get("nova", {})
+        m_idx = self._nova_model.findText(nova_cfg.get("model_size", "base"))
+        if m_idx >= 0: self._nova_model.setCurrentIndex(m_idx)
+        
+        l_idx = self._nova_lang.findText(nova_cfg.get("language", "auto"))
+        if l_idx >= 0: self._nova_lang.setCurrentIndex(l_idx)
+        
+        self._nova_timeout.setValue(nova_cfg.get("silence_timeout", 5))
+        self._nova_wave.setChecked(nova_cfg.get("show_waveform", True))
 
     def _apply_to_manager(self):
         # Update settings to memory object if needed
@@ -799,6 +873,12 @@ class SettingsDialog(QDialog):
             "enter_to_send": self._send_chk.isChecked(),
             "font_scale": self._font_combo.currentText(),
             "avatar_display": self._avatar_combo.currentText(),
+        }
+        cfg["nova"] = {
+            "model_size": self._nova_model.currentText(),
+            "language": self._nova_lang.currentText(),
+            "silence_timeout": self._nova_timeout.value(),
+            "show_waveform": self._nova_wave.isChecked(),
         }
         ConfigManager.save(cfg)
 

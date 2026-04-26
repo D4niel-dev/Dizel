@@ -33,41 +33,43 @@ PRETRAIN_OUT = os.path.join(DATA_DIR, "pretrain_v12.txt")
 # Dataset registry — what we need for v1.2
 # ---------------------------------------------------------------------------
 SFT_DATASETS = {
-    # Conversational (weight 3.0)
-    "ultrachat": {
-        "hf_id": "stingning/ultrachat",
-        "split": "train",
-        "max_samples": 50000,
+    # ── Dizel Identity (weight 5.0) ───────────────────────────────────
+    "chat_expanded": {
+        "local": True,  # Already exists in sft_data/
+        "path": "sft_data/chat_expanded.jsonl",
+        "max_samples": -1,
         "format": "messages",
+        "weight": 5.0,
+    },
+    # ── Code & Reasoning (weight 2.5–3.0) ─────────────────────────────
+    "codealpaca": {
+        "hf_id": "sahil2801/CodeAlpaca-20k",
+        "split": "train",
+        "max_samples": 20000,
+        "format": "alpaca",
         "weight": 3.0,
     },
+    "codefeedback": {
+        "hf_id": "m-a-p/CodeFeedback-Filtered-Instruction",
+        "split": "train",
+        "max_samples": 15000,
+        "format": "messages",
+        "weight": 2.5,
+    },
+    # ── Conversational (weight 2.5) ───────────────────────────────────
     "oasst2": {
         "hf_id": "OpenAssistant/oasst2",
         "split": "train",
         "max_samples": 30000,
         "format": "tree",
-        "weight": 3.0,
+        "weight": 2.5,
     },
-    "sharegpt": {
-        "hf_id": "anon8231489123/ShareGPT_Vicuna_unfiltered",
-        "split": "train",
-        "max_samples": 40000,
-        "format": "conversations",
-        "weight": 3.0,
-    },
-    # Instruction (weight 2.0)
+    # ── Instruction following (weight 1.5–2.0) ────────────────────────
     "alpaca_gpt4": {
         "hf_id": "vicgalle/alpaca-gpt4",
         "split": "train",
-        "max_samples": 52000,
+        "max_samples": 20000,
         "format": "alpaca",
-        "weight": 2.0,
-    },
-    "openorca": {
-        "hf_id": "Open-Orca/OpenOrca",
-        "split": "train",
-        "max_samples": 100000,
-        "format": "messages",
         "weight": 2.0,
     },
     "dolly": {
@@ -75,37 +77,15 @@ SFT_DATASETS = {
         "split": "train",
         "max_samples": 15000,
         "format": "dolly",
-        "weight": 2.0,
-    },
-    # Code (weight 1.5)
-    "codealpaca": {
-        "hf_id": "sahil2801/CodeAlpaca-20k",
-        "split": "train",
-        "max_samples": 20000,
-        "format": "alpaca",
         "weight": 1.5,
     },
-    "codefeedback": {
-        "hf_id": "m-a-p/CodeFeedback-Filtered-Instruction",
-        "split": "train",
-        "max_samples": 30000,
-        "format": "messages",
-        "weight": 1.5,
-    },
-    # Factual (weight 1.5)
+    # ── Editing (weight 1.0) ──────────────────────────────────────────
     "coedit": {
         "hf_id": "grammarly/coedit",
         "split": "train",
-        "max_samples": 20000,
+        "max_samples": 8000,
         "format": "src_tgt",
-        "weight": 1.5,
-    },
-    "sciq": {
-        "hf_id": "allenai/sciq",
-        "split": "train",
-        "max_samples": 12000,
-        "format": "qa",
-        "weight": 1.5,
+        "weight": 1.0,
     },
 }
 
@@ -208,6 +188,17 @@ FORMAT_MAP = {
 # ---------------------------------------------------------------------------
 def process_dataset(name: str, info: dict):
     """Download and convert a single dataset to JSONL."""
+    # Local datasets (e.g. chat_expanded) — already processed, just verify
+    if info.get("local"):
+        local_path = info["path"]
+        if os.path.exists(local_path):
+            count = sum(1 for _ in open(local_path, "r", encoding="utf-8"))
+            print(f"  [local] {name}: {count} samples ({local_path})")
+            return local_path
+        else:
+            print(f"  [error] Local dataset not found: {local_path}")
+            return None
+
     out_path = os.path.join(PROCESSED_DIR, f"{name}.jsonl")
     if os.path.exists(out_path):
         count = sum(1 for _ in open(out_path, "r", encoding="utf-8"))

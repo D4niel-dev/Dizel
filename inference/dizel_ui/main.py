@@ -26,6 +26,8 @@ from dizel_ui.ui.input_panel     import InputPanel
 from dizel_ui.ui.settings_dialog import SettingsDialog
 from dizel_ui.ui.profile_dialog  import ProfileDialog
 from dizel_ui.ui.command_palette import CommandPalette
+from dizel_ui.ui.nova_overlay    import NovaOverlay
+from dizel_ui.logic.nova_worker  import NovaWorker
 from dizel_ui.logic.chat_manager import ChatManager
 from dizel_ui.logic.history_manager import (
     save_session, load_session, list_sessions,
@@ -283,6 +285,8 @@ class DizelApp(QMainWindow):
         )
         right_layout.addWidget(self._chat_window, stretch=1)
 
+        self._old_nova_workers = set()
+
         # Input Panel
         self._input_panel = InputPanel(
             on_send=self._on_send,
@@ -294,6 +298,14 @@ class DizelApp(QMainWindow):
         )
         self._input_panel.local_model_switch.connect(self._on_local_model_switch)
         right_layout.addWidget(self._input_panel)
+
+        # Nova Overlay (Inline Chip)
+        self._nova_overlay = NovaOverlay(parent=self._input_panel._preview_content)
+        self._nova_overlay.text_ready.connect(self._nova_on_final)
+        self._nova_overlay.cancelled.connect(self._nova_stop)
+        self._input_panel._preview_layout.addWidget(self._nova_overlay)
+        
+        self._nova_worker = None
         
         # Load user profile UI details
         self._update_profile_ui()
@@ -555,9 +567,81 @@ class DizelApp(QMainWindow):
             self._input_panel.add_attachment(fpath)
 
     def _do_voice(self):
-        self._show_status("Listening... (Speak now)", dim=False)
-        QTimer.singleShot(2000, lambda: self._input_panel._input.append("Hello Dizel, how are you?"))
-        QTimer.singleShot(2000, lambda: self._show_status("Transcribed.", dim=True))
+        if self._nova_overlay.isVisible():
+            self._nova_stop()
+            return
+        self._nova_start()
+
+    def _nova_start(self):
+        self._input_panel.set_recording_state(True)
+        self._input_panel._preview_area.show()
+        self._nova_overlay.show_listening()
+        
+        self._nova_original_text = self._input_panel._input.toPlainText()
+
+        # Clean up existing worker if clicking start repeatedly
+        if self._nova_worker and self._nova_worker.isRunning():
+            self._nova_worker.stop()
+            old = self._nova_worker
+            self._old_nova_workers.add(old)
+            old.finished.connect(lambda: self._old_nova_workers.discard(old))
+            self._nova_worker = None
+
+        # Read from config later, default to "base" and "auto"
+        config = ConfigManager.load()
+        nova_cfg = config.get("nova", {})
+        model_size = nova_cfg.get("model_size", "base")
+        lang = nova_cfg.get("language", "auto")
+        timeout = nova_cfg.get("silence_timeout", 5)
+
+        self._nova_worker = NovaWorker(model_size=model_size, language=lang, silence_timeout=timeout, parent=self)
+        self._nova_worker.partial_text.connect(self._nova_on_partial)
+        self._nova_worker.amplitude.connect(self._nova_overlay.update_waveform)
+        self._nova_worker.final_text.connect(self._nova_on_final)
+        self._nova_worker.error.connect(self._nova_on_error)
+        self._nova_worker.status_update.connect(self._nova_overlay.update_status)
+        self._nova_worker.start()
+
+    def _nova_on_partial(self, text: str):
+        if text:
+            new_text = self._nova_original_text
+            if new_text and not new_text.endswith(" ") and not new_text.endswith("\n"):
+                new_text += " "
+            new_text += text
+            self._input_panel._input.setPlainText(new_text)
+
+    def _nova_stop(self):
+        self._input_panel.set_recording_state(False)
+        if self._nova_worker and self._nova_worker.isRunning():
+            self._nova_worker.stop()
+            old = self._nova_worker
+            self._old_nova_workers.add(old)
+            old.finished.connect(lambda: self._old_nova_workers.discard(old))
+            self._nova_worker = None
+        self._nova_overlay.hide_overlay()
+        if not self._input_panel._attachments:
+            self._input_panel._preview_area.hide()
+
+    def _nova_on_final(self, text: str):
+        self._input_panel.set_recording_state(False)
+        self._nova_overlay.hide_overlay()
+        if not self._input_panel._attachments:
+            self._input_panel._preview_area.hide()
+            
+        if text and text.strip():
+            new_text = self._nova_original_text
+            if new_text and not new_text.endswith(" ") and not new_text.endswith("\n"):
+                new_text += " "
+            new_text += text.strip() + " "
+            self._input_panel._input.setPlainText(new_text)
+            self._input_panel._input.setFocus()
+
+    def _nova_on_error(self, msg: str):
+        self._input_panel.set_recording_state(False)
+        self._nova_overlay.hide_overlay()
+        if not self._input_panel._attachments:
+            self._input_panel._preview_area.hide()
+        self._show_status(f"Nova Error: {msg}", dim=False)
 
     def _on_quick_action(self, prompt: str):
         self._on_send(prompt)
@@ -954,6 +1038,20 @@ class DizelApp(QMainWindow):
             
         self._refresh_history()
         
+    def closeEvent(self, event):
+        """Clean up background threads before exiting to prevent QThread crashes."""
+        if hasattr(self, "_nova_worker") and self._nova_worker and self._nova_worker.isRunning():
+            self._nova_worker.stop()
+            self._nova_worker.wait() # Block safely until whisper releases
+            
+        for worker in getattr(self, "_old_nova_workers", set()):
+            if worker.isRunning():
+                worker.stop()
+                worker.wait()
+                
+        super().closeEvent(event)
+
+    def _restore_session(self):
         # Restore active session content
         if self._session_id:
             data = load_session(self._session_id)
