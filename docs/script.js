@@ -9,6 +9,18 @@ const micBtn = document.getElementById('mic-btn');
 const welcomeScreen = document.querySelector('.welcome-screen');
 
 // --- Global Tooltip Engine ---
+window.addEventListener('DOMContentLoaded', () => {
+    // Demo Splash Screen Check
+    if(!localStorage.getItem('dizel_demo_seen')) {
+        setTimeout(() => window.openModal('welcome-modal'), 250);
+    }
+});
+
+window.acknowledgeDemo = function() {
+    localStorage.setItem('dizel_demo_seen', 'true');
+    closeAllModals();
+};
+
 const globalTooltip = document.getElementById('global-tooltip');
 
 document.addEventListener('mouseover', (e) => {

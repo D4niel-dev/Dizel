@@ -18,10 +18,10 @@
         <!-- Sidebar Navigation -->
         <nav id="sidebar">
             <div class="sidebar-top">
-                <div class="sidebar-logo">
-                    <button class="icon-btn" onclick="togglePrimarySidebar()" style="color:var(--text-primary); margin-left:8px;"><i data-lucide="menu"></i></button>
-                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img nav-label">
-                </div>
+                <button class="nav-btn tooltip-target" data-tooltip="Menu" onclick="togglePrimarySidebar()" style="cursor: pointer; margin-bottom: 8px;">
+                    <i data-lucide="menu" style="color:var(--text-primary);"></i>
+                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img nav-label" style="width: 24px; height: 24px; border-radius: 50%; min-width: 24px; margin-left: 14px;">
+                </button>
                 <!-- Command Palette Trigger on Search -->
                 <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()">
                     <i data-lucide="search"></i><span class="nav-label">Search</span>
@@ -155,6 +155,23 @@
         <!-- Global Modal Backdrop -->
         <div id="modal-backdrop" class="hidden" onclick="closeAllModals()">
             
+            <!-- Welcome Demo Modal -->
+            <div id="welcome-modal" class="modal-box hidden prompt-style" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i data-lucide="info"></i> Developer Preview</h2>
+                    <button class="icon-btn xs" onclick="acknowledgeDemo()"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-content" style="padding: 24px; text-align: center;">
+                    <img src="assets/app/Dizel.png" width="48" style="margin-bottom: 16px; border-radius: 50%;">
+                    <h3>Welcome to Dizel Serverless Web UI</h3>
+                    <p class="dim-text" style="margin-top: 12px; margin-bottom: 24px; font-size: 13px; line-height: 1.5;">
+                        This is an interactive standalone demo of the Dizel ecosystem running entirely within your browser.<br><br>
+                        <b>Disclaimer:</b> Features, models, and interfaces provided in this preview are highly experimental and are subject to change, break, or be permanently removed in future iterations.
+                    </p>
+                    <button class="pill-btn send-action" style="width: 100%; justify-content: center; padding: 12px;" onclick="acknowledgeDemo()">I Understand &mdash; Continue</button>
+                </div>
+            </div>
+
             <!-- Command Palette (Ctrl+K) -->
             <div id="command-palette" class="modal-box hidden prompt-style" onclick="event.stopPropagation()">
                 <div class="cmd-input-area">
@@ -323,9 +340,6 @@
             </div>
 
         </div>
-
-        <!-- Mobile Sidebar Toggle Overlay -->
-        <button id="mobile-menu-btn" class="mobile-only"><i data-lucide="menu"></i></button>
     </div>
 
     <!-- Global Floating Tooltip Layer -->
