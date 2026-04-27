@@ -323,7 +323,8 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 
 ---
 
-### Step 8 — Chat with Dizel (Disable)
+### Step 8 — CMD UI (Disable)
+This UI currently is being disabled for maintenance and updating, please go to **Step 9** to chat with the GUI version.
 
 **Interactive chat:**
 ```bash
@@ -368,7 +369,7 @@ python inference/cli_ui/cmd_ui.py \
 
 ---
 
-### Step 9 — Launch the Desktop UI *(Recommended)*
+### Step 9 — Desktop GUI *(Recommended)*
 
 Dizel includes a fully localized, premium Desktop Interface built with PySide6 featuring the **Premium Dark Theme**. 
 
