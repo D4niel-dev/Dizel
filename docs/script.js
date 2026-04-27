@@ -61,7 +61,7 @@ document.getElementById('scroll-right')?.addEventListener('click', () => {
 });
 
 // --- Popover Engine ---
-window.togglePopover = function(popoverId) {
+window.toggleCustomPopover = function(popoverId) {
     const popover = document.getElementById(popoverId);
     if (!popover) return;
     
@@ -79,6 +79,9 @@ window.selectModel = function(modelName) {
         lucide.createIcons({ root: btn });
     }
     document.getElementById('model-popover')?.classList.add('hidden');
+    if(modelName === 'Ollama') {
+        closeAllModals(); // Close modal on local select
+    }
 };
 
 document.addEventListener('click', (e) => {

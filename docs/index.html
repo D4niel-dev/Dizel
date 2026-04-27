@@ -90,26 +90,14 @@
                     <div class="input-actions">
                         <div class="actions-left">
                             <div class="popover-wrapper">
-                                <button class="icon-btn tooltip-target" data-tooltip="Attach File" onclick="togglePopover('attach-popover')"><i data-lucide="plus"></i></button>
+                                <button class="icon-btn tooltip-target" data-tooltip="Attach File" onclick="toggleCustomPopover('attach-popover')"><i data-lucide="plus"></i></button>
                                 <div class="popover-menu bottom-up hidden" id="attach-popover">
                                     <button class="popover-item" onclick="attachDocumentMock()"><i data-lucide="folder"></i> Select Project File</button>
                                     <button class="popover-item"><i data-lucide="upload"></i> Upload from Computer</button>
                                 </div>
                             </div>
                             
-                            <div class="popover-wrapper">
-                                <button class="model-select-btn" onclick="togglePopover('model-popover')"><i data-lucide="chevron-up"></i> Ollama</button>
-                                <div class="popover-menu bottom-up hidden" id="model-popover">
-                                    <div class="popover-label">Local Inference</div>
-                                    <button class="popover-item active" onclick="selectModel('Ollama')"><img src="assets/app/Dizel.png" class="popover-icon"> Ollama Engine</button>
-                                    
-                                    <div class="popover-divider"></div>
-                                    
-                                    <div class="popover-label">Cloud Services</div>
-                                    <!-- Opens the API Keys modal directly -->
-                                    <button class="popover-item" onclick="openModal('api-modal'); selectModel('API Keys')"><i data-lucide="key" style="color:var(--text-primary)"></i> Setup API Keys</button>
-                                </div>
-                            </div>
+                            <button class="model-select-btn" onclick="openModal('model-selector-modal')"><i data-lucide="chevron-up"></i> Ollama Engine</button>
                             
                             <button class="speed-toggle-btn"><i data-lucide="zap"></i> Fast</button>
                         </div>
@@ -268,6 +256,32 @@
                     <h3>D4niel-dev</h3>
                     <p class="dim-text">Pro Tier (API Keys Bound)</p>
                     <button class="pill-btn" style="margin: 20px auto 0;" onclick="closeAllModals()">Close Stats</button>
+                </div>
+            </div>
+
+            <!-- Model Selector Dialog -->
+            <div id="model-selector-modal" class="modal-box hidden prompt-style" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i data-lucide="cpu"></i> Model Provider</h2>
+                    <button class="icon-btn xs" onclick="closeAllModals()"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-content" style="padding: 24px;">
+                    <p class="dim-text mb-12">Select your underlying engine inference routing layer.</p>
+                    <div style="display: flex; gap: 12px; margin-top: 16px;">
+                        
+                        <button class="provider-card active" onclick="selectModel('Ollama');" style="flex:1; border: 2px solid var(--accent); background: var(--hover-bg); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
+                            <img src="assets/app/Dizel.png" width="32" style="margin-bottom:8px">
+                            <h3 style="font-size: 14px; color: var(--text-primary);">Ollama</h3>
+                            <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Local Engine</p>
+                        </button>
+                        
+                        <button class="provider-card" onclick="openModal('api-modal'); selectModel('API Keys');" style="flex:1; border: 1px solid var(--border); background: var(--bg-input); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
+                            <i data-lucide="key" style="margin-bottom:8px; width:32px; height:32px; color: var(--text-secondary);"></i>
+                            <h3 style="font-size: 14px; color: var(--text-primary);">Providers</h3>
+                            <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Cloud Models</p>
+                        </button>
+
+                    </div>
                 </div>
             </div>
 
