@@ -22,13 +22,13 @@
                     <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img">
                 </div>
                 <button class="nav-btn tooltip-target" data-tooltip="Search"><i data-lucide="search"></i></button>
-                <button class="nav-btn tooltip-target" data-tooltip="New Chat"><i data-lucide="edit"></i></button>
+                <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn"><i data-lucide="edit"></i></button>
                 <button class="nav-btn tooltip-target" data-tooltip="Brainstorm"><i data-lucide="message-square-plus"></i></button>
                 <button class="nav-btn tooltip-target" data-tooltip="Projects"><i data-lucide="folder"></i></button>
             </div>
             
             <div class="sidebar-bottom">
-                <button class="nav-btn avatar-btn">
+                <button class="nav-btn avatar-btn tooltip-target" data-tooltip="Profile">
                     <img src="https://ui-avatars.com/api/?name=User&background=333&color=fff&rounded=true" alt="User Profile">
                 </button>
             </div>
@@ -52,16 +52,18 @@
             <!-- Chat / Document Area -->
             <section id="chat-stream">
                 <div class="welcome-screen">
-                    <h1 class="hero-title">Beyond expectations, into reality.</h1>
+                    <h1 class="hero-title" id="hero-title-text">Beyond expectations, into reality.</h1>
                     
                     <div class="action-carousel">
-                        <button class="nav-pill-arrow"><i data-lucide="chevron-left"></i></button>
-                        <div class="action-pills">
+                        <button class="nav-pill-arrow" id="scroll-left"><i data-lucide="chevron-left"></i></button>
+                        <div class="action-pills" id="pills-container">
                             <button class="action-pill"><i data-lucide="image"></i> Create Image</button>
                             <button class="action-pill"><i data-lucide="zap"></i> Brainstorm</button>
                             <button class="action-pill"><i data-lucide="file-text"></i> Make a plan</button>
+                            <button class="action-pill"><i data-lucide="code"></i> Write code</button>
+                            <button class="action-pill"><i data-lucide="search"></i> Search web</button>
                         </div>
-                        <button class="nav-pill-arrow"><i data-lucide="chevron-right"></i></button>
+                        <button class="nav-pill-arrow" id="scroll-right"><i data-lucide="chevron-right"></i></button>
                     </div>
                 </div>
             </section>
@@ -70,7 +72,7 @@
             <section id="input-anchor">
                 <div class="input-panel">
                     
-                    <!-- Dictation Pill (Hidden by default) -->
+                    <!-- Dictation Pill -->
                     <div id="nova-pill" class="hidden">
                         <i data-lucide="mic" class="accent-icon"></i>
                         <span class="nova-status">Listening...</span>
@@ -85,13 +87,32 @@
                     
                     <div class="input-actions">
                         <div class="actions-left">
-                            <button class="icon-btn tooltip-target" data-tooltip="Attach File"><i data-lucide="plus"></i></button>
-                            <button class="model-select-btn"><i data-lucide="chevron-up"></i> Dizel Lite</button>
+                            <div class="popover-wrapper">
+                                <button class="icon-btn tooltip-target" data-tooltip="Attach File" onclick="togglePopover('attach-popover')"><i data-lucide="plus"></i></button>
+                                <div class="popover-menu bottom-up hidden" id="attach-popover">
+                                    <button class="popover-item"><i data-lucide="folder"></i> Select Project File</button>
+                                    <button class="popover-item"><i data-lucide="upload"></i> Upload from Computer</button>
+                                </div>
+                            </div>
+                            
+                            <div class="popover-wrapper">
+                                <button class="model-select-btn" onclick="togglePopover('model-popover')"><i data-lucide="chevron-up"></i> Ollama</button>
+                                <div class="popover-menu bottom-up hidden" id="model-popover">
+                                    <div class="popover-label">Local Inference</div>
+                                    <button class="popover-item active" onclick="selectModel('Ollama')"><img src="assets/app/Dizel.png" class="popover-icon"> Ollama Engine</button>
+                                    
+                                    <div class="popover-divider"></div>
+                                    
+                                    <div class="popover-label">Cloud Services</div>
+                                    <button class="popover-item" onclick="selectModel('API Keys')"><i data-lucide="key" style="color:var(--text-primary)"></i> Setup API Keys</button>
+                                </div>
+                            </div>
+                            
                             <button class="speed-toggle-btn"><i data-lucide="zap"></i> Fast</button>
                         </div>
                         <div class="actions-right">
-                            <button id="mic-btn" class="icon-btn mic-action"><i data-lucide="mic"></i></button>
-                            <button id="send-btn" class="icon-btn send-action"><i data-lucide="arrow-up"></i></button>
+                            <button id="mic-btn" class="icon-btn mic-action tooltip-target" data-tooltip="Voice to text"><i data-lucide="mic"></i></button>
+                            <button id="send-btn" class="icon-btn send-action tooltip-target" data-tooltip="Send message"><i data-lucide="arrow-up"></i></button>
                         </div>
                     </div>
                 </div>
@@ -106,7 +127,9 @@
         <button id="mobile-menu-btn" class="mobile-only"><i data-lucide="menu"></i></button>
     </div>
 
-    <!-- Script at bottom for initialization -->
+    <!-- Global Floating Tooltip Layer -->
+    <div id="global-tooltip" class="floating-tooltip hidden"></div>
+
     <script src="script.js"></script>
 </body>
 </html>
