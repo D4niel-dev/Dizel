@@ -179,7 +179,7 @@ context_length = 512    # how much contexts for the model to generate a respond
 | 256     | 6        | ~10 M      |
 | 384     | 6        | ~20 M      |
 | 512     | 6        | ~34 M      |
-| 2048    | 12       | ~110.35 M  |
+| 768     | 12       | ~110.35 M  |
 
 ---
 
