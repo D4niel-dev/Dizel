@@ -238,9 +238,10 @@ button:active { transform: scale(0.96); }
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
 }
 .form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;}
-.form-row input[type="text"], .form-row input[type="password"] {
-    background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 12px; border-radius: 6px; font-size: 13px;
+.form-row input[type="text"], .form-row input[type="password"], .card-box textarea {
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 10px 12px; border-radius: 6px; font-size: 13px; font-family: var(--font-body);
 }
+.card-box textarea { padding: 12px; line-height: 1.5; resize: vertical; }
 .settings-select {
     background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 12px; border-radius: 6px; outline: none;
 }

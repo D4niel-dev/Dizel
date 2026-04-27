@@ -221,25 +221,25 @@
                             
                             <h3 class="pane-title">System Prompt</h3>
                             <div class="card-box">
-                                <textarea rows="3" placeholder="You are a helpful assistant..." style="width:100%; resize:none;"></textarea>
+                                <textarea id="system-prompt" rows="3" placeholder="You are a helpful assistant..." style="width:100%; resize:none;"></textarea>
                             </div>
 
                             <h3 class="pane-title">Sampling Settings</h3>
                             <div class="card-box">
                                 <div class="form-row slider-row">
                                     <span>Temperature</span>
-                                    <input type="range" min="0" max="200" value="70">
-                                    <span class="value">0.70</span>
+                                    <input type="range" id="temp-slider" min="0" max="200" value="70">
+                                    <span class="value" id="temp-val">0.70</span>
                                 </div>
                                 <div class="form-row slider-row">
                                     <span>Top-K</span>
-                                    <input type="range" min="1" max="200" value="40">
-                                    <span class="value">40</span>
+                                    <input type="range" id="topk-slider" min="1" max="200" value="40">
+                                    <span class="value" id="topk-val">40</span>
                                 </div>
                                 <div class="form-row slider-row">
                                     <span>Max new tokens</span>
-                                    <input type="range" min="32" max="1024" value="400">
-                                    <span class="value">400</span>
+                                    <input type="range" id="tokens-slider" min="32" max="1024" value="400">
+                                    <span class="value" id="tokens-val">400</span>
                                 </div>
                             </div>
                         </div>
@@ -270,7 +270,7 @@
                 </div>
                 <div class="modal-footer">
                     <button class="pill-btn" onclick="closeAllModals()">Back</button>
-                    <button class="pill-btn send-action" onclick="closeAllModals()">Save / Close</button>
+                    <button class="pill-btn send-action" onclick="saveSettings()">Save / Close</button>
                 </div>
             </div>
 

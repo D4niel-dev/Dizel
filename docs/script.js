@@ -390,3 +390,33 @@ window.toggleSecondarySidebar = function() {
     const mainView = document.getElementById('main-view');
     sidebar.classList.toggle('open');
 };
+
+// --- Settings Bindings ---
+const tempSlider = document.getElementById('temp-slider');
+const tempVal = document.getElementById('temp-val');
+const topkSlider = document.getElementById('topk-slider');
+const topkVal = document.getElementById('topk-val');
+const tokensSlider = document.getElementById('tokens-slider');
+const tokensVal = document.getElementById('tokens-val');
+
+if (tempSlider && tempVal) tempSlider.addEventListener('input', (e) => tempVal.innerText = (e.target.value / 100).toFixed(2));
+if (topkSlider && topkVal) topkSlider.addEventListener('input', (e) => topkVal.innerText = e.target.value);
+if (tokensSlider && tokensVal) tokensSlider.addEventListener('input', (e) => tokensVal.innerText = e.target.value);
+
+window.saveSettings = async function() {
+    const sysPrompt = document.getElementById('system-prompt')?.value || '';
+    const temp = tempSlider ? parseInt(tempSlider.value) / 100 : 0.7;
+    const topk = topkSlider ? parseInt(topkSlider.value) : 40;
+    const maxTokens = tokensSlider ? parseInt(tokensSlider.value) : 400;
+
+    await DBManager.setSetting('systemPrompt', sysPrompt);
+    await DBManager.setSetting('temperature', temp);
+    await DBManager.setSetting('topK', topk);
+    await DBManager.setSetting('maxTokens', maxTokens);
+    
+    if (typeof Config !== 'undefined') {
+        Config.temperature = temp;
+    }
+    
+    closeAllModals();
+};
