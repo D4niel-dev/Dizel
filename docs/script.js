@@ -104,6 +104,67 @@ window.attachDocumentMock = function() {
     document.getElementById('attach-popover')?.classList.add('hidden');
 };
 
+// --- Web Speech API (Voice Engine Replacement) ---
+// --- Web Speech API (Voice Engine Replacement) ---
+const novaPill = document.getElementById('nova-pill');
+const novaCancel = document.getElementById('nova-cancel');
+const novaDone = document.getElementById('nova-done');
+let recognition = null;
+
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    recognition.onstart = function() {
+        novaPill.classList.remove('hidden');
+        micBtn.classList.add('recording-active'); // Add a glowing ring effect CSS
+    };
+    
+    recognition.onresult = function(event) {
+        let finalTranscripts = '';
+        let interimTranscripts = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalTranscripts += transcript;
+            else interimTranscripts += transcript;
+        }
+        chatInput.value = finalTranscripts + interimTranscripts;
+        chatInput.style.height = 'auto'; 
+        chatInput.style.height = (chatInput.scrollHeight) + 'px';
+    };
+    
+    recognition.onerror = function(event) {
+        console.error("Speech recognition error", event.error);
+        stopDictation();
+    };
+    
+    recognition.onend = function() {
+        stopDictation();
+    };
+}
+
+function stopDictation() {
+    novaPill.classList.add('hidden');
+    micBtn.classList.remove('recording-active');
+    if(recognition) recognition.stop();
+}
+
+micBtn?.addEventListener('click', () => {
+    if(!recognition) { alert("Speech Recognition not supported in this browser."); return; }
+    if(novaPill.classList.contains('hidden')) recognition.start();
+    else stopDictation();
+});
+
+novaCancel?.addEventListener('click', () => {
+    chatInput.value = "";
+    stopDictation();
+});
+novaDone?.addEventListener('click', () => {
+    stopDictation();
+    sendMessage();
+});
+
 // --- Chat Engine ---
 chatInput.addEventListener('input', function() {
     this.style.height = 'auto'; 
@@ -209,27 +270,24 @@ window.toggleThought = function(btn) {
 function simulateAIResponse(userQuery) {
     const loadingBubble = createBubble('assistant', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
     chatStream.scrollTop = chatStream.scrollHeight;
-    setTimeout(() => {
-        loadingBubble.remove();
-        const actualBubble = createBubble('assistant', '...');
-        const body = actualBubble.querySelector('.message-body');
+    
+    // Connect to actual LLM Engine
+    let actualBubble = null;
+    let bodyNode = null;
+    let isFirstToken = true;
+
+    LLMEngine.generateStream(userQuery, (token, fullText) => {
+        if (isFirstToken) {
+            isFirstToken = false;
+            loadingBubble.remove();
+            actualBubble = createBubble('assistant', '');
+            bodyNode = actualBubble.querySelector('.message-body');
+        }
         
-        // Command execution intercepts (e.g. running a clear)
-        let fakeStream = `<think>\nAnalyzing the requested input...\nI am simulating a response in the standalone Web SPA.</think>\nSure, I can help you with that!`;
-        
-        let currentIndex = 0; let accumulatedText = "";
-        const interval = setInterval(() => {
-            if (currentIndex < fakeStream.length) {
-                accumulatedText += fakeStream.charAt(currentIndex);
-                body.innerHTML = parseAndFormatThought(accumulatedText);
-                lucide.createIcons({ root: body }); 
-                chatStream.scrollTop = chatStream.scrollHeight;
-                currentIndex++;
-            } else {
-                clearInterval(interval);
-            }
-        }, 15);
-    }, 1200);
+        bodyNode.innerHTML = parseAndFormatThought(fullText);
+        lucide.createIcons({ root: bodyNode }); 
+        chatStream.scrollTop = chatStream.scrollHeight;
+    });
 }
 
 
@@ -311,17 +369,12 @@ window.switchThemeTab = function(tabId, btnElement) {
 };
 
 // --- Secondary Sidebar Engine ---
+window.togglePrimarySidebar = function() {
+    document.getElementById('sidebar').classList.toggle('expanded');
+};
+
 window.toggleSecondarySidebar = function() {
     const sidebar = document.getElementById('secondary-sidebar');
     const mainView = document.getElementById('main-view');
-    
     sidebar.classList.toggle('open');
-    if(sidebar.classList.contains('open')) {
-        // Shift main view slightly on desktop
-        if(window.innerWidth > 900) {
-            mainView.style.marginRight = '320px';
-        }
-    } else {
-        mainView.style.marginRight = '0';
-    }
 };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dizel AI</title>
+    <title>Dizel AI (Demo)</title>
     <!-- App Favicon -->
     <link rel="icon" type="image/x-icon" href="assets/app/Dizel.ico">
     <link rel="icon" type="image/png" href="assets/app/Dizel.png">
@@ -19,22 +19,60 @@
         <nav id="sidebar">
             <div class="sidebar-top">
                 <div class="sidebar-logo">
-                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img">
+                    <button class="icon-btn" onclick="togglePrimarySidebar()" style="color:var(--text-primary); margin-left:8px;"><i data-lucide="menu"></i></button>
+                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img nav-label">
                 </div>
                 <!-- Command Palette Trigger on Search -->
-                <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()"><i data-lucide="search"></i></button>
-                <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn"><i data-lucide="edit"></i></button>
-                <button class="nav-btn tooltip-target" data-tooltip="Brainstorm"><i data-lucide="message-square-plus"></i></button>
+                <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()">
+                    <i data-lucide="search"></i><span class="nav-label">Search</span>
+                </button>
+                <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn">
+                    <i data-lucide="edit"></i><span class="nav-label">New Chat</span>
+                </button>
+                <button class="nav-btn tooltip-target" data-tooltip="Brainstorm">
+                    <i data-lucide="message-square-plus"></i><span class="nav-label">Brainstorm</span>
+                </button>
                 <!-- Secondary Sidebar Trigger on Folder -->
-                <button class="nav-btn tooltip-target" data-tooltip="Projects" onclick="toggleSecondarySidebar()"><i data-lucide="folder"></i></button>
+                <button class="nav-btn tooltip-target" data-tooltip="Projects" onclick="toggleSecondarySidebar()">
+                    <i data-lucide="folder"></i><span class="nav-label">Projects / Files</span>
+                </button>
             </div>
             
             <div class="sidebar-bottom">
                 <button class="nav-btn avatar-btn tooltip-target" data-tooltip="Profile" onclick="openModal('profile-modal')">
                     <img src="https://ui-avatars.com/api/?name=User&background=333&color=fff&rounded=true" alt="User Profile">
+                    <span class="nav-label" style="font-weight:600; color:var(--text-primary);">D4niel-dev</span>
                 </button>
             </div>
         </nav>
+
+        <!-- Secondary Sidebar (Left Slide-out Panel next to primary sidebar) -->
+        <aside id="secondary-sidebar">
+            <div class="sec-header">
+                <h3>Workspace Metadata</h3>
+                <button class="icon-btn xs" onclick="toggleSecondarySidebar()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sec-content">
+                <div class="info-card">
+                    <h4>Current Project Structure</h4>
+                    <p class="dim-text">Loaded from local directory.</p>
+                    <ul class="file-tree">
+                        <li><i data-lucide="file-code"></i> main.py</li>
+                        <li><i data-lucide="folder"></i> ui
+                            <ul>
+                                <li><i data-lucide="file-code"></i> settings_dialog.py</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Token Budget Constraints</h4>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 45%;"></div></div>
+                    <p class="dim-text">450 / 1000 tokens used.</p>
+                </div>
+            </div>
+        </aside>
 
         <!-- Main Interface -->
         <main id="main-view">
@@ -114,34 +152,6 @@
             </section>
         </main>
         
-        <!-- Secondary Sidebar (Right Slide-out Panel) -->
-        <aside id="secondary-sidebar">
-            <div class="sec-header">
-                <h3>Workspace Metadata</h3>
-                <button class="icon-btn xs" onclick="toggleSecondarySidebar()"><i data-lucide="x"></i></button>
-            </div>
-            <div class="sec-content">
-                <div class="info-card">
-                    <h4>Current Project Structure</h4>
-                    <p class="dim-text">Loaded from local directory.</p>
-                    <ul class="file-tree">
-                        <li><i data-lucide="file-code"></i> main.py</li>
-                        <li><i data-lucide="folder"></i> ui
-                            <ul>
-                                <li><i data-lucide="file-code"></i> settings_dialog.py</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-                
-                <div class="info-card">
-                    <h4>Token Budget Constraints</h4>
-                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 45%;"></div></div>
-                    <p class="dim-text">450 / 1000 tokens used.</p>
-                </div>
-            </div>
-        </aside>
-
         <!-- Global Modal Backdrop -->
         <div id="modal-backdrop" class="hidden" onclick="closeAllModals()">
             
@@ -270,7 +280,7 @@
                     <div style="display: flex; gap: 12px; margin-top: 16px;">
                         
                         <button class="provider-card active" onclick="selectModel('Ollama');" style="flex:1; border: 2px solid var(--accent); background: var(--hover-bg); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
-                            <img src="assets/app/Dizel.png" width="32" style="margin-bottom:8px">
+                            <img src="assets/providers/ollama.png" width="32" style="margin-bottom:8px">
                             <h3 style="font-size: 14px; color: var(--text-primary);">Ollama</h3>
                             <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Local Engine</p>
                         </button>
@@ -281,6 +291,10 @@
                             <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Cloud Models</p>
                         </button>
 
+                    </div>
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3); border-radius: 8px; font-size: 11px; color: var(--text-secondary);">
+                        <i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: orange; display: inline-block; vertical-align: middle;"></i> 
+                        <b>Local CORS Requirement:</b> Since this web app was a demo and runs dynamically in the browser, your local Ollama instance will block the connection unless you launch it with the <code style="background:var(--bg-root); padding:2px 4px; border-radius:4px;">OLLAMA_ORIGINS="*"</code> environment variable set.
                     </div>
                 </div>
             </div>
@@ -317,6 +331,8 @@
     <!-- Global Floating Tooltip Layer -->
     <div id="global-tooltip" class="floating-tooltip hidden"></div>
 
+    <!-- Scripts -->
     <script src="script.js"></script>
+    <script src="dizel_core.js"></script>
 </body>
 </html>
