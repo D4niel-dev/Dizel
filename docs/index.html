@@ -21,14 +21,16 @@
                 <div class="sidebar-logo">
                     <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img">
                 </div>
-                <button class="nav-btn tooltip-target" data-tooltip="Search"><i data-lucide="search"></i></button>
+                <!-- Command Palette Trigger on Search -->
+                <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()"><i data-lucide="search"></i></button>
                 <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn"><i data-lucide="edit"></i></button>
                 <button class="nav-btn tooltip-target" data-tooltip="Brainstorm"><i data-lucide="message-square-plus"></i></button>
-                <button class="nav-btn tooltip-target" data-tooltip="Projects"><i data-lucide="folder"></i></button>
+                <!-- Secondary Sidebar Trigger on Folder -->
+                <button class="nav-btn tooltip-target" data-tooltip="Projects" onclick="toggleSecondarySidebar()"><i data-lucide="folder"></i></button>
             </div>
             
             <div class="sidebar-bottom">
-                <button class="nav-btn avatar-btn tooltip-target" data-tooltip="Profile">
+                <button class="nav-btn avatar-btn tooltip-target" data-tooltip="Profile" onclick="openModal('profile-modal')">
                     <img src="https://ui-avatars.com/api/?name=User&background=333&color=fff&rounded=true" alt="User Profile">
                 </button>
             </div>
@@ -45,7 +47,7 @@
                 </div>
                 <div class="header-actions">
                     <button class="pill-btn"><i data-lucide="external-link"></i> Export</button>
-                    <button class="pill-btn"><i data-lucide="settings"></i> Configuration</button>
+                    <button class="pill-btn tooltip-target" data-tooltip="Settings" onclick="openModal('settings-modal')"><i data-lucide="settings"></i> Configuration</button>
                 </div>
             </header>
 
@@ -90,7 +92,7 @@
                             <div class="popover-wrapper">
                                 <button class="icon-btn tooltip-target" data-tooltip="Attach File" onclick="togglePopover('attach-popover')"><i data-lucide="plus"></i></button>
                                 <div class="popover-menu bottom-up hidden" id="attach-popover">
-                                    <button class="popover-item"><i data-lucide="folder"></i> Select Project File</button>
+                                    <button class="popover-item" onclick="attachDocumentMock()"><i data-lucide="folder"></i> Select Project File</button>
                                     <button class="popover-item"><i data-lucide="upload"></i> Upload from Computer</button>
                                 </div>
                             </div>
@@ -104,7 +106,8 @@
                                     <div class="popover-divider"></div>
                                     
                                     <div class="popover-label">Cloud Services</div>
-                                    <button class="popover-item" onclick="selectModel('API Keys')"><i data-lucide="key" style="color:var(--text-primary)"></i> Setup API Keys</button>
+                                    <!-- Opens the API Keys modal directly -->
+                                    <button class="popover-item" onclick="openModal('api-modal'); selectModel('API Keys')"><i data-lucide="key" style="color:var(--text-primary)"></i> Setup API Keys</button>
                                 </div>
                             </div>
                             
@@ -123,6 +126,176 @@
             </section>
         </main>
         
+        <!-- Secondary Sidebar (Right Slide-out Panel) -->
+        <aside id="secondary-sidebar">
+            <div class="sec-header">
+                <h3>Workspace Metadata</h3>
+                <button class="icon-btn xs" onclick="toggleSecondarySidebar()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="sec-content">
+                <div class="info-card">
+                    <h4>Current Project Structure</h4>
+                    <p class="dim-text">Loaded from local directory.</p>
+                    <ul class="file-tree">
+                        <li><i data-lucide="file-code"></i> main.py</li>
+                        <li><i data-lucide="folder"></i> ui
+                            <ul>
+                                <li><i data-lucide="file-code"></i> settings_dialog.py</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="info-card">
+                    <h4>Token Budget Constraints</h4>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 45%;"></div></div>
+                    <p class="dim-text">450 / 1000 tokens used.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Global Modal Backdrop -->
+        <div id="modal-backdrop" class="hidden" onclick="closeAllModals()">
+            
+            <!-- Command Palette (Ctrl+K) -->
+            <div id="command-palette" class="modal-box hidden prompt-style" onclick="event.stopPropagation()">
+                <div class="cmd-input-area">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="cmd-input" placeholder="Search commands, files, or actions...">
+                </div>
+                <div class="cmd-results">
+                    <div class="popover-label">Actions</div>
+                    <button class="cmd-item" onclick="executeCommand('clear')"><i data-lucide="trash-2"></i> Clear Chat History</button>
+                    <button class="cmd-item" onclick="executeCommand('settings')"><i data-lucide="settings"></i> Open Settings</button>
+                    <button class="cmd-item" onclick="executeCommand('theme')"><i data-lucide="moon"></i> Toggle Dark Theme</button>
+                </div>
+            </div>
+
+            <!-- Settings Dialog -->
+            <div id="settings-modal" class="modal-box hidden full-style" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i data-lucide="sliders"></i> Settings &mdash; Dizel AI</h2>
+                    <button class="icon-btn xs" onclick="closeAllModals()"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-content horizontal">
+                    <!-- Tab Navigation -->
+                    <div class="settings-tabs">
+                        <button class="tab-btn active" onclick="switchThemeTab('chat-tab', this)">Chat</button>
+                        <button class="tab-btn" onclick="switchThemeTab('model-tab', this)">Model</button>
+                        <button class="tab-btn" onclick="switchThemeTab('appearance-tab', this)">Appearance</button>
+                        <button class="tab-btn" onclick="switchThemeTab('speech-tab', this)">Speech</button>
+                        <button class="tab-btn" onclick="switchThemeTab('about-tab', this)">About</button>
+                    </div>
+                    
+                    <!-- Tab Contents -->
+                    <div class="settings-panes">
+                        <!-- Chat Tab -->
+                        <div id="chat-tab" class="pane active">
+                            <h3 class="pane-title">Checkpoint Loader</h3>
+                            <div class="card-box">
+                                <div class="form-row">
+                                    <input type="text" placeholder="Select checkpoint..." style="flex:1;">
+                                    <button class="pill-btn"><i data-lucide="upload"></i> Val</button>
+                                </div>
+                                <div class="form-row mt-12">
+                                    <span>Device</span>
+                                    <select class="settings-select"><option>cpu</option><option>cuda</option></select>
+                                </div>
+                            </div>
+                            
+                            <h3 class="pane-title">System Prompt</h3>
+                            <div class="card-box">
+                                <textarea rows="3" placeholder="You are a helpful assistant..." style="width:100%; resize:none;"></textarea>
+                            </div>
+
+                            <h3 class="pane-title">Sampling Settings</h3>
+                            <div class="card-box">
+                                <div class="form-row slider-row">
+                                    <span>Temperature</span>
+                                    <input type="range" min="0" max="200" value="70">
+                                    <span class="value">0.70</span>
+                                </div>
+                                <div class="form-row slider-row">
+                                    <span>Top-K</span>
+                                    <input type="range" min="1" max="200" value="40">
+                                    <span class="value">40</span>
+                                </div>
+                                <div class="form-row slider-row">
+                                    <span>Max new tokens</span>
+                                    <input type="range" min="32" max="1024" value="400">
+                                    <span class="value">400</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Appearance Tab Placeholder -->
+                        <div id="appearance-tab" class="pane hidden">
+                            <h3 class="pane-title">Theme Preferences</h3>
+                            <div class="card-box">
+                                <div class="form-row">
+                                    <span><i data-lucide="moon"></i> Color Mode</span>
+                                    <select class="settings-select">
+                                        <option>System</option><option>Dark</option><option>Light</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <h3 class="pane-title">Chat Display</h3>
+                            <div class="card-box">
+                                <label class="checkbox-row"><input type="checkbox" checked> Show message timestamps</label>
+                                <label class="checkbox-row"><input type="checkbox" checked> Enable UI animations</label>
+                            </div>
+                        </div>
+                        
+                        <!-- Extra tabs omitted for brevity via hidden class -->
+                        <div id="model-tab" class="pane hidden"><div class="card-box">Model stats render here.</div></div>
+                        <div id="speech-tab" class="pane hidden"><div class="card-box">Nova whisper settings render here.</div></div>
+                        <div id="about-tab" class="pane hidden"><div class="card-box" style="text-align:center;"><img src="assets/app/Dizel.png" width="60"><br><b>Dizel AI</b><br>UI Parity Replica</div></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="pill-btn" onclick="closeAllModals()">Back</button>
+                    <button class="pill-btn send-action" onclick="closeAllModals()">Save / Close</button>
+                </div>
+            </div>
+
+            <!-- Profile Dialog -->
+            <div id="profile-modal" class="modal-box hidden compact-style" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Profile Context</h2>
+                </div>
+                <div class="modal-content" style="text-align:center; padding: 24px;">
+                    <img src="https://ui-avatars.com/api/?name=User&background=333&color=fff&rounded=true" style="width:64px; border-radius:50%; margin-bottom:12px;">
+                    <h3>D4niel-dev</h3>
+                    <p class="dim-text">Pro Tier (API Keys Bound)</p>
+                    <button class="pill-btn" style="margin: 20px auto 0;" onclick="closeAllModals()">Close Stats</button>
+                </div>
+            </div>
+
+             <!-- API Key Dialog -->
+             <div id="api-modal" class="modal-box hidden prompt-style" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2><i data-lucide="key"></i> Connect Provider Keys</h2>
+                </div>
+                <div class="modal-content" style="padding: 16px;">
+                    <p class="dim-text mb-12">Dizel routes complex tasks to secure providers. Your keys remain local.</p>
+                    <div class="form-row mb-12">
+                        <span style="width:90px;">OpenAI</span>
+                        <input type="password" placeholder="sk-..." style="flex:1;">
+                    </div>
+                    <div class="form-row mb-12">
+                        <span style="width:90px;">DeepSeek</span>
+                        <input type="password" placeholder="sk-..." style="flex:1;">
+                    </div>
+                    <div class="form-row">
+                        <span style="width:90px;">Gemini</span>
+                        <input type="password" placeholder="AI..." style="flex:1;">
+                    </div>
+                    <button class="pill-btn send-action mt-12" style="width:100%; justify-content:center;" onclick="closeAllModals()">Verify Keys</button>
+                </div>
+            </div>
+
+        </div>
+
         <!-- Mobile Sidebar Toggle Overlay -->
         <button id="mobile-menu-btn" class="mobile-only"><i data-lucide="menu"></i></button>
     </div>

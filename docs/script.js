@@ -6,7 +6,6 @@ const chatInput = document.getElementById('chat-input');
 const chatStream = document.getElementById('chat-stream');
 const sendBtn = document.getElementById('send-btn');
 const micBtn = document.getElementById('mic-btn');
-const novaPill = document.getElementById('nova-pill');
 const welcomeScreen = document.querySelector('.welcome-screen');
 
 // --- Global Tooltip Engine ---
@@ -18,8 +17,6 @@ document.addEventListener('mouseover', (e) => {
         const text = target.dataset.tooltip;
         globalTooltip.textContent = text;
         const rect = target.getBoundingClientRect();
-        
-        // Position tooltip centered above the element
         const tooltipX = rect.left + (rect.width / 2);
         const tooltipY = rect.top - 8;
         
@@ -28,7 +25,6 @@ document.addEventListener('mouseover', (e) => {
         globalTooltip.style.transform = 'translate(-50%, -100%)';
         globalTooltip.classList.remove('hidden');
         
-        // Slight delay for smooth fade in
         setTimeout(() => globalTooltip.classList.add('visible'), 10);
     }
 });
@@ -52,7 +48,6 @@ const titles = [
 ];
 const titleEl = document.getElementById('hero-title-text');
 if (titleEl) {
-    // Pick random on page load
     titleEl.textContent = titles[Math.floor(Math.random() * titles.length)];
 }
 
@@ -70,11 +65,9 @@ window.togglePopover = function(popoverId) {
     const popover = document.getElementById(popoverId);
     if (!popover) return;
     
-    // Auto-close others
     document.querySelectorAll('.popover-menu').forEach(el => {
         if (el.id !== popoverId) el.classList.add('hidden');
     });
-
     popover.classList.toggle('hidden');
 };
 
@@ -85,28 +78,35 @@ window.selectModel = function(modelName) {
         btn.innerHTML = `<i data-lucide="chevron-up"></i> ${modelName}`;
         lucide.createIcons({ root: btn });
     }
-    document.getElementById('model-popover').classList.add('hidden');
-    
-    // Simulate Opening API Key modal if selected
-    if (modelName === 'API Keys') {
-        setTimeout(() => alert("Mocking the Dizel API Key Modal!"), 100);
-    }
+    document.getElementById('model-popover')?.classList.add('hidden');
 };
 
-// Close popovers on click outside
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.popover-wrapper')) {
         document.querySelectorAll('.popover-menu').forEach(el => el.classList.add('hidden'));
     }
 });
 
-// Auto-resizing textarea
+// --- Attach Document Mock ---
+window.attachDocumentMock = function() {
+    const panel = document.querySelector('.input-panel');
+    const existing = document.querySelector('.attachment-pill');
+    if (!existing) {
+        const pill = document.createElement('div');
+        pill.className = 'attachment-pill';
+        pill.innerHTML = `<i data-lucide="file-code"></i> <span>project_data.json</span> <button class="icon-btn xs" onclick="this.parentElement.remove()" style="margin-left:4px"><i data-lucide="x"></i></button>`;
+        panel.insertBefore(pill, chatInput);
+        lucide.createIcons({ root: pill });
+    }
+    document.getElementById('attach-popover')?.classList.add('hidden');
+};
+
+// --- Chat Engine ---
 chatInput.addEventListener('input', function() {
     this.style.height = 'auto'; 
     this.style.height = (this.scrollHeight) + 'px';
 });
 
-// Handle 'Enter' to send
 chatInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -125,25 +125,26 @@ function sendMessage() {
 
     createBubble('user', text);
     
+    // Clear attachments mock
+    const pill = document.querySelector('.attachment-pill');
+    if (pill) pill.remove();
+
     chatInput.value = '';
     chatInput.style.height = 'auto';
     chatStream.scrollTop = chatStream.scrollHeight;
 
-    // Simulate AI with Typing Indicator latency
     simulateAIResponse(text);
 }
 
 function createBubble(role, content) {
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${role}`;
-    
     const isUser = role === 'user';
     const roleLabel = isUser ? 'You' : 'Dizel';
     const avatarImg = isUser 
         ? "https://ui-avatars.com/api/?name=User&background=333&color=fff&rounded=true"
         : "assets/app/Dizel.png";
 
-    // Incorporating the Action Bar on assistant messages!
     bubble.innerHTML = `
         <div class="bubble-container">
             ${!isUser ? `
@@ -152,7 +153,6 @@ function createBubble(role, content) {
                 ${roleLabel}
             </div>` : ''}
             <div class="message-body">${content}</div>
-            
             ${!isUser ? `
             <div class="bubble-action-bar">
                 <button class="icon-btn xs tooltip-target" data-tooltip="Copy" onclick="copyMock(this)"><i data-lucide="copy"></i></button>
@@ -181,20 +181,16 @@ window.copyMock = function(btn) {
 function parseAndFormatThought(rawContent) {
     const thinkRegex = /<think>([\s\S]*?)(<\/think>|$)/;
     const match = rawContent.match(thinkRegex);
-    
     if (match) {
         const thoughtContent = match[1].trim();
         const mainContent = rawContent.replace(thinkRegex, '').trim();
-        
         return `
             <div class="thought-widget">
                 <button class="thought-toggle" onclick="toggleThought(this)">
                     <i data-lucide="cpu" style="width: 14px; height: 14px;"></i> 
-                    <span>Thought process (completed)</span>
+                    <span>Thought process</span>
                 </button>
-                <div class="thought-content hidden">
-                    ${thoughtContent.replace(/\n/g, '<br>')}
-                </div>
+                <div class="thought-content hidden">${thoughtContent.replace(/\n/g, '<br>')}</div>
             </div>
             <div class="main-text">${mainContent.replace(/\n/g, '<br>')}</div>
         `;
@@ -203,36 +199,22 @@ function parseAndFormatThought(rawContent) {
 }
 
 window.toggleThought = function(btn) {
-    const container = btn.nextElementSibling;
-    container.classList.toggle('hidden');
+    btn.nextElementSibling.classList.toggle('hidden');
     chatStream.scrollTop = chatStream.scrollHeight;
 };
 
-// Deepseek Simulation Logic with Typing Dots!
 function simulateAIResponse(userQuery) {
-    // Inject Typing Indicator Bubble First
-    const loadingBubble = createBubble('assistant', `
-        <div class="typing-dots">
-            <span></span><span></span><span></span>
-        </div>
-    `);
-    
+    const loadingBubble = createBubble('assistant', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
     chatStream.scrollTop = chatStream.scrollHeight;
-
-    // Simulate Server Latency
     setTimeout(() => {
-        // Remove typing dots bubble
         loadingBubble.remove();
-        
-        // Spawn actual streaming bubble
         const actualBubble = createBubble('assistant', '...');
         const body = actualBubble.querySelector('.message-body');
         
-        let fakeStream = `<think>\nAnalyzing the user's intent: "${userQuery}"\n1. Process request\n2. Determine parameters\n3. Construct response\nI will supply a formatted response with code.</think>\nHere is the synthesized response to your request exactly as programmed!`;
+        // Command execution intercepts (e.g. running a clear)
+        let fakeStream = `<think>\nAnalyzing the requested input...\nI am simulating a response in the standalone Web SPA.</think>\nSure, I can help you with that!`;
         
-        let currentIndex = 0;
-        let accumulatedText = "";
-        
+        let currentIndex = 0; let accumulatedText = "";
         const interval = setInterval(() => {
             if (currentIndex < fakeStream.length) {
                 accumulatedText += fakeStream.charAt(currentIndex);
@@ -244,23 +226,99 @@ function simulateAIResponse(userQuery) {
                 clearInterval(interval);
             }
         }, 15);
-    }, 1200); // 1.2 second fake latency
+    }, 1200);
 }
 
-// Dictation "Nova" Simulation
-micBtn.addEventListener('click', () => {
-    micBtn.classList.toggle('recording');
-    document.getElementById('nova-pill').classList.toggle('hidden');
+
+// --- Global Modal Engine & Ctrl+K Palette ---
+
+const backdrop = document.getElementById('modal-backdrop');
+
+window.openModal = function(modalId) {
+    // Hide all internal panels first
+    document.querySelectorAll('.modal-box').forEach(box => box.classList.add('hidden'));
+    
+    // Show target
+    const target = document.getElementById(modalId);
+    if (target) {
+        target.classList.remove('hidden');
+        backdrop.classList.remove('hidden');
+        
+        // Auto-focus logic for command palette
+        if(modalId === 'command-palette') {
+            document.getElementById('cmd-input')?.focus();
+        }
+    }
+};
+
+window.closeAllModals = function() {
+    backdrop.classList.add('hidden');
+};
+
+window.toggleCommandPalette = function() {
+    if(backdrop.classList.contains('hidden')){
+        openModal('command-palette');
+    } else {
+        closeAllModals();
+    }
+}
+
+// Global Hotkeys Listener
+document.addEventListener('keydown', (e) => {
+    // Escape to close modals
+    if (e.key === 'Escape') {
+        closeAllModals();
+        document.getElementById('secondary-sidebar').classList.remove('open');
+    }
+    
+    // Command Palette: Ctrl+K or Cmd+K
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        toggleCommandPalette();
+    }
 });
 
-document.getElementById('nova-cancel').addEventListener('click', () => {
-    micBtn.classList.remove('recording');
-    document.getElementById('nova-pill').classList.add('hidden');
-});
+// --- Command Execution ---
+window.executeCommand = function(cmd) {
+    closeAllModals();
+    if(cmd === 'clear') {
+        // Clear chat, reshow welcome screen
+        document.querySelectorAll('.message-bubble').forEach(b => b.remove());
+        if(welcomeScreen) {
+            welcomeScreen.style.display = 'flex';
+            chatStream.style.justifyContent = 'center';
+        }
+    } else if(cmd === 'settings') {
+        openModal('settings-modal');
+    } else if(cmd === 'theme') {
+        alert("Simulating standard Theme Toggle!");
+    }
+};
 
-document.getElementById('nova-done').addEventListener('click', () => {
-    micBtn.classList.remove('recording');
-    document.getElementById('nova-pill').classList.add('hidden');
-    chatInput.value = "Dictated text from Nova system...";
-    chatInput.style.height = 'auto'; 
-});
+window.switchThemeTab = function(tabId, btnElement) {
+    // Un-active tabs
+    document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+    btnElement.classList.add('active');
+    
+    // Hide all panes
+    document.querySelectorAll('.settings-panes .pane').forEach(p => p.classList.add('hidden'));
+    
+    // Show specific pane
+    document.getElementById(tabId).classList.remove('hidden');
+};
+
+// --- Secondary Sidebar Engine ---
+window.toggleSecondarySidebar = function() {
+    const sidebar = document.getElementById('secondary-sidebar');
+    const mainView = document.getElementById('main-view');
+    
+    sidebar.classList.toggle('open');
+    if(sidebar.classList.contains('open')) {
+        // Shift main view slightly on desktop
+        if(window.innerWidth > 900) {
+            mainView.style.marginRight = '320px';
+        }
+    } else {
+        mainView.style.marginRight = '0';
+    }
+};
