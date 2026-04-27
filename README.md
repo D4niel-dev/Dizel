@@ -559,8 +559,8 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 
 ## References
 
-- **Attention Is All You Need** — Vaswani et al., 2017
-- **GPT-2** — Radford et al., 2019 (OpenAI)
-- **nanoGPT** — Andrej Karpathy (architectural inspiration)
-- **SentencePiece** — Kudo & Richardson, 2018
-- **PyTorch Documentation** — pytorch.org
+- **Attention Is All You Need** — [Vaswani et al., 2017](https://share.google/KEN2RB5lMguOf9vE7)
+- **GPT-2** — [Radford et al., 2019](https://share.google/7nyubfRaa6dFuHCwI) (OpenAI)
+- **nanoGPT** — [Andrej Karpathy](https://github.com/karpathy/nanoGPT) (architectural inspiration)
+- **SentencePiece** — [Kudo & Richardson, 2018](https://share.google/lwV2qoP42TOyzat9B)
+- **PyTorch Documentation** — [pytorch.org](https://share.google/wp67KCOAlAFdYxswg)
