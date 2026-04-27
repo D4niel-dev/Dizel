@@ -20,7 +20,8 @@
             <div class="sidebar-top">
                 <button class="nav-btn tooltip-target" data-tooltip="Menu" onclick="togglePrimarySidebar()" style="cursor: pointer; margin-bottom: 8px;">
                     <i data-lucide="menu" style="color:var(--text-primary);"></i>
-                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img nav-label" style="width: 24px; height: 24px; border-radius: 50%; min-width: 24px; margin-left: 14px;">
+                    <img src="assets/app/Dizel.png" alt="Dizel Logo" class="logo-img nav-label" style="width: 24px; height: 24px; border-radius: 50%; min-width: 24px; margin-left: 14px; margin-right: -4px;">
+                    <span class="nav-label" style="font-weight: 700; font-size: 15px; color: var(--text-primary);">Dizel</span>
                 </button>
                 <!-- Command Palette Trigger on Search -->
                 <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()">
@@ -297,7 +298,7 @@
                     <div style="display: flex; gap: 12px; margin-top: 16px;">
                         
                         <button class="provider-card active" onclick="selectModel('Ollama');" style="flex:1; border: 2px solid var(--accent); background: var(--hover-bg); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
-                            <img src="assets/providers/ollama.png" width="32" style="margin-bottom:8px">
+                            <img src="assets/providers/ollama.png" width="32" style="margin-bottom:8px; border-radius: 50%;">
                             <h3 style="font-size: 14px; color: var(--text-primary);">Ollama</h3>
                             <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Local Engine</p>
                         </button>
