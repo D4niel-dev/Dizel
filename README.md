@@ -4,7 +4,7 @@
     height="50%"/>
 </div>
 
-> *Dizel — Distributed Intelligent Execution Layer*
+> *Dizel — Distributed Intelligent Zen Execution Layer*
 
 **Dizel** is a complete, educational implementation of a GPT-style causal language
 model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
