@@ -4,7 +4,7 @@
     height="50%"/>
 </div>
 
-> *Dizel — Distributed Intelligent Zero-shot Execution Layer*
+> *Dizel — Distributed Intelligent Execution Layer*
 
 **Dizel** is a complete, educational implementation of a GPT-style causal language
 model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
@@ -394,6 +394,23 @@ python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --d
 - **Context Limiter:** Live UI tracking of context limits.
 - **Dark/Light Themes:** Premium colors for Dark and Light mode 
   *(WARNING! Light mode can cause a flashbang when switching from Dark mode, so please be careful)*.
+
+---
+
+## Web UI Demo
+You can now preview how the GUI looks and feels through the web demo.
+
+> **Note**: This is a visual and interaction demo — not the full application.
+
+**Things need to be noted:**
+- Most features in the demo are **subjected to change, improved or removed**
+- Unlike the desktop app, the web version only supports:
+   - Ollama
+   - API-based providers
+- The web UI may receive frequent updates, including early previews of upcoming features
+- The current demo focuses on **UI interactions** only — it does not include full backend logic (e.g. local model execution)
+
+> Try the demo [here.](https://d4niel-dev.github.io/Dizel/)
 
 ---
 
