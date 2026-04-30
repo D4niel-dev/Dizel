@@ -9,7 +9,7 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter, QPainterPath
 
 from dizel_ui.utils.icons import get_icon
 from dizel_ui.theme.colors import (
-    BG_ROOT, BG_CHAT, ACCENT, ACCENT_HOVER, BORDER,
+    BG_ROOT, BG_CHAT, ACCENT, ACCENT_HOVER, ACCENT_LIGHT, BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM,
     BG_CARD, TAB_BG, TAB_UNSELECTED, BG_INPUT, WELCOME_CARD_HOVER, resolve
 )
@@ -88,6 +88,137 @@ class ProviderCard(QPushButton):
         self.name_lbl.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.name_lbl, alignment=Qt.AlignCenter)
 
+class CustomProviderDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add Other Provider")
+        self.setFixedSize(450, 420)
+        self.setStyleSheet(f"QDialog {{ background-color: {resolve(BG_ROOT)}; }}")
+        self._build()
+
+    def _build(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(32, 28, 32, 24)
+        layout.setSpacing(20)
+
+        # Header area
+        header = QHBoxLayout()
+        icon_lbl = QLabel()
+        pm = get_icon("server", (24, 24), TEXT_PRIMARY)
+        if pm:
+            icon_lbl.setPixmap(pm.pixmap(32, 32))
+            icon_lbl.setFixedSize(48, 48)
+            icon_lbl.setAlignment(Qt.AlignCenter)
+            icon_lbl.setStyleSheet(f"background: {resolve(BG_CARD)}; border-radius: 24px; border: 1px solid {resolve(BORDER)};")
+            header.addWidget(icon_lbl)
+        
+        title_l = QVBoxLayout()
+        title_l.setSpacing(2)
+        title = QLabel("Add Custom Provider")
+        title.setFont(LOGO)
+        title.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 22px;")
+        desc = QLabel("Configure any OpenAI-compatible API endpoint")
+        desc.setStyleSheet(f"color: {resolve(TEXT_SECONDARY)}; font-size: 13px;")
+        title_l.addWidget(title)
+        title_l.addWidget(desc)
+        title_l.addStretch()
+        
+        header.addLayout(title_l)
+        header.addStretch(1)
+        layout.addLayout(header)
+
+        card = QFrame()
+        card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
+        card_l = QVBoxLayout(card)
+        card_l.setContentsMargins(20, 20, 20, 20)
+        card_l.setSpacing(16)
+
+        input_style = (
+            f"background: {resolve(BG_INPUT)}; color: {resolve(TEXT_PRIMARY)}; "
+            f"border: 1px solid {resolve(BORDER)}; padding: 0px 14px; border-radius: 8px; "
+            f"font-size: 14px; min-height: 40px;"
+        )
+        
+        combo_style = input_style + f"""
+            QComboBox::drop-down {{ border: none; width: 34px; }}
+            QComboBox QAbstractItemView {{
+                background-color: {resolve(BG_INPUT)};
+                color: {resolve(TEXT_PRIMARY)};
+                selection-background-color: {resolve(ACCENT)};
+                selection-color: white;
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 6px;
+                outline: 0;
+            }}
+            QComboBox QLineEdit {{
+                background: transparent;
+                color: {resolve(TEXT_PRIMARY)};
+                border: none;
+                padding: 0px;
+            }}
+        """
+
+        def make_field(label_text, widget):
+            v = QVBoxLayout()
+            v.setSpacing(6)
+            lbl = QLabel(label_text)
+            lbl.setFont(LABEL)
+            lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)};")
+            v.addWidget(lbl)
+            v.addWidget(widget)
+            card_l.addLayout(v)
+
+        self.name_edit = QComboBox()
+        self.name_edit.setEditable(True)
+        self.name_edit.addItems(["OpenRouter", "DeepSeek", "Together AI", "Replicate", "Fireworks", "Perplexity", "Anyscale"])
+        self.name_edit.setStyleSheet(combo_style)
+        
+        # Override the inner line edit styling natively just in case
+        le = self.name_edit.lineEdit()
+        if le: le.setStyleSheet("background: transparent; border: none; padding-left: 0px;")
+        
+        make_field("Provider Name", self.name_edit)
+
+        self.key_edit = QLineEdit()
+        self.key_edit.setPlaceholderText("sk-... or paste your API key here")
+        self.key_edit.setEchoMode(QLineEdit.Password)
+        self.key_edit.setStyleSheet(input_style)
+        make_field("API Key", self.key_edit)
+
+        self.url_edit = QLineEdit()
+        self.url_edit.setPlaceholderText("https://api.openai.com/v1")
+        self.url_edit.setStyleSheet(input_style)
+        make_field("Base URL (Optional)", self.url_edit)
+
+        layout.addWidget(card)
+        layout.addStretch(1)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_SECONDARY, border_color=BORDER))
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.setFixedHeight(34)
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save & Connect")
+        save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff", radius=6))
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.setFixedHeight(34)
+        save_btn.clicked.connect(self.accept)
+        btn_row.addWidget(save_btn)
+
+        layout.addLayout(btn_row)
+
+    def get_data(self):
+        return {
+            "name": self.name_edit.currentText().strip() or "Custom",
+            "key": self.key_edit.text().strip(),
+            "url": self.url_edit.text().strip()
+        }
+
 class SettingsDialog(QDialog):
     def __init__(self, parent, chat_mgr, on_reload):
         super().__init__(parent)
@@ -154,13 +285,17 @@ class SettingsDialog(QDialog):
         # Buttons Row
         btn_layout = QHBoxLayout()
         back_btn = QPushButton("Back")
-        back_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, border_color=BORDER))
+        back_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=18, border_color=BORDER))
         back_btn.setCursor(Qt.PointingHandCursor)
+        back_btn.setFixedHeight(36)
+        back_btn.setMinimumWidth(100)
         back_btn.clicked.connect(self.reject)
         
-        close_btn = QPushButton("Save/Close")
-        close_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff"))
+        close_btn = QPushButton("Save & Close")
+        close_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff", radius=18))
         close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setFixedHeight(36)
+        close_btn.setMinimumWidth(120)
         close_btn.clicked.connect(self._save_and_reload)
         
         btn_layout.addWidget(back_btn)
@@ -279,6 +414,15 @@ class SettingsDialog(QDialog):
         self._api_status.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-size: 13px;")
         status_row.addWidget(self._api_status)
         status_row.addStretch(1)
+
+        other_btn = QPushButton("+ Other Provider")
+        other_btn.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=8, border_color=BORDER))
+        other_btn.setCursor(Qt.PointingHandCursor)
+        other_btn.setFixedHeight(32)
+        other_btn.clicked.connect(self._open_custom_provider_dialog)
+        status_row.addWidget(other_btn)
+        
+        status_row.addSpacing(8)
 
         configure_btn = QPushButton("Configure")
         configure_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff", radius=8))
@@ -578,60 +722,128 @@ class SettingsDialog(QDialog):
     def _build_speech_tab(self):
         tab, layout = self._create_scroll_tab()
         
+        combo_style = f"""
+            QComboBox {{
+                background: {resolve(BG_CHAT)}; 
+                color: {resolve(TEXT_PRIMARY)}; 
+                padding: 8px 12px; 
+                border-radius: 6px;
+                border: 1px solid {resolve(BORDER)};
+            }}
+            QComboBox::drop-down {{ border: none; width: 30px; }}
+            QComboBox QAbstractItemView {{
+                background-color: {resolve(BG_CHAT)};
+                color: {resolve(TEXT_PRIMARY)};
+                selection-background-color: {resolve(ACCENT)};
+                selection-color: white;
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 4px;
+            }}
+        """
+
+        toggle_qss = f"""
+            QCheckBox {{
+                color: {resolve(TEXT_PRIMARY)};
+                spacing: 12px;
+                font-size: 14px;
+            }}
+            QCheckBox::indicator {{
+                width: 36px;
+                height: 20px;
+                border-radius: 10px;
+                background-color: {resolve(BORDER)};
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {resolve(ACCENT)};
+            }}
+        """
+
+        slider_style = f"""
+            QSlider::groove:horizontal {{
+                border: none;
+                height: 4px;
+                background: {resolve(BORDER)};
+                border-radius: 2px;
+            }}
+            QSlider::handle:horizontal {{
+                background: {resolve(ACCENT)};
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {resolve(ACCENT_LIGHT)};
+                border-radius: 2px;
+            }}
+        """
+        
         self._section(layout, "NOVA SPEECH RECOGNITION")
         card = QFrame()
         card.setStyleSheet(get_frame_style(BG_CARD, radius=12))
         lyt = QVBoxLayout(card)
         lyt.setContentsMargins(16, 20, 16, 20)
+        lyt.setSpacing(16)
         
         from PySide6.QtWidgets import QComboBox, QCheckBox, QSlider
         
         r1 = QHBoxLayout()
-        lbl1 = QLabel("Whisper Model Size")
+        ico1 = QLabel()
+        pm_ico = get_icon("cpu", (18,18), TEXT_DIM)
+        if pm_ico: ico1.setPixmap(pm_ico.pixmap(18,18))
+        r1.addWidget(ico1)
+        
+        lbl1 = QLabel("  Whisper Model Size")
         lbl1.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
         r1.addWidget(lbl1)
-        r1.addStretch()
+        r1.addStretch(1)
         self._nova_model = QComboBox()
         self._nova_model.addItems(["tiny", "base", "small"])
-        self._nova_model.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=4))
+        self._nova_model.setStyleSheet(combo_style)
         r1.addWidget(self._nova_model)
         lyt.addLayout(r1)
         
-        lyt.addSpacing(16)
-        
         r2 = QHBoxLayout()
-        lbl2 = QLabel("Language")
+        ico2 = QLabel()
+        pm_ico2 = get_icon("globe", (18,18), TEXT_DIM)
+        if pm_ico2: ico2.setPixmap(pm_ico2.pixmap(18,18))
+        r2.addWidget(ico2)
+        
+        lbl2 = QLabel("  Language")
         lbl2.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
         r2.addWidget(lbl2)
-        r2.addStretch()
+        r2.addStretch(1)
         self._nova_lang = QComboBox()
         self._nova_lang.addItems(["auto", "en", "id", "ja"])
-        self._nova_lang.setStyleSheet(get_button_style("transparent", BORDER, TEXT_PRIMARY, radius=4))
+        self._nova_lang.setStyleSheet(combo_style)
         r2.addWidget(self._nova_lang)
         lyt.addLayout(r2)
         
-        lyt.addSpacing(16)
-        
         r3 = QHBoxLayout()
-        lbl3 = QLabel("Silence Timeout (sec)")
+        ico3 = QLabel()
+        pm_ico3 = get_icon("clock", (18,18), TEXT_DIM)
+        if pm_ico3: ico3.setPixmap(pm_ico3.pixmap(18,18))
+        r3.addWidget(ico3)
+        
+        lbl3 = QLabel("  Silence Timeout (sec)")
         lbl3.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
         r3.addWidget(lbl3)
-        r3.addStretch()
+        r3.addStretch(1)
         self._nova_timeout = QSlider(Qt.Horizontal)
         self._nova_timeout.setRange(2, 10)
-        self._nova_timeout.setFixedWidth(100)
+        self._nova_timeout.setFixedWidth(120)
+        self._nova_timeout.setStyleSheet(slider_style)
         r3.addWidget(self._nova_timeout)
         self._nova_timeout_lbl = QLabel()
-        self._nova_timeout_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+        self._nova_timeout_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; font-weight: 500;")
         self._nova_timeout_lbl.setFixedWidth(24)
+        self._nova_timeout_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._nova_timeout.valueChanged.connect(lambda v: self._nova_timeout_lbl.setText(str(v)))
         r3.addWidget(self._nova_timeout_lbl)
         lyt.addLayout(r3)
         
-        lyt.addSpacing(16)
-        
-        self._nova_wave = QCheckBox("Show Waveform")
-        self._nova_wave.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-size: 14px;")
+        self._nova_wave = QCheckBox("Show Waveform Overlay")
+        self._nova_wave.setStyleSheet(toggle_qss)
         lyt.addWidget(self._nova_wave)
         
         layout.addWidget(card)
@@ -966,7 +1178,51 @@ class SettingsDialog(QDialog):
         for card in self._provider_cards:
             if card.slug == saved_slug:
                 self._on_provider_card_clicked(card)
-                break
+                return
+        
+        if saved_slug == "custom":
+            for card in self._provider_cards:
+                card.setChecked(False)
+            self._selected_provider_slug = "custom"
+            self._ckpt_label.setVisible(False)
+            self._ckpt_card.setVisible(False)
+            custom_name = api_cfg.get("custom_name", "Other Provider")
+            self._api_status.setText(f"🟢 Connected — {custom_name} (Custom)")
+            self._api_status.setStyleSheet("color: #10b981; font-size: 13px;")
+
+    def _open_custom_provider_dialog(self):
+        dlg = CustomProviderDialog(self)
+        
+        cfg = ConfigManager.load()
+        api_cfg = cfg.get("api_router", {})
+        if api_cfg.get("provider") == "custom":
+            dlg.name_edit.setCurrentText(api_cfg.get("custom_name", "Other Provider"))
+            dlg.url_edit.setText(api_cfg.get("custom_url", ""))
+            from dizel_ui.logic.config_manager import decrypt_key
+            saved_key = decrypt_key(api_cfg.get("api_key", ""))
+            if saved_key:
+                dlg.key_edit.setText(saved_key)
+
+        if dlg.exec():
+            data = dlg.get_data()
+            self._selected_provider_slug = "custom"
+            
+            # Uncheck grid cards
+            for card in self._provider_cards:
+                card.setChecked(False)
+            self._ckpt_label.setVisible(False)
+            self._ckpt_card.setVisible(False)
+            
+            self._api_status.setText(f"🟢 Connected — {data['name']} (Custom)")
+            self._api_status.setStyleSheet("color: #10b981; font-size: 13px;")
+            
+            from dizel_ui.logic.config_manager import encrypt_key
+            api_cfg["provider"] = "custom"
+            api_cfg["custom_name"] = data["name"]
+            api_cfg["custom_url"] = data["url"]
+            api_cfg["api_key"] = encrypt_key(data["key"])
+            cfg["api_router"] = api_cfg
+            ConfigManager.save(cfg)
 
     def _open_api_config(self):
         slug = getattr(self, "_selected_provider_slug", "local")

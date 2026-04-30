@@ -19,16 +19,16 @@ if _PROJ_ROOT not in sys.path:
 if _INFERENCE_DIR not in sys.path:
     sys.path.insert(0, _INFERENCE_DIR)
 
-from dizel_ui.ui.chat_window     import ChatWindow
-from dizel_ui.ui.sidebar         import Sidebar
-from dizel_ui.ui.secondary_sidebar import SecondarySidebar
-from dizel_ui.ui.input_panel     import InputPanel
-from dizel_ui.ui.settings_dialog import SettingsDialog
-from dizel_ui.ui.profile_dialog  import ProfileDialog
-from dizel_ui.ui.command_palette import CommandPalette
-from dizel_ui.ui.nova_overlay    import NovaOverlay
-from dizel_ui.logic.nova_worker  import NovaWorker
-from dizel_ui.logic.chat_manager import ChatManager
+from dizel_ui.ui.chat_window        import ChatWindow
+from dizel_ui.ui.sidebar            import Sidebar
+from dizel_ui.ui.secondary_sidebar  import SecondarySidebar
+from dizel_ui.ui.input_panel        import InputPanel
+from dizel_ui.ui.settings_dialog    import SettingsDialog
+from dizel_ui.ui.profile_dialog     import ProfileDialog
+from dizel_ui.ui.command_palette    import CommandPalette
+from dizel_ui.ui.nova_overlay       import NovaOverlay
+from dizel_ui.logic.nova_worker     import NovaWorker
+from dizel_ui.logic.chat_manager    import ChatManager
 from dizel_ui.logic.history_manager import (
     save_session, load_session, list_sessions,
     delete_session, new_session_id, toggle_pin_session
@@ -36,7 +36,7 @@ from dizel_ui.logic.history_manager import (
 from dizel_ui.logic.config_manager import ConfigManager
 from dizel_ui.logic.usage_manager import UsageManager
 from dizel_ui.theme.colors import (
-    BG_ROOT, BG_CHAT, BG_INPUT, ACCENT, TEXT_PRIMARY, TEXT_DIM,
+    BG_ROOT, BG_CHAT, BG_INPUT, ACCENT, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
     ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, resolve
 )
 from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
