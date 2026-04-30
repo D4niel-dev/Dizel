@@ -203,8 +203,8 @@ button:active { transform: scale(0.96); }
 
 /* Specific Modals */
 .full-style { width: 850px; height: 700px; max-width: 95vw; max-height: 95vh; }
-.compact-style { width: 350px; min-height: 200px; }
-.prompt-style { width: 500px; min-height: 100px; }
+.compact-style { width: 350px; min-height: 200px; max-width: 95vw; }
+.prompt-style { width: 500px; min-height: 100px; max-width: 95vw; }
 
 .modal-header {
     display: flex; justify-content: space-between; align-items: center;
