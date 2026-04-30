@@ -44,7 +44,7 @@ The result should feel like:
 ## DESIGN PHILOSOPHY
 The CMD UI must feel like a terminal IDE, not a shell.
 
-> Core experience goals:
+Core experience goals:
 - visible workspace layout
 - persistent panels
 - command + chat hybrid interaction
@@ -60,11 +60,11 @@ The CMD UI must feel like a terminal IDE, not a shell.
 - polished but minimal terminal styling
 
 ## TECH STACK REQUIREMENT
-> Use both:
+1) Use both:
 - **Textual** : for the actual terminal app structure, widgets, docking/panel layout, focus, input components, sidebar, main workspace, and event handling
 - **Rich** : for high-quality formatted output, markdown-ish renderables, status blocks, logs, tables, progress, highlight panels, and stream rendering
 
-> Use each tool where it is strongest:
+2) Use each tool where it is strongest:
 - Textual = UI shell, panes, layouts, interaction
 - Rich = text formatting, structured output, logs, status lines, tables, code blocks, streaming visuals
 
@@ -73,14 +73,19 @@ The CMD UI should be multi-panel and persistent, inspired by OpenCode/KiloCode:
 
 > Suggested layout:
 
-┌──────────────────────────────────────────────────────────────┐
-│ Top header / session bar                                     │
-├───────────────┬───────────────────────────────┬──────────────┤
-│ Left sidebar   │ Main workspace / conversation │ Right panel  │
-│               │ / logs / tool output           │ context      │
-├───────────────┴───────────────────────────────┴──────────────┤
-│ Bottom input bar / command line / hint bar                   │
-└──────────────────────────────────────────────────────────────┘
+```
+┌─────────────────────────────────────────────────────────┐
+│                       Top Header / Session Bar                    │
+├─────────────────┬────────────────────────────┬──────────┤
+│                    │                                 |            │
+│    Left Sidebar    │       Main Workspace            │    Right   │
+│                    │       Conversation / Logs /     │    Panel   │
+│                    │       Tool Output               │   Context  │
+│                    │                                 │            │
+├─────────────────┴────────────────────────────┴──────────┤
+│            Bottom Input Bar / Command Line / Hint Bar             │
+└─────────────────────────────────────────────────────────┘
+```
 
 > The interface should support:
 - left panel for sessions, history, commands, agents
