@@ -267,10 +267,31 @@ button:active { transform: scale(0.96); }
 
 @media (max-width: 600px) {
     #app-layout { flex-direction: column-reverse; }
-    #sidebar { width: 100%; min-height: 60px; height: 60px; flex-direction: row; border-right: none; border-top: 1px solid var(--border); padding: 0 16px; }
-    .sidebar-top, .sidebar-bottom { flex-direction: row; gap: 8px; }
+    #sidebar { width: 100%; min-height: 60px; height: 60px; flex-direction: row; border-right: none; border-top: 1px solid var(--border); padding: 0 12px; justify-content: space-between; align-items: center; }
+    .sidebar-top { flex-direction: row; flex: 1; justify-content: space-evenly; gap: 0; }
+    .sidebar-bottom { flex-direction: row; flex: none; gap: 0; margin-left: 8px; align-items: center; justify-content: center; width: auto; }
+    .nav-btn, .sidebar-bottom .avatar-btn { width: 40px; margin: 0; justify-content: center; padding: 0; }
+    .nav-label { display: none !important; }
     .logo-img { display: none; } 
     #chat-stream { padding-top: 60px; }
     .modal-content.horizontal { flex-direction: column; }
     .settings-tabs { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border);}
+    
+    #secondary-sidebar {
+        position: fixed;
+        bottom: 60px; /* Start above sidebar */
+        top: 0;
+        left: -100%;
+        margin-left: 0;
+        width: 80%; /* Don't take full width on mobile */
+        max-width: 320px;
+        height: auto; /* stretch to bottom 60px */
+        border-right: 1px solid var(--border);
+        transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
+    }
+    #secondary-sidebar.open {
+        left: 0;
+        margin-left: 0;
+    }
+    #input-anchor { padding-bottom: 16px; }
 }
