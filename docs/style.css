@@ -1,19 +1,19 @@
 :root {
     /* Dizel Native UI Theme Tokens */
-    --bg-root: #0B0B0B;
-    --bg-panel: #111111;
-    --bg-input: #18181A;
-    --bg-card: #141414;
+    --bg-root: #212121;
+    --bg-panel: #171717;
+    --bg-input: #212121;
+    --bg-card: #171717;
     
     --text-primary: #FFFFFF;
-    --text-secondary: #E0E0E0;
-    --text-dim: #A0A0A0;
+    --text-secondary: #B4B4B4;
+    --text-dim: #9B9B9B;
     
-    --accent: #D1D1D1;
+    --accent: #10a37f;
     --accent-glow: #AD1535;
     
-    --border: #2A2A2A;
-    --border-focus: #404040;
+    --border: #303030;
+    --border-focus: #ececec;
     --hover-bg: rgba(255, 255, 255, 0.05);
     
     --font-heading: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

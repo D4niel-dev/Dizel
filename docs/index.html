@@ -27,7 +27,7 @@
                 <button class="nav-btn tooltip-target" data-tooltip="Search (Ctrl+K)" onclick="toggleCommandPalette()">
                     <i data-lucide="search"></i><span class="nav-label">Search</span>
                 </button>
-                <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn">
+                <button class="nav-btn tooltip-target" data-tooltip="New Chat" id="new-chat-btn" onclick="newChat()">
                     <i data-lucide="edit"></i><span class="nav-label">New Chat</span>
                 </button>
                 <button class="nav-btn tooltip-target" data-tooltip="Brainstorm">
@@ -50,28 +50,17 @@
         <!-- Secondary Sidebar (Left Slide-out Panel next to primary sidebar) -->
         <aside id="secondary-sidebar">
             <div class="sec-header">
-                <h3>Workspace Metadata</h3>
-                <button class="icon-btn xs" onclick="toggleSecondarySidebar()"><i data-lucide="x"></i></button>
+                <h3><i data-lucide="history" style="width:16px;height:16px;color:var(--text-dim);margin-right:6px;vertical-align:middle;"></i> All Chats</h3>
+                <button class="icon-btn xs tooltip-target" data-tooltip="Close" onclick="toggleSecondarySidebar()"><i data-lucide="x"></i></button>
             </div>
-            <div class="sec-content">
-                <div class="info-card">
-                    <h4>Current Project Structure</h4>
-                    <p class="dim-text">Loaded from local directory.</p>
-                    <ul class="file-tree">
-                        <li><i data-lucide="file-code"></i> main.py</li>
-                        <li><i data-lucide="folder"></i> ui
-                            <ul>
-                                <li><i data-lucide="file-code"></i> settings_dialog.py</li>
-                            </ul>
-                        </li>
-                    </ul>
+            <div class="sec-search" style="padding: 12px 20px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;">
+                    <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-dim); margin-right: 8px;"></i>
+                    <input type="text" id="history-search" placeholder="Search chats..." style="background: transparent; border: none; color: var(--text-primary); outline: none; width: 100%; font-size: 13px;">
                 </div>
-                
-                <div class="info-card">
-                    <h4>Token Budget Constraints</h4>
-                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 45%;"></div></div>
-                    <p class="dim-text">450 / 1000 tokens used.</p>
-                </div>
+            </div>
+            <div class="sec-content" id="history-list" style="padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
+                <!-- Live history items populated by JS -->
             </div>
         </aside>
 
@@ -129,14 +118,16 @@
                     <div class="input-actions">
                         <div class="actions-left">
                             <div class="popover-wrapper">
-                                <button class="icon-btn tooltip-target" data-tooltip="Attach File" onclick="toggleCustomPopover('attach-popover')"><i data-lucide="plus"></i></button>
+                                <button class="icon-btn tooltip-target" data-tooltip="Tools" onclick="toggleCustomPopover('attach-popover')"><i data-lucide="plus"></i></button>
                                 <div class="popover-menu bottom-up hidden" id="attach-popover">
-                                    <button class="popover-item" onclick="attachDocumentMock()"><i data-lucide="folder"></i> Select Project File</button>
-                                    <button class="popover-item"><i data-lucide="upload"></i> Upload from Computer</button>
+                                    <button class="popover-item" onclick="attachDocumentMock('web-search')"><i data-lucide="globe"></i> Web Search</button>
+                                    <button class="popover-item" onclick="attachDocumentMock('deep-think')"><i data-lucide="brain"></i> Deep Think</button>
+                                    <button class="popover-item" onclick="attachDocumentMock('parse')"><i data-lucide="folder"></i> Parse Files</button>
+                                    <button class="popover-item" onclick="attachDocumentMock('image')"><i data-lucide="image"></i> Image Gen</button>
                                 </div>
                             </div>
                             
-                            <button class="model-select-btn" onclick="openModal('model-selector-modal')"><i data-lucide="chevron-up"></i> Ollama Engine</button>
+                            <button id="model-indicator-btn" class="model-select-btn" onclick="openModal('model-selector-modal')"><i data-lucide="chevron-up"></i> Ollama</button>
                             
                             <button class="speed-toggle-btn"><i data-lucide="zap"></i> Fast</button>
                         </div>
@@ -207,20 +198,34 @@
                     <div class="settings-panes">
                         <!-- Chat Tab -->
                         <div id="chat-tab" class="pane active">
-                            <h3 class="pane-title">Checkpoint Loader</h3>
-                            <div class="card-box">
-                                <div class="form-row">
-                                    <input type="text" placeholder="Select checkpoint..." style="flex:1;">
-                                    <button class="pill-btn"><i data-lucide="upload"></i> Val</button>
+                            <h3 class="pane-title">API Provider</h3>
+                            <div class="provider-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 12px;">
+                                <div class="pill-btn provider-card active" data-provider="ollama" onclick="selectProviderSettings('ollama')" style="justify-content: center;"><i data-lucide="server"></i> Ollama</div>
+                                <div class="pill-btn provider-card" data-provider="openai" onclick="selectProviderSettings('openai')" style="justify-content: center;"><i data-lucide="aperture"></i> OpenAI</div>
+                                <div class="pill-btn provider-card" data-provider="anthropic" onclick="selectProviderSettings('anthropic')" style="justify-content: center;"><i data-lucide="cpu"></i> Anthropic</div>
+                                <div class="pill-btn provider-card" data-provider="google" onclick="selectProviderSettings('google')" style="justify-content: center;"><i data-lucide="box"></i> Google</div>
+                                <div class="pill-btn provider-card" data-provider="groq" onclick="selectProviderSettings('groq')" style="justify-content: center;"><i data-lucide="zap"></i> Groq</div>
+                            </div>
+                            <div class="card-box" id="provider-config-box" style="margin-bottom: 24px;">
+                                <div class="form-row mb-12">
+                                    <span style="min-width: 100px;">Model ID</span>
+                                    <input type="text" id="model-name" placeholder="llama3" style="flex:1;">
                                 </div>
-                                <div class="form-row mt-12">
-                                    <span>Device</span>
-                                    <select class="settings-select"><option>cpu</option><option>cuda</option></select>
+                                <div class="form-row" id="api-key-row" style="display:none;">
+                                    <span style="min-width: 100px;">API Key <i class="icon-btn xs tooltip-target" data-tooltip="Encrypted via Web Crypto API in IndexedDB" style="display:inline-block;"><i data-lucide="lock" style="width:12px;"></i></i></span>
+                                    <input type="password" id="api-key" placeholder="sk-..." style="flex:1;">
+                                </div>
+                                <div class="form-row" id="ollama-url-row">
+                                    <span style="min-width: 100px;">Ollama URL</span>
+                                    <input type="text" id="ollama-url" placeholder="http://localhost:11434" style="flex:1;">
+                                </div>
+                                <div class="form-row mt-12" style="justify-content: flex-end;">
+                                    <button class="pill-btn" onclick="testConnection()"><i data-lucide="wifi"></i> Test Connection</button>
                                 </div>
                             </div>
                             
                             <h3 class="pane-title">System Prompt</h3>
-                            <div class="card-box">
+                            <div class="card-box" style="margin-bottom: 24px;">
                                 <textarea id="system-prompt" rows="3" placeholder="You are a helpful assistant..." style="width:100%; resize:none;"></textarea>
                             </div>
 
@@ -233,39 +238,105 @@
                                 </div>
                                 <div class="form-row slider-row">
                                     <span>Top-K</span>
-                                    <input type="range" id="topk-slider" min="1" max="200" value="40">
+                                    <input type="range" id="topk-slider" min="1" max="100" value="40">
                                     <span class="value" id="topk-val">40</span>
                                 </div>
                                 <div class="form-row slider-row">
-                                    <span>Max new tokens</span>
-                                    <input type="range" id="tokens-slider" min="32" max="1024" value="400">
+                                    <span>Top-P</span>
+                                    <input type="range" id="topp-slider" min="10" max="100" value="90">
+                                    <span class="value" id="topp-val">0.90</span>
+                                </div>
+                                <div class="form-row slider-row">
+                                    <span>Rep. Penalty</span>
+                                    <input type="range" id="rep-slider" min="100" max="200" value="110">
+                                    <span class="value" id="rep-val">1.10</span>
+                                </div>
+                                <div class="form-row slider-row" style="margin-bottom:0;">
+                                    <span>Max length</span>
+                                    <input type="range" id="tokens-slider" min="32" max="4096" value="400">
                                     <span class="value" id="tokens-val">400</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Appearance Tab Placeholder -->
                         <div id="appearance-tab" class="pane hidden">
                             <h3 class="pane-title">Theme Preferences</h3>
-                            <div class="card-box">
+                            <div class="card-box" style="margin-bottom: 24px;">
+                                <div class="form-row mb-12">
+                                    <span><i data-lucide="moon" style="width:16px;vertical-align:middle;margin-right:4px;"></i> Color Mode</span>
+                                    <select class="settings-select" disabled>
+                                        <option>Dark (Default)</option>
+                                    </select>
+                                </div>
                                 <div class="form-row">
-                                    <span><i data-lucide="moon"></i> Color Mode</span>
-                                    <select class="settings-select">
-                                        <option>System</option><option>Dark</option><option>Light</option>
+                                    <span>Font Scale</span>
+                                    <select id="font-scale" class="settings-select" onchange="document.body.style.fontSize = this.value">
+                                        <option value="14px">Small</option>
+                                        <option value="15px" selected>Medium</option>
+                                        <option value="16px">Large</option>
                                     </select>
                                 </div>
                             </div>
                             <h3 class="pane-title">Chat Display</h3>
                             <div class="card-box">
-                                <label class="checkbox-row"><input type="checkbox" checked> Show message timestamps</label>
-                                <label class="checkbox-row"><input type="checkbox" checked> Enable UI animations</label>
+                                <label class="checkbox-row"><input type="checkbox" id="enter-send" checked> Enter to Send</label>
+                                <label class="checkbox-row"><input type="checkbox" checked> Markdown Syntax Highlighting</label>
+                                <label class="checkbox-row"><input type="checkbox" checked> UI Animations</label>
                             </div>
                         </div>
                         
-                        <!-- Extra tabs omitted for brevity via hidden class -->
-                        <div id="model-tab" class="pane hidden"><div class="card-box">Model stats render here.</div></div>
-                        <div id="speech-tab" class="pane hidden"><div class="card-box">Nova whisper settings render here.</div></div>
-                        <div id="about-tab" class="pane hidden"><div class="card-box" style="text-align:center;"><img src="assets/app/Dizel.png" width="60"><br><b>Dizel AI</b><br>UI Parity Replica</div></div>
+                        <div id="model-tab" class="pane hidden">
+                            <h3 class="pane-title">Model Architecture Info</h3>
+                            <div class="card-box" style="margin-bottom: 24px;">
+                                <ul style="list-style: none; padding: 0; line-height: 1.8; font-size: 13px;">
+                                    <li><b>Family:</b> Transformer (Decoder-only)</li>
+                                    <li><b>Context Window:</b> 8,192 tokens</li>
+                                    <li><b>Vocab Size:</b> 128,256 tokens</li>
+                                    <li><b>Parameters:</b> ~8B</li>
+                                </ul>
+                            </div>
+                            <h3 class="pane-title">Capabilities</h3>
+                            <div class="card-box">
+                                <ul style="padding-left: 20px; line-height: 1.8; font-size: 13px;">
+                                    <li>Instruction Following</li>
+                                    <li>Code Generation & Explanation</li>
+                                    <li>Multilingual Translation</li>
+                                    <li>Reasoning & Logic</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div id="speech-tab" class="pane hidden">
+                            <h3 class="pane-title">Dictation Specs</h3>
+                            <div class="card-box" style="margin-bottom: 24px;">
+                                <div class="form-row mb-12">
+                                    <span>Language</span>
+                                    <select id="speech-lang" class="settings-select">
+                                        <option value="en-US">English (US)</option>
+                                        <option value="es-ES">Spanish</option>
+                                        <option value="fr-FR">French</option>
+                                        <option value="id-ID">Indonesian</option>
+                                        <option value="ja-JP">Japanese</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <span>Browser Compatibility</span>
+                                    <span id="speech-compat">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="about-tab" class="pane hidden">
+                            <div class="card-box" style="text-align:center; padding: 40px 20px;">
+                                <img src="assets/app/Dizel.png" width="80" style="border-radius: 50%; border: 2px solid var(--border); margin-bottom: 16px;">
+                                <h2 style="margin-bottom: 4px;">Dizel AI Serverless</h2>
+                                <p class="dim-text mb-12">Web UI Parity Demo &middot; v1.2.1</p>
+                                <div style="display:flex; justify-content:center; gap: 12px; margin-top: 24px;">
+                                    <button class="pill-btn"><i data-lucide="github"></i> Repository</button>
+                                    <button class="pill-btn"><i data-lucide="message-circle"></i> Discord</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -303,7 +374,7 @@
                             <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Local Engine</p>
                         </button>
                         
-                        <button class="provider-card" onclick="openModal('api-modal'); selectModel('API Keys');" style="flex:1; border: 1px solid var(--border); background: var(--bg-input); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
+                        <button class="provider-card" onclick="openModal('settings-modal');" style="flex:1; border: 1px solid var(--border); background: var(--bg-input); padding: 16px; border-radius: 12px; text-align: center; cursor: pointer;">
                             <i data-lucide="key" style="margin-bottom:8px; width:32px; height:32px; color: var(--text-secondary);"></i>
                             <h3 style="font-size: 14px; color: var(--text-primary);">Providers</h3>
                             <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px;">Cloud Models</p>

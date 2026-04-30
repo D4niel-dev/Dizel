@@ -103,13 +103,20 @@ document.addEventListener('click', (e) => {
 });
 
 // --- Attach Document Mock ---
-window.attachDocumentMock = function() {
+window.attachDocumentMock = function(type = 'file') {
     const panel = document.querySelector('.input-panel');
-    const existing = document.querySelector('.attachment-pill');
+    const existing = document.querySelector(`.attachment-pill[data-tool="${type}"]`);
     if (!existing) {
         const pill = document.createElement('div');
         pill.className = 'attachment-pill';
-        pill.innerHTML = `<i data-lucide="file-code"></i> <span>project_data.json</span> <button class="icon-btn xs" onclick="this.parentElement.remove()" style="margin-left:4px"><i data-lucide="x"></i></button>`;
+        pill.setAttribute('data-tool', type);
+        let icon = 'file-code'; let label = 'project_data.json';
+        if (type === 'web-search') { icon = 'globe'; label = 'Web Search'; }
+        if (type === 'deep-think') { icon = 'brain'; label = 'Deep Think'; }
+        if (type === 'parse') { icon = 'folder'; label = 'File Parser'; }
+        if (type === 'image') { icon = 'image'; label = 'Image Generation'; }
+
+        pill.innerHTML = `<i data-lucide="${icon}"></i> <span>${label}</span> <button class="icon-btn xs" onclick="this.parentElement.remove()" style="margin-left:4px"><i data-lucide="x"></i></button>`;
         panel.insertBefore(pill, chatInput);
         lucide.createIcons({ root: pill });
     }
@@ -190,6 +197,9 @@ chatInput.addEventListener('keydown', function(e) {
     }
 });
 
+let currentSessionId = null;
+let currentSessionMessages = [];
+
 function sendMessage() {
     const text = chatInput.value.trim();
     if (!text) return;
@@ -200,6 +210,7 @@ function sendMessage() {
     }
 
     createBubble('user', text);
+    currentSessionMessages.push({ role: 'user', content: text });
     
     // Clear attachments mock
     const pill = document.querySelector('.attachment-pill');
@@ -279,6 +290,33 @@ window.toggleThought = function(btn) {
     chatStream.scrollTop = chatStream.scrollHeight;
 };
 
+let currentAbortController = null;
+
+function setGeneratingState(isGenerating) {
+    const sendBtn = document.getElementById('send-btn');
+    if (!sendBtn) return;
+    const icon = sendBtn.querySelector('i');
+    if (isGenerating) {
+        icon.setAttribute('data-lucide', 'square');
+        sendBtn.onclick = stopGeneration;
+        sendBtn.style.color = 'var(--error)';
+    } else {
+        icon.setAttribute('data-lucide', 'arrow-up');
+        sendBtn.onclick = sendMessage;
+        sendBtn.style.color = '';
+    }
+    lucide.createIcons({ root: sendBtn });
+}
+
+function stopGeneration() {
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+}
+
+// Initial setup
+document.getElementById('send-btn').onclick = sendMessage;
+
 function simulateAIResponse(userQuery) {
     const loadingBubble = createBubble('assistant', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
     chatStream.scrollTop = chatStream.scrollHeight;
@@ -287,6 +325,11 @@ function simulateAIResponse(userQuery) {
     let actualBubble = null;
     let bodyNode = null;
     let isFirstToken = true;
+
+    const historyToPass = currentSessionMessages.slice(0, -1);
+    
+    currentAbortController = new AbortController();
+    setGeneratingState(true);
 
     LLMEngine.generateStream(userQuery, (token, fullText) => {
         if (isFirstToken) {
@@ -299,8 +342,134 @@ function simulateAIResponse(userQuery) {
         bodyNode.innerHTML = parseAndFormatThought(fullText);
         lucide.createIcons({ root: bodyNode }); 
         chatStream.scrollTop = chatStream.scrollHeight;
+    }, currentAbortController.signal, historyToPass).then(async (finalText) => {
+        setGeneratingState(false);
+        currentAbortController = null;
+        
+        if(finalText) currentSessionMessages.push({ role: 'assistant', content: finalText });
+        else currentSessionMessages.push({ role: 'assistant', content: bodyNode?.innerText || "*Empty Response*" });
+
+        if (!currentSessionId) {
+            const pad = (n) => n.toString().padStart(2, '0');
+            const d = new Date();
+            currentSessionId = `session_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+        
+        const title = currentSessionMessages[0]?.content.substring(0, 45) || 'New Chat';
+        
+        await DBManager.saveSession({
+            id: currentSessionId,
+            title: title + (currentSessionMessages[0]?.content.length > 45 ? '...' : ''),
+            created: new Date().toISOString(),
+            messages: currentSessionMessages,
+            pinned: false
+        });
+        refreshHistoryUI();
+    }).catch(err => {
+        setGeneratingState(false);
+        currentAbortController = null;
+        if(err.name === 'AbortError') {
+            currentSessionMessages.push({ role: 'assistant', content: bodyNode?.innerText || "*Stopped*" });
+        } else {
+            console.error(err);
+            if(loadingBubble.parentElement) loadingBubble.remove();
+            createBubble('assistant', `<span style="color:var(--error);"><i data-lucide="alert-triangle"></i> Error generating response. Check credentials and provider network.</span>`);
+        }
     });
 }
+
+// History UI Engine
+async function refreshHistoryUI(query = '') {
+    const list = document.getElementById('history-list');
+    if(!list) return;
+    
+    const sessions = await DBManager.searchSessions(query);
+    list.innerHTML = '';
+    
+    if(sessions.length === 0) {
+        list.innerHTML = `<div class="dim-text" style="text-align:center; padding: 20px;">No chats found.</div>`;
+        return;
+    }
+    
+    sessions.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'info-card history-item hover-bg-transition';
+        item.style.cursor = 'pointer';
+        item.style.border = currentSessionId === s.id ? '1px solid var(--border-focus)' : '1px solid var(--border)';
+        
+        const pinColor = s.pinned ? 'color: var(--accent);' : 'color: var(--text-dim);';
+        
+        item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                <h4 style="font-size: 13px; font-weight: 500; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${s.title}</h4>
+                <div style="display:flex; gap: 4px;">
+                    <button class="icon-btn xs" onclick="event.stopPropagation(); togglePin('${s.id}')"><i data-lucide="pin" style="${pinColor}"></i></button>
+                    <button class="icon-btn xs" onclick="event.stopPropagation(); deleteSession('${s.id}')"><i data-lucide="trash-2"></i></button>
+                </div>
+            </div>
+            <div class="dim-text" style="font-size: 11px;">${new Date(s.created).toLocaleDateString()} ${new Date(s.created).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+        `;
+        item.onclick = () => loadSession(s.id);
+        list.appendChild(item);
+    });
+    lucide.createIcons({ root: list });
+}
+
+window.newChat = function() {
+    currentSessionId = null;
+    currentSessionMessages = [];
+    document.querySelectorAll('.message-bubble').forEach(b => b.remove());
+    if (welcomeScreen) {
+        welcomeScreen.style.display = 'flex';
+        chatStream.style.justifyContent = 'center';
+    }
+    refreshHistoryUI();
+};
+
+window.loadSession = async function(id) {
+    const session = await DBManager.loadSession(id);
+    if(!session) return;
+    
+    currentSessionId = session.id;
+    currentSessionMessages = session.messages || [];
+    
+    document.querySelectorAll('.message-bubble').forEach(b => b.remove());
+    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    chatStream.style.justifyContent = 'flex-start';
+    
+    for(const m of currentSessionMessages) {
+        if(m.role === 'user') createBubble('user', m.content);
+        else {
+            const b = createBubble('assistant', '');
+            const body = b.querySelector('.message-body');
+            body.innerHTML = parseAndFormatThought(m.content);
+            lucide.createIcons({ root: body }); 
+        }
+    }
+    chatStream.scrollTop = chatStream.scrollHeight;
+    refreshHistoryUI();
+    if(window.innerWidth < 900) toggleSecondarySidebar(); // auto close on mobile
+};
+
+window.deleteSession = async function(id) {
+    if(confirm("Are you sure you want to delete this chat?")) {
+        await DBManager.deleteSession(id);
+        if(currentSessionId === id) window.newChat();
+        else refreshHistoryUI();
+    }
+};
+
+window.togglePin = async function(id) {
+    await DBManager.togglePin(id);
+    refreshHistoryUI();
+};
+
+document.getElementById('history-search')?.addEventListener('input', (e) => {
+    refreshHistoryUI(e.target.value);
+});
+
+// Run refresh on load
+window.addEventListener('DOMContentLoaded', () => { setTimeout(() => refreshHistoryUI(), 500); });
 
 
 // --- Global Modal Engine & Ctrl+K Palette ---
@@ -320,6 +489,8 @@ window.openModal = function(modalId) {
         // Auto-focus logic for command palette
         if(modalId === 'command-palette') {
             document.getElementById('cmd-input')?.focus();
+        } else if (modalId === 'settings-modal') {
+            hydrateSettingsModal();
         }
     }
 };
@@ -396,26 +567,93 @@ const tempSlider = document.getElementById('temp-slider');
 const tempVal = document.getElementById('temp-val');
 const topkSlider = document.getElementById('topk-slider');
 const topkVal = document.getElementById('topk-val');
+const toppSlider = document.getElementById('topp-slider');
+const toppVal = document.getElementById('topp-val');
+const repSlider = document.getElementById('rep-slider');
+const repVal = document.getElementById('rep-val');
 const tokensSlider = document.getElementById('tokens-slider');
 const tokensVal = document.getElementById('tokens-val');
 
 if (tempSlider && tempVal) tempSlider.addEventListener('input', (e) => tempVal.innerText = (e.target.value / 100).toFixed(2));
 if (topkSlider && topkVal) topkSlider.addEventListener('input', (e) => topkVal.innerText = e.target.value);
+if (toppSlider && toppVal) toppSlider.addEventListener('input', (e) => toppVal.innerText = (e.target.value / 100).toFixed(2));
+if (repSlider && repVal) repSlider.addEventListener('input', (e) => repVal.innerText = (e.target.value / 100).toFixed(2));
 if (tokensSlider && tokensVal) tokensSlider.addEventListener('input', (e) => tokensVal.innerText = e.target.value);
 
-window.saveSettings = async function() {
-    const sysPrompt = document.getElementById('system-prompt')?.value || '';
-    const temp = tempSlider ? parseInt(tempSlider.value) / 100 : 0.7;
-    const topk = topkSlider ? parseInt(topkSlider.value) : 40;
-    const maxTokens = tokensSlider ? parseInt(tokensSlider.value) : 400;
+let selectedProvider = 'ollama';
 
-    await DBManager.setSetting('systemPrompt', sysPrompt);
-    await DBManager.setSetting('temperature', temp);
-    await DBManager.setSetting('topK', topk);
-    await DBManager.setSetting('maxTokens', maxTokens);
+window.selectProviderSettings = function(provider) {
+    selectedProvider = provider;
+    document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.provider-card[data-provider="${provider}"]`)?.classList.add('active');
     
-    if (typeof Config !== 'undefined') {
-        Config.temperature = temp;
+    // UI logic
+    const apiKeyRow = document.getElementById('api-key-row');
+    const ollamaUrlRow = document.getElementById('ollama-url-row');
+    const apiKeyInput = document.getElementById('api-key');
+    
+    if (provider === 'ollama') {
+        apiKeyRow.style.display = 'none';
+        ollamaUrlRow.style.display = 'flex';
+        document.getElementById('ollama-url').value = Config.localOllamaUrl;
+    } else {
+        apiKeyRow.style.display = 'flex';
+        ollamaUrlRow.style.display = 'none';
+        
+        if (provider === 'openai') apiKeyInput.value = Config.apiKey || '';
+        else if (provider === 'anthropic') apiKeyInput.value = Config.anthropicKey || '';
+        else if (provider === 'google') apiKeyInput.value = Config.googleKey || '';
+        else if (provider === 'groq') apiKeyInput.value = Config.groqKey || '';
+    }
+};
+
+window.testConnection = async function() {
+    alert("Connection verified via fetch! (Mocked)");
+};
+
+function hydrateSettingsModal() {
+    document.getElementById('system-prompt').value = Config.systemPrompt;
+    document.getElementById('model-name').value = Config.activeModel;
+    
+    if (tempSlider) { tempSlider.value = Config.temperature * 100; tempVal.innerText = Config.temperature.toFixed(2); }
+    if (topkSlider) { topkSlider.value = Config.topK; topkVal.innerText = Config.topK; }
+    if (toppSlider) { toppSlider.value = Config.topP * 100; toppVal.innerText = Config.topP.toFixed(2); }
+    if (repSlider) { repSlider.value = Config.repPenalty * 100; repVal.innerText = Config.repPenalty.toFixed(2); }
+    if (tokensSlider) { tokensSlider.value = Config.maxTokens; tokensVal.innerText = Config.maxTokens; }
+    
+    selectProviderSettings(Config.targetBackend || 'ollama');
+}
+
+window.saveSettings = async function() {
+    Config.systemPrompt = document.getElementById('system-prompt')?.value || '';
+    Config.activeModel = document.getElementById('model-name')?.value || 'llama3';
+    Config.targetBackend = selectedProvider;
+    
+    Config.temperature = tempSlider ? parseInt(tempSlider.value) / 100 : 0.7;
+    Config.topK = topkSlider ? parseInt(topkSlider.value) : 40;
+    Config.topP = toppSlider ? parseInt(toppSlider.value) / 100 : 0.9;
+    Config.repPenalty = repSlider ? parseInt(repSlider.value) / 100 : 1.1;
+    Config.maxTokens = tokensSlider ? parseInt(tokensSlider.value) : 400;
+
+    await DBManager.setSetting('systemPrompt', Config.systemPrompt);
+    await DBManager.setSetting('activeModel', Config.activeModel);
+    await DBManager.setSetting('targetBackend', Config.targetBackend);
+    await DBManager.setSetting('temperature', Config.temperature);
+    await DBManager.setSetting('topK', Config.topK);
+    await DBManager.setSetting('topP', Config.topP);
+    await DBManager.setSetting('repPenalty', Config.repPenalty);
+    await DBManager.setSetting('maxTokens', Config.maxTokens);
+    
+    if (selectedProvider === 'ollama') {
+        const url = document.getElementById('ollama-url').value;
+        if(url) { Config.localOllamaUrl = url; await DBManager.setSetting('localOllamaUrl', url); }
+    } else {
+        const key = document.getElementById('api-key').value;
+        const encKey = await CryptoVault.encrypt(key);
+        if (selectedProvider === 'openai') { Config.apiKey = key; await DBManager.setSetting('apiKey', encKey); }
+        else if (selectedProvider === 'anthropic') { Config.anthropicKey = key; await DBManager.setSetting('anthropicKey', encKey); }
+        else if (selectedProvider === 'google') { Config.googleKey = key; await DBManager.setSetting('googleKey', encKey); }
+        else if (selectedProvider === 'groq') { Config.groqKey = key; await DBManager.setSetting('groqKey', encKey); }
     }
     
     closeAllModals();
