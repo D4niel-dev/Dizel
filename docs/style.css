@@ -275,23 +275,27 @@ button:active { transform: scale(0.96); }
     .logo-img { display: none; } 
     #chat-stream { padding-top: 60px; }
     .modal-content.horizontal { flex-direction: column; }
-    .settings-tabs { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border);}
-    
+    #sidebar.expanded {
+        width: 100%; /* Prevent shrinking to 240px when clicking hamburger on mobile */
+    }
     #secondary-sidebar {
         position: fixed;
         bottom: 60px; /* Start above sidebar */
         top: 0;
         left: -100%;
         margin-left: 0;
-        width: 80%; /* Don't take full width on mobile */
-        max-width: 320px;
-        height: auto; /* stretch to bottom 60px */
+        width: 85%; /* Slightly wider on mobile for better touch targets */
+        max-width: 380px;
+        height: auto;
         border-right: 1px solid var(--border);
         transition: left 0.3s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
+        z-index: 150;
+        background-color: var(--bg-panel);
     }
     #secondary-sidebar.open {
         left: 0;
         margin-left: 0;
+        box-shadow: 10px 0 50px rgba(0,0,0,0.8);
     }
     #input-anchor { padding-bottom: 16px; }
 }
