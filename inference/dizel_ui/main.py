@@ -482,10 +482,15 @@ class DizelApp(QMainWindow):
 
     def _open_command_palette(self):
         commands = [
-            {"label": "New Chat", "icon": "plus-square", "hook": self._new_chat},
-            {"label": "Settings", "icon": "settings", "hook": self._open_settings},
-            {"label": "Clear Chat Output", "icon": "trash-2", "hook": self._chat_window.clear},
-            {"label": "Quit", "icon": "x-circle", "hook": self.close},
+            {"label": "New Chat",            "icon": "plus-square",   "shortcut": "Ctrl + N",  "hook": self._new_chat},
+            {"label": "Settings",            "icon": "settings",      "shortcut": "Ctrl + ,",  "hook": self._open_settings},
+            {"label": "Export Chat",          "icon": "download",      "shortcut": "",         "hook": self._export_chat},
+            {"label": "Toggle Sidebar",       "icon": "sidebar",       "shortcut": "",         "hook": self._toggle_secondary_sidebar},
+            {"label": "Toggle Theme",         "icon": "sun",           "shortcut": "",         "hook": self._toggle_theme_from_palette},
+            {"label": "Reload Model",         "icon": "refresh-cw",    "shortcut": "",         "hook": self._reload_model},
+            {"label": "Attach File",          "icon": "paperclip",     "shortcut": "",         "hook": self._do_attach},
+            {"label": "Clear Chat Output",    "icon": "trash-2",       "shortcut": "",         "hook": self._chat_window.clear},
+            {"label": "Quit",                 "icon": "x-circle",      "shortcut": "Ctrl + W", "hook": self.close},
         ]
         
         palette = CommandPalette(commands, parent=self)
@@ -495,6 +500,15 @@ class DizelApp(QMainWindow):
         y = geom.y() + (geom.height() - palette.height()) // 4
         palette.move(x, y)
         palette.exec()
+
+    def _toggle_theme_from_palette(self):
+        current = Theme.current()
+        new_theme = "light" if current == "dark" else "dark"
+        Theme.set(new_theme)
+        cfg = ConfigManager.load()
+        cfg["theme"] = new_theme
+        ConfigManager.save(cfg)
+        self._apply_theme()
 
     def _show_status(self, msg: str, dim: bool = False):
         color = TEXT_DIM if dim else TEXT_PRIMARY

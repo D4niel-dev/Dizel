@@ -3,17 +3,25 @@
     width="50%"
     height="50%"/>
 </div>
+<div align="center">
+
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch)
+![PySide6](https://img.shields.io/badge/GUI-PySide6-41CD52?logo=qt)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+</div>
 
 > *Dizel — Distributed Intelligent Zen Execution Layer*
 
 **Dizel** is a complete, educational implementation of a GPT-style causal language
 model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
-single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training
-required.
+single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training required.
+But it has grown into **so much more**—shipping with a state-of-the-art **Native Desktop App** featuring voice transcription, cross-provider API routing (BYOK), and rich markdown UI.
 
 ---
 
-## What You Will Build
+## 🌟 What You Will Build
 
 | Component | Details |
 |---|---|
@@ -22,8 +30,8 @@ required.
 | **Tokenizer** | SentencePiece BPE, 32 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
 | **SFT** | Basic chat format, prompt-loss masking |
-| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty |
-| **Inference (GUI)** | Full Desktop App (PySide6) with dark/light themes, history, persistent settings, and first-run tutorial |
+| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Currently under maintenance) |
+| **Inference (GUI)** | Full Desktop App (PySide6) with **API Router (BYOK)**, **Nova Voice Engine**, Dark mode, history & persistent UI |
 
 ---
 
@@ -383,18 +391,17 @@ python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --d
 ```
 
 **Features of the Desktop App:**
-- **First-Run Tutorial:** Interactive onboarding overlay that highlights key UI elements with a spotlight effect and step-by-step tooltip instructions.
-- **Action Pill Carousel:** Quick-action buttons (Create Image, Brainstorm, Write Code, etc.) displayed as a scrollable, paginated carousel on the welcome screen.
-- **Persistent Settings:** Your temperature, top-p, checkpoints, and UI preferences are saved automatically across sessions.
-- **Chat History:** Seamlessly manage multiple conversations from the left sidebar.
-- **Attachment Previews:** Visually queue up reference items for your prompts.
-- **Model Switcher:** Switch between Dizel and Mila model versions.
-- **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` modes.
-- **Hardware Info:** Live UI tracking of generation tokens/sec and context windows.
-- **Keyboard Shortcut:** `Ctrl+K` opens the command palette with a lot of options.
-- **Context Limiter:** Live UI tracking of context limits.
-- **Dark/Light Themes:** Premium colors for Dark and Light mode 
-  *(WARNING! Light mode can cause a flashbang when switching from Dark mode, so please be careful)*.
+- 🎙️ **Nova Voice Engine:** Native whisper-powered speech transcription with live waveform UI processing, customizable silence timeouts, and multi-language support.
+- 🔌 **API Router (BYOK):** Bring your own keys! Out-of-the-box support for *Anthropic, Gemini, OpenAI, xAI,* and a fully configurable **Custom Provider** module to plug into *OpenRouter, DeepSeek, Together AI* or whatever local OpenAI-compatible endpoint you're running.
+- 🎒 **First-Run Tutorial:** Interactive onboarding overlay that highlights key UI elements with a spotlight effect and step-by-step tooltip instructions.
+- 💊 **Action Pill Carousel:** Quick-action buttons (Create Image, Brainstorm, Write Code, etc.) displayed as a scrollable, paginated carousel on the welcome screen.
+- 💾 **Persistent Settings:** Your temperature, top-p, external API keys (AES ENCRYPTED), checkpoints, and UI preferences are saved safely across sessions.
+- 💬 **Chat History:** Seamlessly manage multiple conversations from the left sidebar via localized JSON instances.
+- 📎 **Attachment Previews:** Visually queue up reference items for your prompts directly in the floating composer.
+- 🎭 **Model Switcher:** Switch between Dizel and Mila model versions on the fly.
+- 🧠 **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` mode toggles right in the chatbox.
+- ⚡ **Hardware & Limits Info:** Live UI tracking of generation tokens/sec, context limits, and hardware overhead.
+- ⌨️ **Keyboard Shortcut:** `Ctrl+K` opens the command palette with a lot of options.
 
 ---
 
@@ -554,6 +561,30 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 
 **Q: How can I report any errors/issues?**  
 > Very simple! — Just go to the model GitHub Repo and create an *Issue* request.
+
+**Q: How do I use the API Router (BYOK) to connect to external providers?**  
+> Open the Desktop App → click **Configuration** → go to the **Chat** tab → you'll see the **API Router** section with provider cards (Anthropic, Gemini, OpenAI, xAI, etc.). Click any card, then hit **Configure** to enter your API key. For unlisted providers, click **+ Other Provider** to add any OpenAI-compatible endpoint with a custom name and base URL.
+
+**Q: Are my API keys stored securely?**  
+> Yes. All API keys (both built-in and custom providers) are encrypted using AES encryption before being persisted to the local configuration file. Keys are never stored in plaintext.
+
+**Q: How do I use voice input (Nova)?**  
+> Click the **microphone icon** (🎙️) next to the send button in the chat input. The Nova overlay will appear with a live waveform visualization. Speak your message — it will be transcribed automatically using Whisper. You can configure the Whisper model size, language, and silence timeout in **Settings → Speech**.
+
+**Q: Can I use Dizel with Ollama or other local LLM servers?**  
+> Yes! Use the **+ Other Provider** feature in the API Router. Set the provider name (e.g., "Ollama"), leave the API key blank if not needed, and set the base URL to your local server (e.g., `http://localhost:11434/v1`).
+
+**Q: What does the `Ctrl+K` command palette do?**  
+> It opens a searchable command palette (like VS Code). From there, you can quickly access **New Chat**, **Settings**, **Export Chat**, **Toggle Theme**, **Reload Model**, **Attach File**, **Clear Output**, and **Quit** — all without touching your mouse.
+
+**Q: How do I switch between Dark and Light themes?**  
+> Go to **Settings → Appearance** and select your preferred theme, or use the command palette (`Ctrl+K`) and type "Toggle Theme" to switch instantly. ⚠️ *Warning: Light mode can cause a flashbang when switching from Dark mode — be careful!*
+
+**Q: Can I export my chat conversations?**  
+> Yes! Click the **Export** button in the top header bar or use `Ctrl+K → Export Chat`. Conversations are exported as `.md` (Markdown), `.json`, or `.txt` files — you choose.
+
+**Q: What are "Context Chips" in the input bar?**  
+> Context Chips are toggleable modes that enhance how the model processes your prompt. **Web Search** adds real-time web context, **Deep Think** enables chain-of-thought reasoning, and **Parse Files** lets the model analyze attached documents.
 
 ---
 

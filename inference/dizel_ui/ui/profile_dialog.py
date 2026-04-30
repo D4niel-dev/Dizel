@@ -7,7 +7,7 @@ from typing import Dict, Any
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QLineEdit, QPushButton, QFileDialog, QFrame, QSizePolicy, QWidget,
-    QComboBox
+    QComboBox, QTextEdit
 )
 from PySide6.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, QTimer, QEvent
 from PySide6.QtGui import QPixmap, QIcon
@@ -34,7 +34,7 @@ class ProfileDialog(QDialog):
             self._profile["username"] = "@user"
             
         self.setWindowTitle("Edit Profile")
-        self.setFixedSize(400, 620)
+        self.setFixedSize(660, 560)
         
         # Transparent Frameless Window
         self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
@@ -102,12 +102,12 @@ class ProfileDialog(QDialog):
                 border-radius: 66px;
             }}
         """)
-        self.ring_frame.move((400 - 132) // 2, 54) # Offset to align with avatar overlap
+        self.ring_frame.move((660 - 132) // 2, 54) # Offset to align with avatar overlap
 
         self.avatar_btn = QPushButton(self.bg_frame)
         self.avatar_btn.setFixedSize(120, 120)
         self.avatar_btn.setCursor(Qt.PointingHandCursor)
-        self.avatar_btn.move( (400 - 120) // 2, 60 ) # Center horizontally, offset vertically to overlap banner
+        self.avatar_btn.move((660 - 120) // 2, 60) # Center horizontally, offset vertically to overlap banner
         
         self._update_avatar_preview()
         self.avatar_btn.clicked.connect(self._select_avatar)
@@ -116,7 +116,7 @@ class ProfileDialog(QDialog):
         
         self.avatar_overlay = QLabel(self.bg_frame)
         self.avatar_overlay.setFixedSize(120, 120)
-        self.avatar_overlay.move((400 - 120) // 2, 60)
+        self.avatar_overlay.move((660 - 120) // 2, 60)
         self.avatar_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 150); border-radius: 60px;")
         self.avatar_overlay.setAlignment(Qt.AlignCenter)
         self.avatar_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -138,9 +138,15 @@ class ProfileDialog(QDialog):
 
         # --- Fields Section ---
         fields_container = QWidget()
-        fields_lyt = QVBoxLayout(fields_container)
+        fields_lyt = QHBoxLayout(fields_container)
         fields_lyt.setContentsMargins(32, 0, 32, 0)
-        fields_lyt.setSpacing(16)
+        fields_lyt.setSpacing(32)
+        
+        col1 = QVBoxLayout()
+        col1.setSpacing(16)
+        
+        col2 = QVBoxLayout()
+        col2.setSpacing(16)
         
         # Display Name
         disp_lyt = QVBoxLayout()
@@ -151,12 +157,12 @@ class ProfileDialog(QDialog):
         disp_lyt.addWidget(name_lbl)
         
         self.name_input = QLineEdit(self._profile.get("display_name", self._profile.get("username", "User")))
-        self.name_input.setFixedHeight(48)
+        self.name_input.setFixedHeight(36)
         self.name_input.setFont(NAV_ITEM)
         self.name_input.setPlaceholderText("Enter your display name...")
-        self.name_input.setStyleSheet(get_input_style(BG_CHAT, BORDER, ACCENT, TEXT_PRIMARY, radius=12) + " QLineEdit { padding: 0 16px; }")
+        self.name_input.setStyleSheet(get_input_style(BG_CHAT, BORDER, ACCENT, TEXT_PRIMARY, radius=18) + " QLineEdit { padding: 0 16px; }")
         disp_lyt.addWidget(self.name_input)
-        fields_lyt.addLayout(disp_lyt)
+        col1.addLayout(disp_lyt)
         
         # Username
         usr_lyt = QVBoxLayout()
@@ -167,12 +173,52 @@ class ProfileDialog(QDialog):
         usr_lyt.addWidget(usr_lbl)
         
         self.username_input = QLineEdit(self._profile.get("username", "@user"))
-        self.username_input.setFixedHeight(48)
+        self.username_input.setFixedHeight(36)
         self.username_input.setFont(NAV_ITEM)
         self.username_input.setPlaceholderText("Choose a unique username...")
-        self.username_input.setStyleSheet(get_input_style(BG_CHAT, BORDER, ACCENT, TEXT_PRIMARY, radius=12) + " QLineEdit { padding: 0 16px; }")
+        self.username_input.setStyleSheet(get_input_style(BG_CHAT, BORDER, ACCENT, TEXT_PRIMARY, radius=18) + " QLineEdit { padding: 0 16px; }")
         usr_lyt.addWidget(self.username_input)
-        fields_lyt.addLayout(usr_lyt)
+        col1.addLayout(usr_lyt)
+        
+        # System Role / Title
+        role_lyt = QVBoxLayout()
+        role_lyt.setSpacing(8)
+        role_lbl = QLabel("Job Title / Role")
+        role_lbl.setFont(NAV_ITEM)
+        role_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-weight: bold;")
+        role_lyt.addWidget(role_lbl)
+        
+        self.role_input = QLineEdit(self._profile.get("role", "Developer"))
+        self.role_input.setFixedHeight(36)
+        self.role_input.setFont(NAV_ITEM)
+        self.role_input.setPlaceholderText("E.g. Prompt Engineer, AI Overlord...")
+        self.role_input.setStyleSheet(get_input_style(BG_CHAT, BORDER, ACCENT, TEXT_PRIMARY, radius=18) + " QLineEdit { padding: 0 16px; }")
+        role_lyt.addWidget(self.role_input)
+        col1.addLayout(role_lyt)
+        
+        # Bio
+        bio_lyt = QVBoxLayout()
+        bio_lyt.setSpacing(8)
+        bio_lbl = QLabel("About Me / Bio")
+        bio_lbl.setFont(NAV_ITEM)
+        bio_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; font-weight: bold;")
+        bio_lyt.addWidget(bio_lbl)
+        
+        self.bio_input = QTextEdit(self._profile.get("bio", ""))
+        self.bio_input.setMaximumHeight(100)
+        self.bio_input.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: {resolve(BG_CHAT)};
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 12px;
+                color: {resolve(TEXT_PRIMARY)};
+                padding: 10px;
+            }}
+            QTextEdit:focus {{
+                border: 1px solid {resolve(ACCENT)};
+            }}
+        """)
+        bio_lyt.addWidget(self.bio_input)
         
         # Theme Toggle
         theme_lyt = QVBoxLayout()
@@ -183,7 +229,7 @@ class ProfileDialog(QDialog):
         theme_lyt.addWidget(theme_lbl)
         
         self.theme_combo = QComboBox()
-        self.theme_combo.setFixedHeight(48)
+        self.theme_combo.setFixedHeight(36)
         self.theme_combo.setFont(NAV_ITEM)
         self.theme_combo.addItems(["light", "dark", "blue_dark"])
         
@@ -196,7 +242,7 @@ class ProfileDialog(QDialog):
             QComboBox {{
                 background-color: {resolve(BG_CHAT)};
                 border: 1px solid {resolve(BORDER)};
-                border-radius: 12px;
+                border-radius: 18px;
                 color: {resolve(TEXT_PRIMARY)};
                 padding: 0 16px;
             }}
@@ -217,7 +263,14 @@ class ProfileDialog(QDialog):
             }}
         """)
         theme_lyt.addWidget(self.theme_combo)
-        fields_lyt.addLayout(theme_lyt)
+        col2.addLayout(theme_lyt)
+        col2.addLayout(bio_lyt)
+        
+        # Make col1 and col2 align to the top
+        col1.addStretch()
+        
+        fields_lyt.addLayout(col1)
+        fields_lyt.addLayout(col2)
         
         layout.addWidget(fields_container)
 
@@ -226,25 +279,29 @@ class ProfileDialog(QDialog):
         # --- Buttons Section ---
         btn_container = QWidget()
         btn_lyt = QHBoxLayout(btn_container)
-        btn_lyt.setContentsMargins(32, 0, 32, 32)
+        btn_lyt.setContentsMargins(32, 0, 32, 40)
         btn_lyt.setSpacing(12)
         
         self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setFixedHeight(44)
+        self.cancel_btn.setFixedHeight(36)
         self.cancel_btn.setFont(BTN_LABEL)
         self.cancel_btn.setCursor(Qt.PointingHandCursor)
-        self.cancel_btn.setStyleSheet(get_button_style("transparent", BG_CHAT, TEXT_DIM, radius=12, border_color=BORDER))
+        self.cancel_btn.setStyleSheet(get_button_style("transparent", BG_CHAT, TEXT_DIM, radius=18, border_color=BORDER))
         self.cancel_btn.clicked.connect(self.reject)
         
         self.save_btn = QPushButton("Save Changes")
-        self.save_btn.setFixedHeight(44)
+        self.save_btn.setFixedHeight(36)
         self.save_btn.setFont(BTN_LABEL)
         self.save_btn.setCursor(Qt.PointingHandCursor)
-        self.save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#FFFFFF", radius=12))
+        self.save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#FFFFFF", radius=18))
         self.save_btn.clicked.connect(self._save_profile)
         
-        btn_lyt.addWidget(self.cancel_btn, stretch=1)
-        btn_lyt.addWidget(self.save_btn, stretch=2)
+        btn_lyt.addStretch(1)
+        self.cancel_btn.setFixedWidth(120)
+        self.save_btn.setFixedWidth(160)
+        btn_lyt.addWidget(self.cancel_btn)
+        btn_lyt.addWidget(self.save_btn)
+        btn_lyt.addStretch(1)
         
         layout.addWidget(btn_container)
 
@@ -317,7 +374,7 @@ class ProfileDialog(QDialog):
 
     def _save_profile(self):
         self.save_btn.setText("✓ Saved!")
-        self.save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#FFFFFF", radius=12).replace(resolve(ACCENT), "#10b981"))
+        self.save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#FFFFFF", radius=18).replace(resolve(ACCENT), "#10b981"))
         self.save_btn.repaint()
         
         display_name = self.name_input.text().strip()
@@ -328,6 +385,12 @@ class ProfileDialog(QDialog):
         if username:
             self._profile["username"] = username
             
+        role = self.role_input.text().strip()
+        self._profile["role"] = role
+        
+        bio = self.bio_input.toPlainText().strip()
+        self._profile["bio"] = bio
+        
         self._profile["theme"] = self.theme_combo.currentText()
             
         if self.new_avatar_path:
