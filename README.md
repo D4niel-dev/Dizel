@@ -332,49 +332,18 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 ---
 
 ### Step 8 — CMD UI (Disable)
-This UI currently is being disabled for maintenance and updating, please go to **Step 9** to chat with the GUI version.
+The previous CMD-based interface has been removed and is currently being redesigned. Please, go to **Step 9** to use the *Desktop GUI*.
 
-**Interactive chat:**
-```bash
-python inference/cli_ui/cmd_ui.py --checkpoint checkpoints/dizel-sft-best.pt
-```
+A new version is planned with a more structured and extensible architecture, inspired by modern CLI tools.
 
-**Raw text completion (pretrain checkpoint):**
-```bash
-python inference/cli_ui/cmd_ui.py \
-    --checkpoint checkpoints/dizel-pretrain-best.pt \
-    --mode complete \
-    --prompt "Photosynthesis is the process by which"
-```
+Inspired by modern interactive CLI tools (e.g. command palettes, structured prompts)
 
-**JSON structured output:**
-```bash
-python inference/cli_ui/cmd_ui.py \
-    --checkpoint checkpoints/dizel-sft-best.pt \
-    --mode json \
-    --prompt "List the planets in the solar system"
-```
+### Why the rewrite?
+- The previous implementation was too limited
+- Difficult to extend and maintain
+- Did not match the long-term architecture of Dizel
 
-**Sampling controls:**
-```bash
-python inference/cli_ui/cmd_ui.py \
-    --checkpoint checkpoints/dizel-sft-best.pt \
-    --temperature 0.7 \
-    --top_k 40 \
-    --top_p 0.9 \
-    --repetition_penalty 1.2
-```
-
-**In-chat commands:**
-
-```text
-/quit          Exit
-/new           Clear conversation history
-/system <text> Change the system prompt
-/info          Show model info and settings
-/temp 0.6      Adjust temperature on the fly
-```
-
+Status: 🚧 In development
 ---
 
 ### Step 9 — Desktop GUI *(Recommended)*
