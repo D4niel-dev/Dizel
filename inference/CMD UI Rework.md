@@ -403,6 +403,7 @@ Handles:
 ## RECOMMENDED PROJECT STRUCTURE
 Create a dedicated CMD UI package with a clear, layered organization, for example:
 
+```
 cmd_ui/
 ├── main.py                     # Entry point
 ├── app.py                      # Textual app shell and lifecycle
@@ -452,6 +453,7 @@ cmd_ui/
     ├── mila_adapter.py         # Mila backend bridge
     ├── provider_adapter.py     # Provider routing adapter
     └── tool_adapter.py         # Shared tool execution adapter
+```
 
 ## COMMAND REQUIREMENTS
 Minimum commands to support:
