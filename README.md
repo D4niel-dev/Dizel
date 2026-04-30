@@ -334,9 +334,7 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 ### Step 8 — CMD UI (Disable)
 The previous CMD-based interface has been removed and is currently being redesigned. Please, go to **Step 9** to use the *Desktop GUI*.
 
-A new version is planned with a more structured and extensible architecture, inspired by modern CLI tools.
-
-Inspired by modern interactive CLI tools (e.g. command palettes, structured prompts)
+A new version is planned with a more structured and extensible architecture, inspired by modern interactive CLI tools (e.g. command palettes, structured prompts)
 
 ### Why the rewrite?
 - The previous implementation was too limited
