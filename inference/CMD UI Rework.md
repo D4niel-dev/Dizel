@@ -571,19 +571,19 @@ Since functionality matters more than polish right now:
 7. Then improve UX polish
 
 ## ACCEPTANCE CRITERIA
-> The task is complete only if:
-[  ] The CMD UI is rebuilt from scratch
-[  ] It is multi-panel and keyboard-first
-[  ] It uses Textual + Rich effectively
-[  ] It streams output token-by-token
-[  ] It exposes backend actions transparently
-[  ] It supports commands and natural prompts
-[  ] It supports model/mode switching
-[  ] It supports tool visibility and background tasks
-[  ] It has a persistent session/history system
-[  ] It is modular and extensible
-[  ] It fully controls the backend workflow
-[  ] It feels like a real terminal AI workspace inspired by OpenCode / KiloCode
+*The task is complete only if :*
+- [ ] The CMD UI is rebuilt from scratch
+- [ ] It is multi-panel and keyboard-first
+- [ ] It uses Textual + Rich effectively
+- [ ] It streams output token-by-token
+- [ ] It exposes backend actions transparently
+- [ ] It supports commands and natural prompts
+- [ ] It supports model/mode switching
+- [ ] It supports tool visibility and background tasks
+- [ ] It has a persistent session/history system
+- [ ] It is modular and extensible
+- [ ] It fully controls the backend workflow
+- [ ] It feels like a real terminal AI workspace inspired by OpenCode / KiloCode
 
 ## FINAL INTENT
 Build a new Dizel CMD UI from scratch as a modern, transparent, multi-panel, keyboard-first terminal AI workspace using Textual and Rich, with OpenCode/KiloCode-inspired interaction patterns, full backend control, streaming token-by-token output, visible tool and agent activity, command support, session management, and a modular architecture that can grow with the project.
