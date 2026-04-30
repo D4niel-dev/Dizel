@@ -1,6 +1,0 @@
-For why the cmd_ui is gone:
-1. It's still in development
-2. Looks too basic
-3. Alot of bugs (and i mean ALOT)
-4. Missing alot of features from the GUI version
-5. It's better to use the GUI for a better experience
