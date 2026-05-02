@@ -41,7 +41,7 @@ Dizel/
 ├── requirements.txt             ← All app requirements and optionals too
 │
 ├── data/
-│   └── english.md               ← Training corpus (plain English text)
+│   └── english.md               ← Training corpus (plain English text or what ever your datasets is)
 │
 ├── tokenizer/
 │   ├── train_tokenizer.py       ← Train SentencePiece BPE tokenizer
