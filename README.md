@@ -12,7 +12,7 @@
 
 </div>
 
-**Dizel** (Distributed Intelligent Zen Execution Layer) is a complete, educational implementation of a GPT-style causal language
+**Dizel** *(Distributed Intelligent Zen Execution Layer)* is a complete, educational implementation of a GPT-style causal language
 model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
 single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training required.
 But it has grown into **so much more**—shipping with a state-of-the-art **Native Desktop App** featuring voice transcription, cross-provider API routing (BYOK), and rich markdown UI.
