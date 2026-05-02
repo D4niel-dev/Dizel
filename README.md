@@ -24,7 +24,7 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
 | Component | Details |
 |---|---|
 | **Architecture** | Causal Transformer (Pre-LayerNorm, RoPE, SwiGLU MLP, multi-head self-attention) |
-| **Parameters** | ~253 M (configurable 10–250 M) |
+| **Parameters** | ~205 M (configurable 10–250 M) |
 | **Tokenizer** | SentencePiece BPE, 32 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
 | **SFT** | Basic chat format, prompt-loss masking |
