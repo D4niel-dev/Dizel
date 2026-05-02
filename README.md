@@ -1,7 +1,7 @@
 <div align="center">
   <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
-    width="50%"
-    height="50%"/>
+    width="60%"
+    height="60%"/>
 </div>
 <div align="center">
 
@@ -570,6 +570,7 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 
 **Q: What happens if I stop training halfway?**  
 **A:** Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`).
+
 You can safely resume training by running:
 ```python
 python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt
