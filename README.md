@@ -621,13 +621,19 @@ RuntimeError: CUDA out of memory
 ### ⌨️ Terminal (CMD UI) & Workflows
 
 **Q: How do I navigate the new CMD UI without a mouse?**
+
 **A:** Here's are some keybinds:
 - **Tab:** Switch AI Modes (Fast, Planning, Coding).
 - **Ctrl+K:** Open Command Palette.
 - **Ctrl+H:** Toggle Chat History sidebar.
 - **Ctrl+R:** Toggle the Context Panel (token tracking).
 
-**Q: I'm getting an `ImportError` when trying to run the UI!**  
+**Q: I'm getting an** 
+```python
+ImportError
+``` 
+**when trying to run the UI!**
+ 
 **A:** Make sure you have activated your virtual environment (`source .venv/bin/activate`) and run `pip install -r requirements.txt`. The UI relies heavily on `PySide6` (Desktop) and `Textual` (CMD).
 
 **Q: Is the model free-to-use?**  
