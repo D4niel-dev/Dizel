@@ -28,7 +28,7 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
 | **Tokenizer** | SentencePiece BPE, 32 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
 | **SFT** | Basic chat format, prompt-loss masking |
-| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Currently under maintenance) |
+| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Available v2.0!) |
 | **Inference (GUI)** | Full Desktop App (PySide6) with **API Router (BYOK)**, **Nova Voice Engine**, Dark mode, history & persistent UI |
 
 ---
