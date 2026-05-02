@@ -1,0 +1,169 @@
+Screen {
+    layout: vertical;
+    layers: base overlay;
+    background: #18181B; /* Deep dark gray */
+}
+
+/* Footer / Status Bar */
+StatusBar {
+    layer: base;
+    height: 1;
+    dock: bottom;
+    background: #18181B;
+    color: #71717A;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+/* Main horizontal layout */
+#main-layout {
+    layer: base;
+    layout: horizontal;
+    height: 1fr;
+    background: #18181B;
+}
+
+/* Workspace wrapper */
+#workspace-container {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+}
+
+SessionPanel {
+    width: 25;
+    height: 100%;
+    background: #18181B;
+    display: none; /* hidden by default, toggled with ctrl+h */
+    border-right: solid #27272A;
+}
+
+#session-list {
+    background: #18181B;
+    border: none;
+    height: 1fr;
+    padding: 0 1;
+}
+
+.panel-header {
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 1 2;
+}
+
+WorkspacePanel {
+    width: 1fr;
+    height: 1fr;
+    background: #18181B;
+    padding: 1 4;
+}
+
+EmptyStateBlock {
+    width: 1fr;
+    height: 1fr;
+    align: center middle;
+}
+
+.empty-state-logo {
+    width: auto;
+    height: auto;
+    text-align: center;
+    content-align: center middle;
+}
+
+/* The floating input bar */
+InputBar {
+    height: auto;
+    dock: bottom;
+    background: #1E1E1E;
+    margin: 1 1; /* Aligns contents perfectly with WorkspacePanel padding: 1 4 */
+    border-left: thick #3B82F6; /* Blue accent */
+    padding: 1 2;
+}
+
+#input-row {
+    height: 1;
+    layout: horizontal;
+    margin-bottom: 1;
+}
+
+#prompt-icon {
+    width: 2;
+    color: #60A5FA;
+    text-style: bold;
+}
+
+InputBar Input {
+    border: none;
+    background: #1E1E1E;
+    height: 1;
+    padding: 0 0;
+    width: 1fr;
+}
+
+#input-mode-indicator {
+    color: #A1A1AA;
+}
+
+ContextPanel {
+    width: 30;
+    height: 100%;
+    background: #18181B;
+    border-left: solid #27272A;
+}
+
+/* Command Palette Overlay */
+CommandPalette {
+    layer: overlay;
+    display: none;
+    width: 50%;
+    height: auto;
+    max-height: 60%;
+    background: #09090B;
+    border: none;
+    content-align: center middle;
+    offset-x: 25%;
+    offset-y: 20%;
+    box-sizing: border-box;
+}
+
+CommandPalette Input {
+    border: none;
+    border-bottom: solid #27272A;
+    background: #09090B;
+}
+
+CommandPalette OptionList {
+    height: 1fr;
+    border: none;
+    background: #09090B;
+}
+
+/* Overriding Textual default highlights for OptionList */
+CommandPalette OptionList > .option-list--option-highlighted {
+    background: #FFFF00;
+    color: #000000;
+    text-style: bold;
+}
+
+.ctx-item {
+    color: #D4D4D8;
+    padding: 0 0;
+}
+
+/* Tool and Message Blocks */
+MessageBlock {
+    margin: 1 0;
+}
+
+ToolBlock {
+    background: #27272A;
+    border-left: wide #A855F7; /* Purple accent */
+    margin: 1 0;
+    padding: 1 2;
+}
+
+StatusBlock {
+    color: #A855F7;
+    text-style: bold;
+}

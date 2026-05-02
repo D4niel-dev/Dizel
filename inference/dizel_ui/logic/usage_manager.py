@@ -1,7 +1,7 @@
 import time
 import json
 import os
-from dizel_ui.logic.config_manager import SETTINGS_FILE
+from inference.dizel_ui.logic.config_manager import SETTINGS_FILE
 
 class UsageManager:
     """Manages AI compute usage, complexity scoring, and 12-hour reset windows."""

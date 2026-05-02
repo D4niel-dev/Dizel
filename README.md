@@ -11,8 +11,9 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 </div>
-
-> *Dizel — Distributed Intelligent Zen Execution Layer*
+<div align="center">
+  <p><strong><i>Dizel — Distributed Intelligent Zen Execution Layer</i></strong></p>
+</div>
 
 **Dizel** is a complete, educational implementation of a GPT-style causal language
 model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
@@ -38,7 +39,7 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
 ## Folder Structure
 
 ```text
-dizel/
+Dizel/
 ├── config.py                    ← All hyperparameters in one place
 ├── requirements.txt             ← All app requirements and optionals too
 │
@@ -88,21 +89,26 @@ dizel/
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   ├── cli_ui/
-│   │   └── cmd_ui.py            ← CLI chat / completion / JSON inference
+│   ├── cmd_ui/                  ← Terminal UI v2.0 Application! (NEW)
+│   │   ├── main.py              ← Run this to start the Terminal UI
+│   │   ├── app.py               ← Textual App runtime & bindings
+│   │   ├── bridge/              ← Streaming & threading logic
+│   │   ├── commands/            ← Slash command registry & parser
+│   │   ├── panels/              ← InputBar, Workspace, Context panels
+│   │   ├── rendering/           ← Markdown blocks, ASCII empty state
+│   │   └── cmd_ui.tcss          ← Textual CSS styles & layouts
 │   │
-│   └── dizel_ui/                ← Full Desktop GUI Application!
+│   └── dizel_ui/                ← Full Desktop GUI Application! (v1.0.0)
 │       ├── main.py              ← Run this to start the desktop app
-│       ├── __init__.py          ← Package loader
 │       ├── theme/               ← Theme manager, colors, fonts, stylesheets
 │       ├── history/             ← Saved chats via JSON    (auto-created)
 │       ├── .dizel/              ← Saved settings via JSON (auto-created)
-│       ├── ui/                  ← PySide6 UI components (sidebar, chat, input, settings...)
-│       ├── utils/               ← Icons loader and agent logic
-│       ├── logic/               ← Async generation, config/history/tutorial managers
-│       └── assets/              ← Logo and avatar images
+│       ├── ui/                  ← PySide6 UI components (sidebar, chat, input, overlays)
+│       ├── utils/               ← Hardware utilities and generic icons
+│       ├── logic/               ← Async managers, context trimmer, TokenBudget
+│       └── assets/              ← Static logos and fonts
 │       
-├── docs/                        ← Landing page website (vanilla HTML/CSS/JS)
+├── docs/                        ← Demo Website (HTML/CSS/JS)
 │
 ├── utils/
 │   ├── __init__.py              ← Package loader
@@ -331,37 +337,65 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 
 ---
 
-### Step 8 — CMD UI (Disable)
-The previous CMD-based interface has been removed and is currently being redesigned. Please, go to **Step 9** to use the *Desktop GUI*.
+### Step 8 — Dizel CMD UI (v2.0.0)
 
-A new version is planned with a more structured and extensible architecture, inspired by modern interactive CLI tools (e.g. command palettes, structured prompts)
+The Terminal UI for Dizel has been completely reimagined from the ground up to provide a premium, developer-first experience inspired by modern keyboard-centric CLI tools. It is built using the robust Textual framework + Rich for better rendering.
 
-### Why the rewrite?
-- The previous implementation was too limited
-- Difficult to extend and maintain
-- Did not match the long-term architecture of Dizel
-
-Status: 🚧 In development
----
-
-### Step 9 — Desktop GUI *(Recommended)*
-
-Dizel includes a fully localized, premium Desktop Interface built with PySide6 featuring the **Premium Dark Theme**. 
-
+Launch it via:
 ```bash
-python inference/dizel_ui/main.py
+# Option 1 (Recommended)
+python -m inference.cmd_ui.main
+
+# Option 2 (Optional)
+python inference/cmd_ui/main.py
 ```
 
-**(Optional)** Pass a checkpoint right from the command line:
+**Features of the Reworked CMD UI:**
+- 🎨 **Minimalist Dark Theme & Aesthetics:** A seamless, deep dark gray layout featuring floating components, a centered gradient ASCII logo for the empty state, and an overall distraction-free environment.
+- ⌨️ **Keyboard-First Workflow:** Navigate the entire app without a mouse.
+  - `Tab`: Cycle between AI Agent modes (Fast, Planning, Coding, Review).
+  - `Ctrl+K`: Open the floating Command Palette for quick actions.
+  - `Ctrl+H`: Toggle the Session History Panel on the left.
+  - `Ctrl+R`: Toggle the Context Panel on the right.
+- 💬 **Floating Input Bar:** A clean, bottom-docked prompt area that clearly displays your currently active Mode, Model, and Provider (e.g., `[BUILD] Dizel Lite Local`).
+- 📊 **Reactive Context Panel:** A dynamic right sidebar that tracks your live token usage and compute budget in real-time as the model streams its responses.
+- 🚀 **Advanced Slash Commands:** Fully integrated slash commands for instant adjustments right from the chat bar:
+  - `/model [name]` - Swap models on the fly.
+  - `/provider [name]` - Switch between local inference and API routing.
+  - `/mode [name]` - Change your AI persona/agent mode.
+  - `/session [new|rename|delete]` - Manage your chat sessions natively.
+- 🛠 **Real-Time Generation & Tool Use:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
+---
+
+### Step 9 — Desktop GUI (v1.0.0) *(Recommended)*
+
+Dizel includes a fully localized, premium Desktop Interface built entirely from scratch with **PySide6**. It pushes the boundaries of native Python UI development with highly fluid animations, rich data management, and an uncompromising aesthetic heavily inspired by state-of-the-art developer tools.
+
+Launch it via:
 ```bash
+# Launch the app (Default)
+python inference/dizel_ui/main.py
+
+# Pass a checkpoint right from the command line (Optional)
 python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
-**Features of the Desktop App:**
-- 🎙️ **Nova Voice Engine:** Native whisper-powered speech transcription with live waveform UI processing, customizable silence timeouts, and multi-language support.
-- 🔌 **API Router (BYOK):** Bring your own keys! Out-of-the-box support for *Anthropic, Gemini, OpenAI, xAI,* and a fully configurable **Custom Provider** module to plug into *OpenRouter, DeepSeek, Together AI* or whatever local OpenAI-compatible endpoint you're running.
-- 🎒 **First-Run Tutorial:** Interactive onboarding overlay that highlights key UI elements with a spotlight effect and step-by-step tooltip instructions.
-- 💊 **Action Pill Carousel:** Quick-action buttons (Create Image, Brainstorm, Write Code, etc.) displayed as a scrollable, paginated carousel on the welcome screen.
+**Core Capabilities & Architecture:**
+- 🎙️ **Nova Voice Engine:** Native Whisper-powered speech transcription featuring real-time waveform UI visualization (`WaveformWidget`), multi-language support, and customizable silence thresholds to auto-submit your prompts when you stop speaking.
+- 🔌 **API Router (BYOK):** Bring Your Own Keys. Robust out-of-the-box routing for *Anthropic, Gemini, OpenAI,* and *xAI*. Also includes a highly configurable **Custom Provider** module to plug directly into *OpenRouter, DeepSeek, Together AI,* or any local OpenAI-compatible endpoint (like Ollama or vLLM). All external keys are **AES-encrypted** locally before saving.
+- 💬 **Secondary Operations Sidebar:** A dynamic, multi-view animated right sidebar offering:
+  - **Chats & Import:** Search history and import `.json`/`.md` chats.
+  - **Image Gallery:** A visual archive of all images you've generated or attached across all sessions.
+  - **Riset (Global Search):** Deep semantic search filtering across all projects, archived files, and starred content simultaneously.
+  - **Prompt Library:** Save, favorite, and reuse custom personas, instructions, and prompt templates.
+  - **File Archive & Presentations:** Central hub for all documents and slide imports.
+- 📊 **Intelligent Compute Tracking:** An advanced `UsageManager` and `TokenBudget` system dynamically tracks your 12-hour compute window, allocating context ceilings based on active mode complexity (e.g., scoring *Fast* mode vs *Planning* mode differently).
+- 🧠 **Dynamic Context Trimming:** The `ContextTrimmer` automatically truncates or summarizes conversational data to prevent memory overflow (OOM) while rigidly protecting system instructions and recent context.
+- 🎨 **Rich UI & Micro-Animations:** Custom-built PySide6 components including `MessageBubble` (for live-rendered markdown and syntax highlighting), `ActionMenu` (smooth popup tooling), `AnimatedButton`, and a realistic `TypingIndicator` for a truly premium feel.
+- 🎒 **First-Run Onboarding:** An interactive tutorial overlay (`TutorialManager`) that sequentially spotlights critical UI regions with helpful tooltips for first-time users.
+- ⚡ **Performance Telemetry:** Live hardware integration displaying tokens/sec, absolute context lengths, budget consumption, and VRAM overhead straight in the chat window.
+- ⌨️ **Command Palette:** Press `Ctrl+K` to summon a fuzzy-searchable global command list, allowing entirely mouse-free navigation (Toggle Theme, Export Chat, Reload Model, Settings).
+- 💊 **Zero-State Carousels:** Clickable, paginated action pills (Brainstorm, Write Code, Create Image) that instantly queue up complex system instructions.
 - 💾 **Persistent Settings:** Your temperature, top-p, external API keys (AES ENCRYPTED), checkpoints, and UI preferences are saved safely across sessions.
 - 💬 **Chat History:** Seamlessly manage multiple conversations from the left sidebar via localized JSON instances.
 - 📎 **Attachment Previews:** Visually queue up reference items for your prompts directly in the floating composer.
@@ -372,20 +406,27 @@ python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --d
 
 ---
 
-## Web UI Demo
-You can now preview how the GUI looks and feels through the web demo.
+## 🌐 Interactive Web UI Demo
 
-> **Note**: This is a visual and interaction demo — not the full application.
+Want to experience the look and feel of the Dizel GUI without installing Python, PyTorch, or downloading any models? **You can now preview the interface directly in your browser!**
 
-**Things need to be noted:**
-- Most features in the demo are **subjected to change, improved or removed**
-- Unlike the desktop app, the web version only supports:
-   - Ollama
-   - API-based providers
-- The web UI may receive frequent updates, including early previews of upcoming features
-- The current demo focuses on **UI interactions** only — it does not include full backend logic (e.g. local model execution)
+> Try the live demo here: **[Dizel Web Interface](https://d4niel-dev.github.io/Dizel/)**
 
-> Try the demo [here.](https://d4niel-dev.github.io/Dizel/)
+### What is the Web Demo?
+The web demo is a meticulously crafted 1:1 visual replica of the PySide6 Desktop GUI, engineered entirely in **Vanilla HTML/CSS/JS** (located in the `docs/` folder). It is designed to give you a hands-on feel of the application's premium aesthetics, fluid animations, and layout before you commit to cloning the repository.
+
+### What You Can Experience:
+- 🎨 **Pixel-Perfect Aesthetics:** Explore the deep dark theme, glassmorphism overlays, and smooth micro-animations.
+- 🎒 **Interactive Onboarding:** Walk through the mock first-run tutorial that highlights key UI elements.
+- 🖱️ **Navigation & Layout:** Click through the Action Pill Carousels, toggle the Secondary Operations Sidebar, and open the Command Palette (`Ctrl+K`).
+- 📱 **Responsive Design:** Unlike the desktop app, the web demo allows you to see how the UI reflows on smaller viewports and mobile devices.
+
+### Important Limitations:
+> **Note:** This is an interaction and design playground, *not* the full Python application.
+- **No Local Model Execution:** You cannot run the `.pt` PyTorch models in the browser.
+- **Limited Backend Logic:** The demo focuses on UI interactions. Chat functionality only works if you connect it to **Ollama** or external **API-based providers** (like OpenAI or Anthropic) via the settings.
+- **Experimental Features:** The web UI acts as our testing ground. You may see early previews of upcoming features here before they are merged into the main PySide6 desktop app!
+- **Subject to Change:** Features in the web demo may be altered, improved, or removed frequently.
 
 ---
 
@@ -405,7 +446,9 @@ You can now preview how the GUI looks and feels through the web demo.
 
 ## Architecture Deep-Dive
 
-### Causal Self-Attention
+Dizel implements a modern, highly-optimized variant of the original GPT-style Transformer.
+
+### Core Attention Mechanism (Flash Attention & RoPE)
 
 ```text
 input x (B, T, d_model)
@@ -415,87 +458,87 @@ input x (B, T, d_model)
    │
    ├─ reshape to (B, n_heads, T, head_dim)
    │
-   ├─ RoPE: apply rotary position embeddings to Q and K
+   ├─ RoPE: Apply Rotary Position Embeddings to Q and K
+   │        (Enables relative positional understanding and better length extrapolation)
    │
    ├─ attn = softmax(Q @ K.T / √head_dim + causal_mask)
-   │        (Flash Attention via PyTorch 2.x SDPA if available)
+   │        ⚡ Hardware Accelerated via PyTorch 2.x SDPA (Flash Attention)
    │
    └─ output = attn @ V  →  reshape  →  Linear(d_model → d_model)
 ```
 
-### Transformer Block (Pre-LayerNorm)
+### Transformer Block (Pre-LayerNorm & SwiGLU)
 
 ```text
-x → LayerNorm → Attention → + → LayerNorm → MLP → +
-│                            ↑                     ↑
-└────────────────────────────┘─────────────────────┘
-         residual connections (help gradient flow)
+x → LayerNorm → Attention → + → LayerNorm → SwiGLU MLP → +
+│                            ↑                            ↑
+└────────────────────────────┘────────────────────────────┘
+         residual connections (essential for deep gradient flow)
 ```
 
-### Why Pre-LayerNorm?
+**Why SwiGLU?**
+Instead of a standard ReLU or GELU MLP, Dizel utilizes the SwiGLU activation function (as seen in Llama 3). This gating mechanism requires slightly more parameters per block but yields significantly better reasoning performance.
 
-Post-LN (LayerNorm after residuals) is the original Transformer design but
-requires careful learning rate warm-up to train stably. Pre-LN (before each
-sub-layer) is more stable with standard AdamW and no special tricks.
+**Why Pre-LayerNorm?**
+Post-LN (LayerNorm after residuals) is the original Transformer design but requires careful learning rate warm-up to train stably. Pre-LN (before each sub-layer) is more stable with standard AdamW and prevents gradient vanishing early in training.
 
-### Weight Tying
-
-The token embedding matrix (vocab × d_model) and the LM head (d_model × vocab)
-share the same weights. This reduces parameters by ~3 M and often improves
-perplexity because the model learns that words close in embedding space
-should have similar output distributions.
+**Weight Tying & KV Caching**
+- **Weight Tying:** The token embedding matrix and the final LM head share the same weights. This reduces total parameters by ~3M and forces the embedding space to properly align with output probabilities.
+- **KV Caching:** During inference, past Key and Value vectors are aggressively cached. Instead of re-computing the entire context window for every new word, Dizel only processes the *last* token, dropping O(N²) attention complexity down to O(N).
 
 ---
 
 ## Overfitting on Small Data
 
-Small corpora are the primary challenge. Dizel uses several mitigations:
+Small corpora are the primary challenge when training LLMs from scratch. Dizel uses an aggressive suite of mitigations to prevent memorization:
 
 | Technique | Where | Effect |
 |---|---|---|
-| **Dropout (0.15)** | Attention + MLP | Prevents memorisation |
-| **Weight decay (0.1)** | AdamW | L2 regularisation |
+| **Dropout (0.15)** | Attention + MLP | Prevents strict memorisation of paths |
+| **Weight decay (0.1)** | AdamW Optimiser | L2 regularisation keeps weights small |
 | **Window reshuffling** | DataLoader | Breaks repetitive mini-batch patterns |
-| **Overlapping windows (stride = ctx/2)** | PretrainDataset | More training examples |
-| **Gradient clipping (1.0)** | Optimiser | Prevents instability |
-| **Learning rate schedule** | Cosine + warmup | Stable convergence |
-| **Weight tying** | Embeddings/LM head | Parameter efficiency |
+| **Overlapping windows (stride = ctx/2)** | PretrainDataset | Maximizes examples squeezed from raw text |
+| **Gradient clipping (1.0)** | Optimiser | Prevents explosive instability spikes |
+| **Cosine LR + Warmup** | Scheduler | Allows smooth convergence |
+| **Gradient Accumulation** | Training Loop | Simulates massive batch sizes (e.g., 64+) to average out noise |
 
-> If val loss stops decreasing early, try:
-1. Adding more training data (most effective)
-2. Increasing dropout to 0.2–0.3
-3. Reducing model size (smaller d_model)
-4. Increasing weight decay
+> **Pro Tip:** If your validation loss plateaus early, try:
+> 1. Adding more raw data (this is the only true fix).
+> 2. Increasing dropout to 0.2–0.3.
+> 3. Scaling down the model (use `d_model=256`).
 
 ---
 
 ## VRAM Usage Guide
 
-| Config | d_model | Batch × Accum | VRAM (bfloat16) |
-|--------|---------|---------------|-----------------|
-| Tiny   | 256     | 4 × 8         | ~1.5 GB         |
-| Small  | 384     | 8 × 8         | ~2.5 GB         |
-| Medium | 512     | 8 × 8         | ~4.0 GB         |
-| Large  | 768     | 4 × 8         | ~6.0 GB         |
+Using `bfloat16` mixed precision, memory requirements are highly dependent on whether you are *Training* (which must store optimizer states, gradients, and activations) or running *Inference*.
 
-If you get OOM errors: reduce `batch_size`, reduce `context_length`, or
-enable gradient checkpointing (add `use_reentrant=False` to `torch.utils.checkpoint`).
+| Config | d_model | Params | Training VRAM (Batch 8) | Inference VRAM (w/ KV Cache) |
+|--------|---------|--------|-------------------------|------------------------------|
+| **Tiny**   | 256     | ~10 M  | ~1.5 GB                 | ~400 MB                      |
+| **Small**  | 384     | ~20 M  | ~2.5 GB                 | ~650 MB                      |
+| **Medium** | 512     | ~34 M  | ~4.0 GB                 | ~1.1 GB                      |
+| **Large**  | 768     | ~110 M | ~8.0 GB                 | ~3.5 GB                      |
+
+If you get OOM (Out of Memory) errors during training: reduce `batch_size`, reduce `context_length`, or enable gradient checkpointing.
 
 ---
 
 ## Extending Dizel
 
-### Add more data
-Append any `.md` or `.txt` text to `data/english.md` and retrain the tokenizer.
+The framework is built to be hacked on.
 
-### Change model size
+### 1. Build Custom Agents
+Dizel ships with an Agent Router (`core/router.py`) and predefined agents (`core/agents/`). You can define your own JSON configurations to inject specific tools, system prompts, and personalities into the Desktop App.
+
+### 2. Change Model Architecture
 Edit `d_model`, `n_layers`, `n_heads` in `config.py`.  
-Remember: `d_model` must be divisible by `n_heads`.
+*Rule of thumb:* `d_model` must be evenly divisible by `n_heads`.
 
-### Add more SFT examples
-Edit `sft_data/generate_sft_data.py` or append lines to `sft_data/chat.jsonl`.
+### 3. Expand SFT Datasets
+Add more conversation JSON examples to `sft_data/chat.jsonl` or modify `generate_sft_data.py` to synthesize larger dialogue datasets automatically.
 
-### Export to ONNX
+### 4. Export to ONNX / C++
 ```python
 import torch
 from model.architecture import DizelLM
@@ -508,57 +551,96 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 
 ## Frequently Asked Questions
 
+### 🧠 Training & Model Architecture
+
 **Q: Why does the model repeat itself?**  
-> Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature`.
+> Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature` to 0.7.
 
 **Q: Why is the output nonsensical?**  
-> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more data. The more dataset it gets, the more it'll respond with less nonsensical texts.
+> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more plain-text data! A model is only as smart as the data it has read.
 
-**Q: Can I run this on CPU?**  
-> Yes — set `device = "cpu"`. Training will be ~50× slower. Inference is fine for short generations.
+**Q: How much text data do I need for a good model?**  
+> For basic coherent English, 10–50 MB of clean text (Wikipedia, Gutenberg books) is enough to learn grammar. For deep knowledge, you need gigabytes.
 
-**Q: How do I use my own text?**  
-> Replace or append to `data/english.md`, re-run `train_tokenizer.py`, then retrain.
+**Q: Can I change the context window length?**  
+> Yes, change `context_length` in `config.py`. However, remember that attention complexity is $O(N^2)$. Doubling the context length will quadruple the memory required for the attention matrix!
 
-**Q: How do I make the model produce better JSON?**  
-> Add more JSON examples to `sft_data/chat.jsonl` and re-run SFT. Lower temperature to 0.2–0.4.
+**Q: How do I make the model produce better structured JSON?**  
+> Add more JSON-formatted responses to `sft_data/chat.jsonl` and re-run Supervised Fine-Tuning (SFT). Lower temperature to 0.2–0.4 during inference.
 
-**Q: Is the model free-to-use?**  
-> Yes, it is! — As of right now, this model has the MIT license, things may change in the future.
+**Q: Can I use multiple GPUs for training?**  
+> Dizel is specifically designed for single consumer GPUs to keep the educational barrier low. If you want multi-GPU, you will need to wrap the model in PyTorch's `DistributedDataParallel` (DDP).
 
-**Q: How can I report any errors/issues?**  
-> Very simple! — Just go to the model GitHub Repo and create an *Issue* request.
+**Q: What happens if I stop training halfway?**  
+> Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`). You can safely resume training by running `python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt`.
 
-**Q: How do I use the API Router (BYOK) to connect to external providers?**  
-> Open the Desktop App → click **Configuration** → go to the **Chat** tab → you'll see the **API Router** section with provider cards (Anthropic, Gemini, OpenAI, xAI, etc.). Click any card, then hit **Configure** to enter your API key. For unlisted providers, click **+ Other Provider** to add any OpenAI-compatible endpoint with a custom name and base URL.
+### 🖥️ Hardware & Compatibility
 
-**Q: Are my API keys stored securely?**  
-> Yes. All API keys (both built-in and custom providers) are encrypted using AES encryption before being persisted to the local configuration file. Keys are never stored in plaintext.
+**Q: Can I run/train this on a CPU?**  
+> Yes — set `device = "cpu"`. However, training will be ~50× slower. CPU inference is acceptable for the Tiny/Small models.
+
+**Q: Can I train this on my MacBook (M1/M2/M3)?**  
+> Yes! PyTorch supports Apple Silicon via the `mps` backend. Change your device from `cuda` to `mps`. It is highly efficient, though slightly slower than a dedicated NVIDIA RTX GPU.
+
+**Q: I'm getting `RuntimeError: CUDA out of memory` during training.**  
+> 1. Reduce `batch_size` in `config.py`.
+> 2. Reduce `context_length`.
+> 3. Ensure no other apps (like games or heavy browsers) are eating your VRAM.
+
+### 🎨 Desktop App (PySide6) & UI
+
+**Q: Why does the Desktop GUI use PySide6 instead of Electron or Webview?**  
+> PySide6 (Qt) offers native OS performance, direct Python integration, and hardware-accelerated rendering *without* the massive RAM overhead of shipping a bundled Chromium browser.
+
+**Q: How do I use the API Router (BYOK) in the Desktop App?**  
+> Open the Desktop App → click **Configuration** → go to the **Chat** tab. You'll see the **API Router** section. Click any provider card (Anthropic, Gemini, OpenAI, etc.), then hit **Configure** to enter your API key. For unlisted providers (like Ollama), click **+ Other Provider**.
+
+**Q: Are my external API keys stored securely?**  
+> Yes. All API keys are encrypted using AES encryption before being saved locally to `.dizel/settings.json`.
+
+**Q: Where are my chat histories saved?**  
+> They are saved natively on your machine as JSON files inside the `inference/dizel_ui/history/` directory. You can easily back them up or delete them.
+
+**Q: How does the Context Trimmer work?**  
+> When your conversation approaches the token limit of the model, the `ContextTrimmer` automatically drops the oldest messages to prevent an Out-Of-Memory error. It rigorously protects your System Prompt and the most recent messages.
+
+**Q: How does the "12-hour Compute Budget" work?**  
+> The UI includes a `UsageManager` that tracks the complexity of your requests. Using heavy agent modes (like *Planning*) consumes more of your virtual compute budget than *Fast* mode. The budget resets automatically every 12 hours.
 
 **Q: How do I use voice input (Nova)?**  
-> Click the **microphone icon** (🎙️) next to the send button in the chat input. The Nova overlay will appear with a live waveform visualization. Speak your message — it will be transcribed automatically using Whisper. You can configure the Whisper model size, language, and silence timeout in **Settings → Speech**.
+> Click the microphone icon (🎙️) next to the send button in the GUI chat input. The Nova overlay will appear. Speak, and it will be transcribed using Whisper.
 
-**Q: Can I use Dizel with Ollama or other local LLM servers?**  
-> Yes! Use the **+ Other Provider** feature in the API Router. Set the provider name (e.g., "Ollama"), leave the API key blank if not needed, and set the base URL to your local server (e.g., `http://localhost:11434/v1`).
+### ⌨️ Terminal (CMD UI) & Workflows
 
-**Q: What does the `Ctrl+K` command palette do?**  
-> It opens a searchable command palette (like VS Code). From there, you can quickly access **New Chat**, **Settings**, **Export Chat**, **Toggle Theme**, **Reload Model**, **Attach File**, **Clear Output**, and **Quit** — all without touching your mouse.
+**Q: How do I navigate the new CMD UI without a mouse?**
+> - **Tab:** Switch AI Modes (Fast, Planning, Coding).
+> - **Ctrl+K:** Open Command Palette.
+> - **Ctrl+H:** Toggle Chat History sidebar.
+> - **Ctrl+R:** Toggle the Context Panel (token tracking).
 
-**Q: How do I switch between Dark and Light themes?**  
-> Go to **Settings → Appearance** and select your preferred theme, or use the command palette (`Ctrl+K`) and type "Toggle Theme" to switch instantly. ⚠️ *Warning: Light mode can cause a flashbang when switching from Dark mode — be careful!*
+**Q: I'm getting an `ImportError` when trying to run the UI!**  
+> Make sure you have activated your virtual environment (`source .venv/bin/activate`) and run `pip install -r requirements.txt`. The UI relies heavily on `PySide6` (Desktop) and `Textual` (CMD).
 
-**Q: Can I export my chat conversations?**  
-> Yes! Click the **Export** button in the top header bar or use `Ctrl+K → Export Chat`. Conversations are exported as `.md` (Markdown), `.json`, or `.txt` files — you choose.
-
-**Q: What are "Context Chips" in the input bar?**  
-> Context Chips are toggleable modes that enhance how the model processes your prompt. **Web Search** adds real-time web context, **Deep Think** enables chain-of-thought reasoning, and **Parse Files** lets the model analyze attached documents.
+**Q: Is the model free-to-use?**  
+> Yes, it is! As of right now, this repository uses the MIT license.
 
 ---
 
 ## References
 
-- **Attention Is All You Need** — [Vaswani et al., 2017](https://share.google/KEN2RB5lMguOf9vE7)
-- **GPT-2** — [Radford et al., 2019](https://share.google/7nyubfRaa6dFuHCwI) (OpenAI)
-- **nanoGPT** — [Andrej Karpathy](https://github.com/karpathy/nanoGPT) (architectural inspiration)
-- **SentencePiece** — [Kudo & Richardson, 2018](https://share.google/lwV2qoP42TOyzat9B)
-- **PyTorch Documentation** — [pytorch.org](https://share.google/wp67KCOAlAFdYxswg)
+### Architecture & Papers
+- **Attention Is All You Need** — [Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)
+- **GPT-2: Language Models are Unsupervised Multitask Learners** — [Radford et al., 2019](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
+- **RoFormer: Enhanced Transformer with Rotary Position Embedding (RoPE)** — [Su et al., 2021](https://arxiv.org/abs/2104.09864)
+- **GLU Variants Improve Transformer (SwiGLU)** — [Noam Shazeer, 2020](https://arxiv.org/abs/2002.05202)
+- **LLaMA: Open and Efficient Foundation Language Models** — [Touvron et al., 2023](https://arxiv.org/abs/2302.13971) (Inspiration for the modern Llama-like architecture)
+- **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness** — [Tri Dao et al., 2022](https://arxiv.org/abs/2205.14135)
+- **Robust Speech Recognition via Large-Scale Weak Supervision (Whisper)** — [Radford et al., 2022](https://arxiv.org/abs/2212.04356) (Used in Nova Voice Engine)
+
+### Libraries & Inspiration
+- **nanoGPT** — [Andrej Karpathy](https://github.com/karpathy/nanoGPT) (Invaluable architectural inspiration and educational groundwork)
+- **SentencePiece** — [Kudo & Richardson, 2018](https://github.com/google/sentencepiece)
+- **PyTorch Documentation** — [pytorch.org](https://pytorch.org/docs/stable/index.html)
+- **PySide6 (Qt for Python)** — [Qt Group](https://doc.qt.io/qtforpython-6/) (Powering the Desktop GUI)
+- **Textual & Rich** — [Textualize](https://github.com/Textualize/textual) (Powering the CMD UI v2.0)
+- **Hugging Face Datasets** — [huggingface.co](https://huggingface.co/docs/datasets/)
