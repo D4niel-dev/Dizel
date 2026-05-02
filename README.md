@@ -569,7 +569,8 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 **A:** Dizel is specifically designed for single consumer GPUs to keep the educational barrier low. If you want multi-GPU, you will need to wrap the model in PyTorch's `DistributedDataParallel` **(DDP).
 
 **Q: What happens if I stop training halfway?**  
-**A:** Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`). You can safely resume training by running:
+**A:** Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`). 
+You can safely resume training by running:
 ```python
 python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt
 ```
@@ -582,11 +583,12 @@ python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt
 **Q: Can I train this on my MacBook (M1/M2/M3)?**  
 **A:** Yes! PyTorch supports Apple Silicon via the `mps` backend. Change your device from `cuda` to `mps`. It is highly efficient, though slightly slower than a dedicated NVIDIA RTX GPU.
 
-**Q: I'm getting**
+**Q: I'm getting a**
 ```python
 RuntimeError: CUDA out of memory
 ```
-**during training.**
+**during the model training.**
+
 **A:** Here's how to fix it: 
 1. Reduce `batch_size` in `config.py`.
 2. Reduce `context_length`.
