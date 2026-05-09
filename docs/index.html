@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dizel AI (Demo)</title>
+    <title>Dizel AI</title>
     <!-- App Favicon -->
     <link rel="icon" type="image/x-icon" href="assets/app/Dizel.ico">
     <link rel="icon" type="image/png" href="assets/app/Dizel.png">
@@ -46,6 +46,9 @@
                 </button>
             </div>
         </nav>
+
+        <!-- Secondary Sidebar Backdrop -->
+        <div id="sidebar-backdrop" class="hidden" onclick="toggleSecondarySidebar()"></div>
 
         <!-- Secondary Sidebar (Left Slide-out Panel next to primary sidebar) -->
         <aside id="secondary-sidebar">
@@ -418,7 +421,8 @@
     <div id="global-tooltip" class="floating-tooltip hidden"></div>
 
     <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/streaming.js"></script>
     <script src="script.js"></script>
-    <script src="dizel_core.js"></script>
 </body>
 </html>

@@ -6,16 +6,21 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class SettingsCommand(Command):
     name = "settings"
     help_text = "View or update settings. Usage: /settings [section] [key] [value]"
+    category = "Settings"
+    usage = "/settings [section] [key] [value]"
+    palette_hint = "/settings"
+    examples = ["/settings", "/settings sampling temperature 0.7"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
-        from inference.dizel_ui.logic.config_manager import ConfigManager, decrypt_key
+        from inference.dizel_ui.logic.config_manager import ConfigManager
 
         cfg = ConfigManager.load()
         args = invocation.args
 
         # /settings — show full overview
         if not args:
-            return self._render_overview(app, cfg)
+            app.query_one("SettingsPanel").open()
+            return None
 
         section = args[0].lower()
 

@@ -14,7 +14,10 @@ def parse_command(text: str) -> CommandInvocation:
     if not text.startswith("/"):
         return CommandInvocation(name="", raw=text)
     
-    parts = shlex.split(text[1:])
+    try:
+        parts = shlex.split(text[1:])
+    except ValueError as exc:
+        return CommandInvocation(name="", flags={"error": str(exc)}, raw=text)
     if not parts:
         return CommandInvocation(name="", raw=text)
         

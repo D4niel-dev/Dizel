@@ -5,6 +5,9 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class ClearCommand(Command):
     name = "clear"
     help_text = "Clear the current workspace."
+    category = "Workspace"
+    usage = "/clear"
+    palette_hint = "/clear"
     aliases = ["c"]
     
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:

@@ -5,6 +5,9 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class ReloadCommand(Command):
     name = "reload"
     help_text = "Reload configuration and providers."
+    category = "Runtime"
+    usage = "/reload"
+    palette_hint = "/reload"
     aliases = ["r"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:

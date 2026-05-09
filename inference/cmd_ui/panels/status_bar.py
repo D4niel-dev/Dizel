@@ -2,6 +2,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
+
 class StatusBar(Container):
     def compose(self) -> ComposeResult:
         yield Static(id="status-text")
@@ -13,6 +14,8 @@ class StatusBar(Container):
 
     def update_status(self, *args) -> None:
         app = self.app
-        # Show mode, provider, and helpful hints
-        text = f"[{app.active_mode.upper()}] {app.active_provider}  •  esc interrupt  tab switch agent  ctrl+k commands  ctrl+h sessions  ctrl+r right panel"
+        text = (
+            f"{app.active_provider}  |  esc interrupt  tab agent  "
+            "ctrl+k commands  ctrl+t sessions  ctrl+r context"
+        )
         self.query_one("#status-text").update(text)

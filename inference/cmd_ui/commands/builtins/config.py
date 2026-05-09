@@ -6,6 +6,10 @@ from inference.dizel_ui.logic.config_manager import ConfigManager
 class ConfigCommand(Command):
     name = "config"
     help_text = "Show or update settings. Usage: /config [key] [value]"
+    category = "Settings"
+    usage = "/config [key] [value]"
+    palette_hint = "/config "
+    examples = ["/config", "/config device cpu"]
     
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         manager = ConfigManager()

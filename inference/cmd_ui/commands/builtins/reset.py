@@ -5,6 +5,9 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class ResetCommand(Command):
     name = "reset"
     help_text = "Clear messages in current session."
+    category = "Session"
+    usage = "/reset"
+    palette_hint = "/reset"
     
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         app.session_bridge.current_messages = []

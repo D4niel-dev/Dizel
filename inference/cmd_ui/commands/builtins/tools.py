@@ -11,6 +11,10 @@ AVAILABLE_TOOLS = {
 class ToolsCommand(Command):
     name = "tools"
     help_text = "List or toggle tools. Usage: /tools [name] [on|off]"
+    category = "Runtime"
+    usage = "/tools [name] [on|off]"
+    palette_hint = "/tools "
+    examples = ["/tools", "/tools web_search off"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         # Ensure the app has a tools state dict

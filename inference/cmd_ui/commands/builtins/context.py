@@ -5,6 +5,10 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class ContextCommand(Command):
     name = "context"
     help_text = "Show token usage and context status."
+    category = "Workspace"
+    usage = "/context"
+    palette_hint = "/context"
     
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
-        return f"Context Tokens: {app.context_tokens} / 4096\nBudget: {app.budget_tokens} tokens allocated."
+        max_cap = int(app.usage_manager.max_capacity) if hasattr(app, "usage_manager") else 4096
+        return f"Context Tokens: {app.context_tokens} / {max_cap}\nBudget: {app.budget_tokens} tokens allocated."

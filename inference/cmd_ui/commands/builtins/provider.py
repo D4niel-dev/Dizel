@@ -1,31 +1,35 @@
 from typing import Any
-from inference.cmd_ui.commands.registry import Command
-from inference.cmd_ui.commands.parser import CommandInvocation
 
-VALID_PROVIDERS = ["local", "openai", "anthropic", "google", "ollama", "groq", "mistral", "xai", "ai21", "azure", "cohere", "meta"]
+from inference.cmd_ui.commands.parser import CommandInvocation
+from inference.cmd_ui.commands.registry import Command
+
+VALID_PROVIDERS = [
+    "local",
+    "openai",
+    "anthropic",
+    "google",
+    "ollama",
+    "groq",
+    "mistral",
+    "xai",
+    "ai21",
+    "azure",
+    "cohere",
+    "meta",
+]
+
 
 class ProviderCommand(Command):
     name = "provider"
-    help_text = "Switch or list providers. Usage: /provider [name] [model] [key]"
+    help_text = "Switch or list providers."
+    category = "Runtime"
+    usage = "/provider [name] [model] [key]"
+    palette_hint = "/provider "
+    examples = ["/provider local", "/provider ollama llama3", "/provider openai gpt-4o sk-..."]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         if not invocation.args:
-            lines = [f"Current provider: {app.active_provider}"]
-            mgr = app.chat_bridge.manager
-            if mgr._api_model:
-                lines.append(f"Current model: {mgr._api_model}")
-            lines.append("")
-            lines.append("Available providers:")
-            for p in VALID_PROVIDERS:
-                marker = " ←" if p == app.active_provider else ""
-                lines.append(f"  {p}{marker}")
-            lines.append("")
-            lines.append("Usage:")
-            lines.append("  /provider ollama llama3")
-            lines.append("  /provider openai gpt-4o sk-...")
-            lines.append("  /provider anthropic claude-sonnet-4-20250514 sk-ant-...")
-            lines.append("  /provider local  (switch back to local model)")
-            return "\n".join(lines)
+            return self._render_providers(app)
 
         new_provider = invocation.args[0].lower()
         if new_provider not in VALID_PROVIDERS:
@@ -35,6 +39,7 @@ class ProviderCommand(Command):
         api_key = invocation.args[2] if len(invocation.args) > 2 else ""
 
         from inference.dizel_ui.logic.config_manager import ConfigManager, encrypt_key
+
         cfg = ConfigManager.load()
         api_cfg = cfg.get("api_router", {})
         api_cfg["provider"] = new_provider
@@ -49,7 +54,6 @@ class ProviderCommand(Command):
 
         manager = app.chat_bridge.manager
         manager.reload_provider()
-
         app.active_provider = new_provider
 
         if new_provider == "local":
@@ -59,12 +63,29 @@ class ProviderCommand(Command):
         actual_model = model_id or manager._api_model or "(none set)"
         app.active_model = actual_model
 
-        # Validate connection for non-local providers
         if manager._api_provider:
             try:
                 manager._api_provider.validate(key=manager._api_key)
-                return f"Provider: {new_provider}\nModel: {actual_model}\n✓ Connection verified."
-            except (ConnectionError, ValueError) as e:
-                return f"Provider: {new_provider}\nModel: {actual_model}\n✗ Connection failed: {e}"
-        else:
-            return f"Provider set to {new_provider} but failed to load. Check dependencies."
+                return f"Provider: {new_provider}\nModel: {actual_model}\nConnection verified."
+            except (ConnectionError, ValueError) as exc:
+                return f"Provider: {new_provider}\nModel: {actual_model}\nConnection failed: {exc}"
+
+        return f"Provider set to {new_provider} but failed to load. Check dependencies."
+
+    def _render_providers(self, app: Any) -> str:
+        lines = [f"Current provider: {app.active_provider}"]
+        manager = app.chat_bridge.manager
+        if manager._api_model:
+            lines.append(f"Current model: {manager._api_model}")
+        lines.append("")
+        lines.append("Available providers:")
+        for provider in VALID_PROVIDERS:
+            marker = " <- current" if provider == app.active_provider else ""
+            lines.append(f"  {provider}{marker}")
+        lines.append("")
+        lines.append("Usage:")
+        lines.append("  /provider ollama llama3")
+        lines.append("  /provider openai gpt-4o sk-...")
+        lines.append("  /provider anthropic claude-sonnet-4-20250514 sk-ant-...")
+        lines.append("  /provider local")
+        return "\n".join(lines)

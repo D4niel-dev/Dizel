@@ -84,7 +84,10 @@ class WorkspacePanel(VerticalScroll):
         self.mount(Static(ToolBlock(event.tool_name, "FAILED", event.error_msg)))
         self.scroll_end(animate=False)
         
-    def clear_workspace(self) -> None:
+    def clear_workspace(self, show_empty: bool = True) -> None:
         for child in self.children:
             child.remove()
-        self.mount(EmptyStateBlock())
+        self.current_stream = None
+        self.current_message_widget = None
+        if show_empty:
+            self.mount(EmptyStateBlock())

@@ -48,6 +48,13 @@ class InputBar(Container):
         
         if text.startswith("/"):
             invocation = parse_command(text)
+            if invocation.flags.get("error"):
+                from inference.cmd_ui.rendering.message_block import MessageBlock
+                workspace = self.app.query_one("WorkspacePanel")
+                workspace.mount(Static(MessageBlock("SYSTEM", f"Command parse error: {invocation.flags['error']}")))
+                workspace.scroll_end(animate=False)
+                return
+
             cmd = registry.lookup(invocation.name)
             workspace = self.app.query_one("WorkspacePanel")
             if cmd:

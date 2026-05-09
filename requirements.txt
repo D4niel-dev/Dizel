@@ -23,6 +23,11 @@ anthropic>=0.30.0
 google-genai>=1.0.0
 cryptography>=42.0.0
 
+# Backend Server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+sse-starlette>=3.4.2
+
 # Optional: faster training logging
 # tensorboard>=2.14.0
 # tqdm>=4.66.0

@@ -13,6 +13,7 @@ from inference.cmd_ui.panels.workspace import WorkspacePanel
 from inference.cmd_ui.panels.context_panel import ContextPanel
 from inference.cmd_ui.panels.input_bar import InputBar
 from inference.cmd_ui.panels.command_palette import CommandPalette
+from inference.cmd_ui.panels.settings_panel import SettingsPanel
 from inference.cmd_ui.commands.builtins import register_builtins
 from inference.cmd_ui.bridge.chat_bridge import ChatBridge
 from inference.cmd_ui.rendering.message_block import MessageBlock
@@ -29,6 +30,7 @@ class DizelCMDApp(App):
         ("escape", "interrupt", "Interrupt"),
         ("ctrl+l", "clear_workspace", "Clear"),
         Binding("ctrl+k", "toggle_palette", "Command Palette", priority=True),
+        Binding("ctrl+t", "toggle_session", "Toggle Sessions", priority=True),
         Binding("ctrl+h", "toggle_session", "Toggle Sessions", priority=True),
         Binding("ctrl+r", "toggle_context", "Toggle Context", priority=True),
     ]
@@ -57,13 +59,8 @@ class DizelCMDApp(App):
     # ── Lifecycle ──────────────────────────────────────────────────────
 
     def on_mount(self) -> None:
-        # Load previous session
-        sessions = self.session_bridge.get_all()
-        if sessions:
-            self.session_bridge.load(sessions[0]["id"])
-            self.call_after_refresh(self.load_session_to_workspace, sessions[0]["id"])
-        else:
-            self.session_bridge.create()
+        # Start each run in a fresh session; history stays available in the session panel.
+        self.session_bridge.create()
 
         # Sync provider state from config
         mgr = self.chat_bridge.manager
@@ -81,6 +78,7 @@ class DizelCMDApp(App):
 
         # Auto-load model
         self.call_after_refresh(self._auto_load_model)
+        self.call_after_refresh(self._focus_prompt)
 
     def _auto_load_model(self) -> None:
         """Discover and load a checkpoint, matching the GUI flow."""
@@ -210,12 +208,18 @@ class DizelCMDApp(App):
         except Exception:
             pass  # Workspace not yet mounted
 
+    def _focus_prompt(self) -> None:
+        try:
+            self.query_one("#prompt-input").focus()
+        except Exception:
+            pass
+
     # ── Layout ─────────────────────────────────────────────────────────
 
     def load_session_to_workspace(self, session_id: str):
         if self.session_bridge.load(session_id):
             workspace = self.query_one("WorkspacePanel")
-            workspace.clear_workspace()
+            workspace.clear_workspace(show_empty=False)
             for msg in self.session_bridge.current_messages:
                 workspace.mount(Static(MessageBlock(msg["role"].upper(), msg["content"])))
                 workspace.scroll_end(animate=False)
@@ -227,9 +231,10 @@ class DizelCMDApp(App):
             with Container(id="workspace-container"):
                 yield WorkspacePanel()
                 yield InputBar()
+                yield StatusBar()
             yield ContextPanel()
-        yield StatusBar()
         yield CommandPalette()
+        yield SettingsPanel()
 
     # ── Actions ────────────────────────────────────────────────────────
 
@@ -261,7 +266,7 @@ class DizelCMDApp(App):
         palette.toggle()
 
     def action_toggle_session(self):
-        panel = self.query_one("SessionPanel")
+        panel = self.query_one(SessionPanel)
         panel.toggle_panel()
 
     def action_toggle_context(self):

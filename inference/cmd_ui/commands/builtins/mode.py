@@ -7,6 +7,10 @@ VALID_MODES = ["Fast", "Planning", "Coding", "Review"]
 class ModeCommand(Command):
     name = "mode"
     help_text = "Switch or list modes. Usage: /mode [name]"
+    category = "Runtime"
+    usage = "/mode [fast|planning|coding|review]"
+    palette_hint = "/mode "
+    examples = ["/mode coding", "/mode review"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         if not invocation.args:

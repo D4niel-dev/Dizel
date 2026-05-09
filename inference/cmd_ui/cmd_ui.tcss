@@ -6,13 +6,12 @@ Screen {
 
 /* Footer / Status Bar */
 StatusBar {
-    layer: base;
     height: 1;
-    dock: bottom;
     background: #18181B;
     color: #71717A;
-    content-align: center middle;
-    margin-bottom: 1;
+    content-align: left middle;
+    margin: 1 1 0 1;
+    padding: 0 2;
 }
 
 /* Main horizontal layout */
@@ -31,10 +30,10 @@ StatusBar {
 }
 
 SessionPanel {
-    width: 28;
+    width: 32;
     height: 100%;
-    background: #111113;
-    border-right: solid #27272A;
+    background: #0F0F12;
+    border-right: solid #2A2A31;
 }
 
 SessionPanel.-hidden {
@@ -43,40 +42,48 @@ SessionPanel.-hidden {
 
 #session-inner {
     height: 100%;
+    padding: 1 1;
+    background: #0F0F12;
 }
 
 #session-header {
-    color: #71717A;
+    height: 1;
+    color: #A1A1AA;
     text-style: bold;
-    padding: 1 1;
-    background: #111113;
+    padding: 0 1;
+    background: #0F0F12;
 }
 
 #session-search {
     border: none;
-    background: #1E1E22;
+    background: #1A1A1F;
     height: 1;
-    margin: 0 1 1 1;
+    margin: 1 0;
     padding: 0 1;
 }
 
 #session-list {
-    background: #111113;
+    background: #0F0F12;
     border: none;
     height: 1fr;
-    padding: 0 1;
+    padding: 0;
 }
 
 #session-list > .option-list--option-highlighted {
-    background: #27272A;
+    background: #27272F;
     color: #F4F4F5;
+}
+
+#session-list > .option-list--option-disabled {
+    color: #71717A;
+    text-style: bold;
 }
 
 #session-footer {
     height: 1;
     color: #52525B;
     padding: 0 1;
-    background: #111113;
+    background: #0F0F12;
 }
 
 .panel-header {
@@ -108,9 +115,8 @@ EmptyStateBlock {
 /* The floating input bar */
 InputBar {
     height: auto;
-    dock: bottom;
     background: #1E1E1E;
-    margin: 1 1; /* Aligns contents perfectly with WorkspacePanel padding: 1 4 */
+    margin: 1 1 0 1; /* Aligns contents with workspace padding */
     border-left: thick #3B82F6; /* Blue accent */
     padding: 1 2;
 }
@@ -150,15 +156,23 @@ ContextPanel {
 CommandPalette {
     layer: overlay;
     display: none;
-    width: 50%;
+    width: 62%;
     height: auto;
-    max-height: 60%;
+    max-height: 70%;
     background: #09090B;
     border: none;
     content-align: center middle;
-    offset-x: 25%;
-    offset-y: 20%;
+    offset-x: 19%;
+    offset-y: 15%;
     box-sizing: border-box;
+}
+
+#palette-title {
+    height: 1;
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 0 1;
+    background: #09090B;
 }
 
 CommandPalette Input {
@@ -175,8 +189,48 @@ CommandPalette OptionList {
 
 /* Overriding Textual default highlights for OptionList */
 CommandPalette OptionList > .option-list--option-highlighted {
-    background: #FFFF00;
-    color: #000000;
+    background: #3B82F6;
+    color: #FFFFFF;
+    text-style: bold;
+}
+
+SettingsPanel {
+    layer: overlay;
+    display: none;
+    width: 62%;
+    height: auto;
+    max-height: 70%;
+    background: #09090B;
+    border: none;
+    content-align: center middle;
+    offset-x: 19%;
+    offset-y: 15%;
+    box-sizing: border-box;
+}
+
+#settings-title {
+    height: 1;
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 0 1;
+    background: #09090B;
+}
+
+SettingsPanel Input {
+    border: none;
+    border-bottom: solid #27272A;
+    background: #09090B;
+}
+
+SettingsPanel OptionList {
+    height: 1fr;
+    border: none;
+    background: #09090B;
+}
+
+SettingsPanel OptionList > .option-list--option-highlighted {
+    background: #3B82F6;
+    color: #FFFFFF;
     text-style: bold;
 }
 

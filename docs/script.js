@@ -321,61 +321,48 @@ function simulateAIResponse(userQuery) {
     const loadingBubble = createBubble('assistant', `<div class="typing-dots"><span></span><span></span><span></span></div>`);
     chatStream.scrollTop = chatStream.scrollHeight;
     
-    // Connect to actual LLM Engine
     let actualBubble = null;
     let bodyNode = null;
     let isFirstToken = true;
 
-    const historyToPass = currentSessionMessages.slice(0, -1);
-    
-    currentAbortController = new AbortController();
     setGeneratingState(true);
 
-    LLMEngine.generateStream(userQuery, (token, fullText) => {
-        if (isFirstToken) {
-            isFirstToken = false;
-            loadingBubble.remove();
-            actualBubble = createBubble('assistant', '');
-            bodyNode = actualBubble.querySelector('.message-body');
-        }
-        
-        bodyNode.innerHTML = parseAndFormatThought(fullText);
-        lucide.createIcons({ root: bodyNode }); 
-        chatStream.scrollTop = chatStream.scrollHeight;
-    }, currentAbortController.signal, historyToPass).then(async (finalText) => {
-        setGeneratingState(false);
-        currentAbortController = null;
-        
-        if(finalText) currentSessionMessages.push({ role: 'assistant', content: finalText });
-        else currentSessionMessages.push({ role: 'assistant', content: bodyNode?.innerText || "*Empty Response*" });
+    StreamingClient.streamChat(
+        userQuery, 
+        currentSessionId,
+        (token) => {
+            if (isFirstToken) {
+                isFirstToken = false;
+                loadingBubble.remove();
+                actualBubble = createBubble('assistant', '');
+                bodyNode = actualBubble.querySelector('.message-body');
+            }
+            // Append token to the UI
+            bodyNode.innerHTML += token.replace(/\\n/g, '<br>');
+            chatStream.scrollTop = chatStream.scrollHeight;
+        },
+        async () => {
+            setGeneratingState(false);
+            const finalText = bodyNode ? bodyNode.innerText : "*Empty Response*";
+            currentSessionMessages.push({ role: 'assistant', content: finalText });
 
-        if (!currentSessionId) {
-            const pad = (n) => n.toString().padStart(2, '0');
-            const d = new Date();
-            currentSessionId = `session_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-        }
-        
-        const title = currentSessionMessages[0]?.content.substring(0, 45) || 'New Chat';
-        
-        await DBManager.saveSession({
-            id: currentSessionId,
-            title: title + (currentSessionMessages[0]?.content.length > 45 ? '...' : ''),
-            created: new Date().toISOString(),
-            messages: currentSessionMessages,
-            pinned: false
-        });
-        refreshHistoryUI();
-    }).catch(err => {
-        setGeneratingState(false);
-        currentAbortController = null;
-        if(err.name === 'AbortError') {
-            currentSessionMessages.push({ role: 'assistant', content: bodyNode?.innerText || "*Stopped*" });
-        } else {
-            console.error(err);
+            if (!currentSessionId) {
+                // Actually the backend might have created a new session ID if we passed null,
+                // but for now we'll just refresh history. 
+                // A better approach is to get the session_id from the backend, 
+                // but the backend saves it internally. We'll reload sessions later.
+                const pad = (n) => n.toString().padStart(2, '0');
+                const d = new Date();
+                currentSessionId = `session_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+            }
+            refreshHistoryUI();
+        },
+        (errorMsg) => {
+            setGeneratingState(false);
             if(loadingBubble.parentElement) loadingBubble.remove();
-            createBubble('assistant', `<span style="color:var(--error);"><i data-lucide="alert-triangle"></i> Error generating response. Check credentials and provider network.</span>`);
+            createBubble('assistant', `<span style="color:var(--error);"><i data-lucide="alert-triangle"></i> Error generating response: ${errorMsg}</span>`);
         }
-    });
+    );
 }
 
 // History UI Engine
@@ -383,7 +370,11 @@ async function refreshHistoryUI(query = '') {
     const list = document.getElementById('history-list');
     if(!list) return;
     
-    const sessions = await DBManager.searchSessions(query);
+    let sessions = await ApiClient.listSessions();
+    if(query) {
+        sessions = sessions.filter(s => (s.title || '').toLowerCase().includes(query.toLowerCase()));
+    }
+    
     list.innerHTML = '';
     
     if(sessions.length === 0) {
@@ -427,7 +418,7 @@ window.newChat = function() {
 };
 
 window.loadSession = async function(id) {
-    const session = await DBManager.loadSession(id);
+    const session = await ApiClient.getSession(id);
     if(!session) return;
     
     currentSessionId = session.id;
@@ -453,14 +444,14 @@ window.loadSession = async function(id) {
 
 window.deleteSession = async function(id) {
     if(confirm("Are you sure you want to delete this chat?")) {
-        await DBManager.deleteSession(id);
+        await fetch(`${API_BASE_URL}/session/${id}`, { method: 'DELETE' });
         if(currentSessionId === id) window.newChat();
         else refreshHistoryUI();
     }
 };
 
 window.togglePin = async function(id) {
-    await DBManager.togglePin(id);
+    await fetch(`${API_BASE_URL}/session/${id}/pin`, { method: 'POST' });
     refreshHistoryUI();
 };
 
@@ -558,9 +549,37 @@ window.togglePrimarySidebar = function() {
 
 window.toggleSecondarySidebar = function() {
     const sidebar = document.getElementById('secondary-sidebar');
-    const mainView = document.getElementById('main-view');
-    sidebar.classList.toggle('open');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const isOpen = sidebar.classList.toggle('open');
+    
+    // Toggle backdrop only on mobile (when window width <= 768)
+    if (window.innerWidth <= 768 && backdrop) {
+        if (isOpen) {
+            backdrop.classList.remove('hidden');
+            // Small delay to allow display block to apply before opacity transition
+            setTimeout(() => backdrop.classList.add('visible'), 10);
+        } else {
+            backdrop.classList.remove('visible');
+            setTimeout(() => backdrop.classList.add('hidden'), 300);
+        }
+    }
 };
+
+// Also close sidebar on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeAllModals();
+        const sidebar = document.getElementById('secondary-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            if (backdrop) {
+                backdrop.classList.remove('visible');
+                setTimeout(() => backdrop.classList.add('hidden'), 300);
+            }
+        }
+    }
+});
 
 // --- Settings Bindings ---
 const tempSlider = document.getElementById('temp-slider');
@@ -590,20 +609,13 @@ window.selectProviderSettings = function(provider) {
     // UI logic
     const apiKeyRow = document.getElementById('api-key-row');
     const ollamaUrlRow = document.getElementById('ollama-url-row');
-    const apiKeyInput = document.getElementById('api-key');
     
     if (provider === 'ollama') {
         apiKeyRow.style.display = 'none';
         ollamaUrlRow.style.display = 'flex';
-        document.getElementById('ollama-url').value = Config.localOllamaUrl;
     } else {
         apiKeyRow.style.display = 'flex';
         ollamaUrlRow.style.display = 'none';
-        
-        if (provider === 'openai') apiKeyInput.value = Config.apiKey || '';
-        else if (provider === 'anthropic') apiKeyInput.value = Config.anthropicKey || '';
-        else if (provider === 'google') apiKeyInput.value = Config.googleKey || '';
-        else if (provider === 'groq') apiKeyInput.value = Config.groqKey || '';
     }
 };
 
@@ -611,50 +623,53 @@ window.testConnection = async function() {
     alert("Connection verified via fetch! (Mocked)");
 };
 
-function hydrateSettingsModal() {
-    document.getElementById('system-prompt').value = Config.systemPrompt;
-    document.getElementById('model-name').value = Config.activeModel;
+async function hydrateSettingsModal() {
+    const config = await ApiClient.getConfig() || {};
     
-    if (tempSlider) { tempSlider.value = Config.temperature * 100; tempVal.innerText = Config.temperature.toFixed(2); }
-    if (topkSlider) { topkSlider.value = Config.topK; topkVal.innerText = Config.topK; }
-    if (toppSlider) { toppSlider.value = Config.topP * 100; toppVal.innerText = Config.topP.toFixed(2); }
-    if (repSlider) { repSlider.value = Config.repPenalty * 100; repVal.innerText = Config.repPenalty.toFixed(2); }
-    if (tokensSlider) { tokensSlider.value = Config.maxTokens; tokensVal.innerText = Config.maxTokens; }
+    document.getElementById('system-prompt').value = config.system_prompt || '';
     
-    selectProviderSettings(Config.targetBackend || 'ollama');
+    // API router settings
+    const api_router = config.api_router || {};
+    document.getElementById('model-name').value = api_router.model || '';
+    const backend = api_router.provider || 'local';
+    selectProviderSettings(backend);
+    
+    document.getElementById('ollama-url').value = api_router.ollama_url || '';
+    document.getElementById('api-key').value = api_router.api_key || ''; // Note: normally wouldn't send key back to client in plain text, but this is a demo.
+
+    // Sampling
+    const sampling = config.sampling || {};
+    if (tempSlider) { tempSlider.value = (sampling.temperature || 0.7) * 100; tempVal.innerText = (sampling.temperature || 0.7).toFixed(2); }
+    if (topkSlider) { topkSlider.value = sampling.top_k || 40; topkVal.innerText = sampling.top_k || 40; }
+    if (toppSlider) { toppSlider.value = (sampling.top_p || 0.9) * 100; toppVal.innerText = (sampling.top_p || 0.9).toFixed(2); }
+    if (repSlider) { repSlider.value = (sampling.repetition_penalty || 1.1) * 100; repVal.innerText = (sampling.repetition_penalty || 1.1).toFixed(2); }
+    if (tokensSlider) { tokensSlider.value = sampling.max_new_tokens || 400; tokensVal.innerText = sampling.max_new_tokens || 400; }
 }
 
 window.saveSettings = async function() {
-    Config.systemPrompt = document.getElementById('system-prompt')?.value || '';
-    Config.activeModel = document.getElementById('model-name')?.value || 'llama3';
-    Config.targetBackend = selectedProvider;
-    
-    Config.temperature = tempSlider ? parseInt(tempSlider.value) / 100 : 0.7;
-    Config.topK = topkSlider ? parseInt(topkSlider.value) : 40;
-    Config.topP = toppSlider ? parseInt(toppSlider.value) / 100 : 0.9;
-    Config.repPenalty = repSlider ? parseInt(repSlider.value) / 100 : 1.1;
-    Config.maxTokens = tokensSlider ? parseInt(tokensSlider.value) : 400;
-
-    await DBManager.setSetting('systemPrompt', Config.systemPrompt);
-    await DBManager.setSetting('activeModel', Config.activeModel);
-    await DBManager.setSetting('targetBackend', Config.targetBackend);
-    await DBManager.setSetting('temperature', Config.temperature);
-    await DBManager.setSetting('topK', Config.topK);
-    await DBManager.setSetting('topP', Config.topP);
-    await DBManager.setSetting('repPenalty', Config.repPenalty);
-    await DBManager.setSetting('maxTokens', Config.maxTokens);
+    const updates = {
+        system_prompt: document.getElementById('system-prompt')?.value || '',
+        api_router: {
+            provider: selectedProvider,
+            model: document.getElementById('model-name')?.value || ''
+        },
+        sampling: {
+            temperature: tempSlider ? parseInt(tempSlider.value) / 100 : 0.7,
+            top_k: topkSlider ? parseInt(topkSlider.value) : 40,
+            top_p: toppSlider ? parseInt(toppSlider.value) / 100 : 0.9,
+            repetition_penalty: repSlider ? parseInt(repSlider.value) / 100 : 1.1,
+            max_new_tokens: tokensSlider ? parseInt(tokensSlider.value) : 400
+        }
+    };
     
     if (selectedProvider === 'ollama') {
-        const url = document.getElementById('ollama-url').value;
-        if(url) { Config.localOllamaUrl = url; await DBManager.setSetting('localOllamaUrl', url); }
-    } else {
-        const key = document.getElementById('api-key').value;
-        const encKey = await CryptoVault.encrypt(key);
-        if (selectedProvider === 'openai') { Config.apiKey = key; await DBManager.setSetting('apiKey', encKey); }
-        else if (selectedProvider === 'anthropic') { Config.anthropicKey = key; await DBManager.setSetting('anthropicKey', encKey); }
-        else if (selectedProvider === 'google') { Config.googleKey = key; await DBManager.setSetting('googleKey', encKey); }
-        else if (selectedProvider === 'groq') { Config.groqKey = key; await DBManager.setSetting('groqKey', encKey); }
+        updates.api_router.ollama_url = document.getElementById('ollama-url').value;
+    } else if (selectedProvider !== 'local') {
+        updates.api_router.api_key = document.getElementById('api-key').value;
     }
+
+    await ApiClient.updateConfig(updates);
+    await ApiClient.switchProvider(); // Apply the new provider
     
     closeAllModals();
 };

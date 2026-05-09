@@ -8,6 +8,10 @@ from inference.cmd_ui.commands.parser import CommandInvocation
 class LoadCommand(Command):
     name = "load"
     help_text = "Load a model checkpoint. Usage: /load [path|auto]"
+    category = "Runtime"
+    usage = "/load [path|auto]"
+    palette_hint = "/load "
+    examples = ["/load auto", "/load checkpoints/model.pt"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         if not invocation.args or invocation.args[0] == "auto":
