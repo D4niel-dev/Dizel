@@ -361,7 +361,9 @@ python inference/cmd_ui/main.py
   - `/provider [name]` - Switch between local inference and API routing.
   - `/mode [name]` - Change your AI persona/agent mode.
   - `/session [new|rename|delete]` - Manage your chat sessions natively.
+  - `/settings` - Manage runtime configuration and persist API keys securely.
 - 🛠 **Real-Time Generation & Tool Use:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
+- 🔍 **Enhanced Session Panel:** The `Ctrl+H` history panel now features fuzzy search and session pinning for better workspace organization.
 ---
 
 ### Step 9 — Desktop GUI (v1.0.0) *(Recommended)*
@@ -388,15 +390,16 @@ python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --d
   - **File Archive & Presentations:** Central hub for all documents and slide imports.
 - 📊 **Intelligent Compute Tracking:** An advanced `UsageManager` and `TokenBudget` system dynamically tracks your 12-hour compute window, allocating context ceilings based on active mode complexity (e.g., scoring *Fast* mode vs *Planning* mode differently).
 - 🧠 **Dynamic Context Trimming:** The `ContextTrimmer` automatically truncates or summarizes conversational data to prevent memory overflow (OOM) while rigidly protecting system instructions and recent context.
-- 🎨 **Rich UI & Micro-Animations:** Custom-built PySide6 components including `MessageBubble` (for live-rendered markdown and syntax highlighting), `ActionMenu` (smooth popup tooling), `AnimatedButton`, and a realistic `TypingIndicator` for a truly premium feel.
+- 🎨 **Rich UI & Micro-Animations:** Custom-built PySide6 components including `MessageBubble` (for live-rendered markdown with one-click copy and syntax highlighting), `ActionMenu` (smooth popup tooling), `AnimatedButton`, and a realistic `TypingIndicator` for a truly premium feel.
 - 🎒 **First-Run Onboarding:** An interactive tutorial overlay (`TutorialManager`) that sequentially spotlights critical UI regions with helpful tooltips for first-time users.
-- ⚡ **Performance Telemetry:** Live hardware integration displaying tokens/sec, absolute context lengths, budget consumption, and VRAM overhead straight in the chat window.
+- ⚡ **Performance Telemetry & System Monitor:** Live hardware integration displaying tokens/sec, context lengths, budget consumption, and a persistent CPU/RAM system monitor straight in the sidebar.
 - ⌨️ **Command Palette:** Press `Ctrl+K` to summon a fuzzy-searchable global command list, allowing entirely mouse-free navigation (Toggle Theme, Export Chat, Reload Model, Settings).
 - 💊 **Zero-State Carousels:** Clickable, paginated action pills (Brainstorm, Write Code, Create Image) that instantly queue up complex system instructions.
 - 💾 **Persistent Settings:** Your temperature, top-p, external API keys (AES ENCRYPTED), checkpoints, and UI preferences are saved safely across sessions.
 - 💬 **Chat History:** Seamlessly manage multiple conversations from the left sidebar via localized JSON instances.
 - 📎 **Attachment Previews:** Visually queue up reference items for your prompts directly in the floating composer.
-- 🎭 **Model Switcher:** Switch between Dizel and Mila model versions on the fly.
+- 🎭 **Model Switcher:** Switch between Dizel and Mila model versions on the fly, complete with dynamic avatars.
+- 📏 **Verbosity Control:** Instantly toggle response lengths (Short, Normal, Detailed) from the status bar, modifying token budgets dynamically without entering settings.
 - 🧠 **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` mode toggles right in the chatbox.
 - ⚡ **Hardware & Limits Info:** Live UI tracking of generation tokens/sec, context limits, and hardware overhead.
 - ⌨️ **Keyboard Shortcut:** `Ctrl+K` opens the command palette with a lot of options.
@@ -551,7 +554,7 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 ### 🧠 Training & Model Architecture
 
 **Q: Why does the model repeat itself?**  
-**A:** Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature` to 0.7.
+**A:** Dizel uses an aggressive default `repetition_penalty` of 1.35 over a 128-token window to prevent looping. If you still see repetition, try reducing `temperature` to 0.7 or increasing the penalty slightly (up to 1.5).
 
 **Q: Why is the output nonsensical?**  
 **A:** The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more plain-text data! A model is only as smart as the data it has read.
