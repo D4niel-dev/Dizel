@@ -265,24 +265,70 @@ window.copyMock = function(btn) {
     }, 2000);
 }
 
+// Configure Marked.js
+if (window.marked && window.hljs) {
+    marked.setOptions({
+        breaks: true,
+        gfm: true
+    });
+    
+    // Custom renderer for copy button
+    const renderer = new marked.Renderer();
+    renderer.code = function(codeInfo) {
+        const code = codeInfo.text;
+        let lang = codeInfo.lang || '';
+        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+        const highlighted = hljs.highlight(code, { language }).value;
+        return `
+            <pre><div class="code-header">
+                <span style="text-transform:uppercase">${language}</span>
+                <div class="code-copy-btn" onclick="copyCode(this)">
+                    <i data-lucide="copy"></i> <span>Copy code</span>
+                </div>
+            </div><code class="hljs language-${language}">${highlighted}</code></pre>
+        `;
+    };
+    marked.use({ renderer });
+}
+
+window.copyCode = function(btn) {
+    const pre = btn.closest('pre');
+    const code = pre.querySelector('code').innerText;
+    navigator.clipboard.writeText(code);
+    const icon = btn.querySelector('i');
+    const span = btn.querySelector('span');
+    icon.setAttribute('data-lucide', 'check');
+    span.innerText = 'Copied!';
+    lucide.createIcons({ root: btn });
+    setTimeout(() => {
+        icon.setAttribute('data-lucide', 'copy');
+        span.innerText = 'Copy code';
+        lucide.createIcons({ root: btn });
+    }, 2000);
+};
+
 function parseAndFormatThought(rawContent) {
     const thinkRegex = /<think>([\s\S]*?)(<\/think>|$)/;
     const match = rawContent.match(thinkRegex);
+    let mainContent = rawContent;
+    let thoughtHtml = '';
+    
     if (match) {
         const thoughtContent = match[1].trim();
-        const mainContent = rawContent.replace(thinkRegex, '').trim();
-        return `
+        mainContent = rawContent.replace(thinkRegex, '').trim();
+        thoughtHtml = `
             <div class="thought-widget">
                 <button class="thought-toggle" onclick="toggleThought(this)">
                     <i data-lucide="cpu" style="width: 14px; height: 14px;"></i> 
                     <span>Thought process</span>
                 </button>
-                <div class="thought-content hidden">${thoughtContent.replace(/\n/g, '<br>')}</div>
+                <div class="thought-content hidden">${window.marked ? marked.parse(thoughtContent) : thoughtContent.replace(/\\n/g, '<br>')}</div>
             </div>
-            <div class="main-text">${mainContent.replace(/\n/g, '<br>')}</div>
         `;
     }
-    return `<div class="main-text">${rawContent.replace(/\n/g, '<br>')}</div>`;
+    
+    const mainHtml = window.marked ? marked.parse(mainContent) : `<div class="main-text">${mainContent.replace(/\\n/g, '<br>')}</div>`;
+    return thoughtHtml + mainHtml;
 }
 
 window.toggleThought = function(btn) {
@@ -324,6 +370,7 @@ function simulateAIResponse(userQuery) {
     let actualBubble = null;
     let bodyNode = null;
     let isFirstToken = true;
+    let rawResponse = '';
 
     setGeneratingState(true);
 
@@ -337,20 +384,17 @@ function simulateAIResponse(userQuery) {
                 actualBubble = createBubble('assistant', '');
                 bodyNode = actualBubble.querySelector('.message-body');
             }
-            // Append token to the UI
-            bodyNode.innerHTML += token.replace(/\\n/g, '<br>');
+            // Append token to raw response and re-render
+            rawResponse += token;
+            bodyNode.innerHTML = parseAndFormatThought(rawResponse);
+            lucide.createIcons({ root: bodyNode });
             chatStream.scrollTop = chatStream.scrollHeight;
         },
         async () => {
             setGeneratingState(false);
-            const finalText = bodyNode ? bodyNode.innerText : "*Empty Response*";
-            currentSessionMessages.push({ role: 'assistant', content: finalText });
+            currentSessionMessages.push({ role: 'assistant', content: rawResponse });
 
             if (!currentSessionId) {
-                // Actually the backend might have created a new session ID if we passed null,
-                // but for now we'll just refresh history. 
-                // A better approach is to get the session_id from the backend, 
-                // but the backend saves it internally. We'll reload sessions later.
                 const pad = (n) => n.toString().padStart(2, '0');
                 const d = new Date();
                 currentSessionId = `session_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
