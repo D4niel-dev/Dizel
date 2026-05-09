@@ -628,7 +628,7 @@ RuntimeError: CUDA out of memory
 **A:** Here's are some keybinds:
 - **Tab:** Switch AI Modes (Fast, Planning, Coding).
 - **Ctrl+K:** Open Command Palette.
-- **Ctrl+H:** Toggle Chat History sidebar.
+- **Ctrl+T:** Toggle Chat History sidebar.
 - **Ctrl+R:** Toggle the Context Panel (token tracking).
 
 **Q: I'm getting an** 
