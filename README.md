@@ -334,7 +334,7 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 
 ---
 
-### Step 8 — Dizel CMD UI (v2.0.0)
+### Step 8 — Dizel CMD UI (v2.0.2)
 
 The Terminal UI for Dizel has been completely reimagined from the ground up to provide a premium, developer-first experience inspired by modern keyboard-centric CLI tools. It is built using the robust Textual framework + Rich for better rendering.
 
@@ -344,7 +344,7 @@ Launch it via:
 python -m inference.cmd_ui.main
 
 # Option 2 (Optional)
-python inference/cmd_ui/main.py
+python -m inference.cmd_ui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
 **Features of the Reworked CMD UI:**
@@ -366,17 +366,17 @@ python inference/cmd_ui/main.py
 - 🔍 **Enhanced Session Panel:** The `Ctrl+H` history panel now features fuzzy search and session pinning for better workspace organization.
 ---
 
-### Step 9 — Desktop GUI (v1.0.0) *(Recommended)*
+### Step 9 — Desktop GUI (v1.0.1) *(Recommended)*
 
 Dizel includes a fully localized, premium Desktop Interface built entirely from scratch with **PySide6**. It pushes the boundaries of native Python UI development with highly fluid animations, rich data management, and an uncompromising aesthetic heavily inspired by state-of-the-art developer tools.
 
 Launch it via:
 ```bash
 # Launch the app (Default)
-python inference/dizel_ui/main.py
+python -m inference.dizel_ui.main
 
 # Pass a checkpoint right from the command line (Optional)
-python inference/dizel_ui/main.py --checkpoint checkpoints/dizel-sft-best.pt --device cuda
+python -m inference.dizel_ui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
 **Core Capabilities & Architecture:**
