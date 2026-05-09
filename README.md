@@ -1,7 +1,7 @@
 <div align="center">
   <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
-    width="50%"
-    height="50%"/>
+    width="60%"
+    height="60%"/>
 </div>
 <div align="center">
 
@@ -11,12 +11,9 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 </div>
-<div align="center">
-  <p><strong><i>Dizel — Distributed Intelligent Zen Execution Layer</i></strong></p>
-</div>
 
-**Dizel** is a complete, educational implementation of a GPT-style causal language
-model *(~253 M parameters)* built with PyTorch. It is designed to run locally on a
+**Dizel** *(Distributed Intelligent Zen Execution Layer)* is a complete, educational implementation of a GPT-style causal language
+model *(~205 M parameters)* built with PyTorch. It is designed to run locally on a
 single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training required.
 But it has grown into **so much more**—shipping with a state-of-the-art **Native Desktop App** featuring voice transcription, cross-provider API routing (BYOK), and rich markdown UI.
 
@@ -27,11 +24,11 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
 | Component | Details |
 |---|---|
 | **Architecture** | Causal Transformer (Pre-LayerNorm, RoPE, SwiGLU MLP, multi-head self-attention) |
-| **Parameters** | ~253 M (configurable 10–250 M) |
+| **Parameters** | ~205 M (configurable 10–250 M) |
 | **Tokenizer** | SentencePiece BPE, 32 000 vocab |
 | **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
 | **SFT** | Basic chat format, prompt-loss masking |
-| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Currently under maintenance) |
+| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Available v2.0!) |
 | **Inference (GUI)** | Full Desktop App (PySide6) with **API Router (BYOK)**, **Nova Voice Engine**, Dark mode, history & persistent UI |
 
 ---
@@ -44,7 +41,7 @@ Dizel/
 ├── requirements.txt             ← All app requirements and optionals too
 │
 ├── data/
-│   └── english.md               ← Training corpus (plain English text)
+│   └── english.md               ← Training corpus (plain English text or what ever your datasets is)
 │
 ├── tokenizer/
 │   ├── train_tokenizer.py       ← Train SentencePiece BPE tokenizer
@@ -554,75 +551,93 @@ torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
 ### 🧠 Training & Model Architecture
 
 **Q: Why does the model repeat itself?**  
-> Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature` to 0.7.
+**A:** Increase `repetition_penalty` (try 1.2–1.5) or reduce `temperature` to 0.7.
 
 **Q: Why is the output nonsensical?**  
-> The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more plain-text data! A model is only as smart as the data it has read.
+**A:** The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more plain-text data! A model is only as smart as the data it has read.
 
 **Q: How much text data do I need for a good model?**  
-> For basic coherent English, 10–50 MB of clean text (Wikipedia, Gutenberg books) is enough to learn grammar. For deep knowledge, you need gigabytes.
+**A:** For basic coherent English, 10–50 MB of clean text (Wikipedia, Gutenberg books) is enough to learn grammar. For deep knowledge, you need gigabytes.
 
 **Q: Can I change the context window length?**  
-> Yes, change `context_length` in `config.py`. However, remember that attention complexity is $O(N^2)$. Doubling the context length will quadruple the memory required for the attention matrix!
+**A:** Yes, change `context_length` in `config.py`. However, remember that attention complexity is $O(N^2)$. Doubling the context length will quadruple the memory required for the attention matrix!
 
 **Q: How do I make the model produce better structured JSON?**  
-> Add more JSON-formatted responses to `sft_data/chat.jsonl` and re-run Supervised Fine-Tuning (SFT). Lower temperature to 0.2–0.4 during inference.
+**A:** Add more JSON-formatted responses to `sft_data/chat.jsonl` and re-run Supervised Fine-Tuning (SFT). Lower temperature to 0.2–0.4 during inference.
 
 **Q: Can I use multiple GPUs for training?**  
-> Dizel is specifically designed for single consumer GPUs to keep the educational barrier low. If you want multi-GPU, you will need to wrap the model in PyTorch's `DistributedDataParallel` (DDP).
+**A:** Dizel is specifically designed for single consumer GPUs to keep the educational barrier low. If you want multi-GPU, you will need to wrap the model in PyTorch's `DistributedDataParallel` **(DDP).
 
 **Q: What happens if I stop training halfway?**  
-> Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`). You can safely resume training by running `python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt`.
+**A:** Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`).
+
+You can safely resume training by running:
+```python
+python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt
+```
 
 ### 🖥️ Hardware & Compatibility
 
 **Q: Can I run/train this on a CPU?**  
-> Yes — set `device = "cpu"`. However, training will be ~50× slower. CPU inference is acceptable for the Tiny/Small models.
+**A:** Yes — set `device = "cpu"`. However, training will be ~50× slower. CPU inference is acceptable for the Tiny/Small models.
 
 **Q: Can I train this on my MacBook (M1/M2/M3)?**  
-> Yes! PyTorch supports Apple Silicon via the `mps` backend. Change your device from `cuda` to `mps`. It is highly efficient, though slightly slower than a dedicated NVIDIA RTX GPU.
+**A:** Yes! PyTorch supports Apple Silicon via the `mps` backend. Change your device from `cuda` to `mps`. It is highly efficient, though slightly slower than a dedicated NVIDIA RTX GPU.
 
-**Q: I'm getting `RuntimeError: CUDA out of memory` during training.**  
-> 1. Reduce `batch_size` in `config.py`.
-> 2. Reduce `context_length`.
-> 3. Ensure no other apps (like games or heavy browsers) are eating your VRAM.
+**Q: I'm getting a**
+```python
+RuntimeError: CUDA out of memory
+```
+**during the model training.**
+
+**A:** Here's how to fix it: 
+1. Reduce `batch_size` in `config.py`.
+2. Reduce `context_length`.
+3. Ensure no other apps (like games or heavy browsers) are eating your VRAM.
 
 ### 🎨 Desktop App (PySide6) & UI
 
 **Q: Why does the Desktop GUI use PySide6 instead of Electron or Webview?**  
-> PySide6 (Qt) offers native OS performance, direct Python integration, and hardware-accelerated rendering *without* the massive RAM overhead of shipping a bundled Chromium browser.
+**A:** PySide6 (Qt) offers native OS performance, direct Python integration, and hardware-accelerated rendering *without* the massive RAM overhead of shipping a bundled Chromium browser.
 
 **Q: How do I use the API Router (BYOK) in the Desktop App?**  
-> Open the Desktop App → click **Configuration** → go to the **Chat** tab. You'll see the **API Router** section. Click any provider card (Anthropic, Gemini, OpenAI, etc.), then hit **Configure** to enter your API key. For unlisted providers (like Ollama), click **+ Other Provider**.
+**A:** Open the Desktop App → click **Configuration** → go to the **Chat** tab. You'll see the **API Router** section. Click any provider card (Anthropic, Gemini, OpenAI, etc.), then hit **Configure** to enter your API key. For unlisted providers (like Ollama), click **+ Other Provider**.
 
 **Q: Are my external API keys stored securely?**  
-> Yes. All API keys are encrypted using AES encryption before being saved locally to `.dizel/settings.json`.
+**A:** Yes. All API keys are encrypted using AES encryption before being saved locally to `.dizel/settings.json`.
 
 **Q: Where are my chat histories saved?**  
-> They are saved natively on your machine as JSON files inside the `inference/dizel_ui/history/` directory. You can easily back them up or delete them.
+**A:** They are saved natively on your machine as JSON files inside the `inference/dizel_ui/history/` directory. You can easily back them up or delete them.
 
 **Q: How does the Context Trimmer work?**  
-> When your conversation approaches the token limit of the model, the `ContextTrimmer` automatically drops the oldest messages to prevent an Out-Of-Memory error. It rigorously protects your System Prompt and the most recent messages.
+**A:** When your conversation approaches the token limit of the model, the `ContextTrimmer` automatically drops the oldest messages to prevent an Out-Of-Memory error. It rigorously protects your System Prompt and the most recent messages.
 
 **Q: How does the "12-hour Compute Budget" work?**  
-> The UI includes a `UsageManager` that tracks the complexity of your requests. Using heavy agent modes (like *Planning*) consumes more of your virtual compute budget than *Fast* mode. The budget resets automatically every 12 hours.
+**A:** The UI includes a `UsageManager` that tracks the complexity of your requests. Using heavy agent modes (like *Planning*) consumes more of your virtual compute budget than *Fast* mode. The budget resets automatically every 12 hours.
 
 **Q: How do I use voice input (Nova)?**  
-> Click the microphone icon (🎙️) next to the send button in the GUI chat input. The Nova overlay will appear. Speak, and it will be transcribed using Whisper.
+**A:** Click the microphone icon (🎙️) next to the send button in the GUI chat input. The Nova overlay will appear. Speak, and it will be transcribed using Whisper.
 
 ### ⌨️ Terminal (CMD UI) & Workflows
 
 **Q: How do I navigate the new CMD UI without a mouse?**
-> - **Tab:** Switch AI Modes (Fast, Planning, Coding).
-> - **Ctrl+K:** Open Command Palette.
-> - **Ctrl+H:** Toggle Chat History sidebar.
-> - **Ctrl+R:** Toggle the Context Panel (token tracking).
 
-**Q: I'm getting an `ImportError` when trying to run the UI!**  
-> Make sure you have activated your virtual environment (`source .venv/bin/activate`) and run `pip install -r requirements.txt`. The UI relies heavily on `PySide6` (Desktop) and `Textual` (CMD).
+**A:** Here's are some keybinds:
+- **Tab:** Switch AI Modes (Fast, Planning, Coding).
+- **Ctrl+K:** Open Command Palette.
+- **Ctrl+H:** Toggle Chat History sidebar.
+- **Ctrl+R:** Toggle the Context Panel (token tracking).
+
+**Q: I'm getting an** 
+```python
+ImportError
+``` 
+**when trying to run the UI!**
+ 
+**A:** Make sure you have activated your virtual environment (`source .venv/bin/activate`) and run `pip install -r requirements.txt`. The UI relies heavily on `PySide6` (Desktop) and `Textual` (CMD).
 
 **Q: Is the model free-to-use?**  
-> Yes, it is! As of right now, this repository uses the MIT license.
+**A:** Yes, it is! As of right now, this repository uses the `MIT license`.
 
 ---
 
