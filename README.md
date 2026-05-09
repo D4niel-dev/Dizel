@@ -352,7 +352,7 @@ python -m inference.cmd_ui.main --checkpoint checkpoints/dizel-sft-best.pt --dev
 - ⌨️ **Keyboard-First Workflow:** Navigate the entire app without a mouse.
   - `Tab`: Cycle between AI Agent modes (Fast, Planning, Coding, Review).
   - `Ctrl+K`: Open the floating Command Palette for quick actions.
-  - `Ctrl+H`: Toggle the Session History Panel on the left.
+  - `Ctrl+T`: Toggle the Session History Panel on the left.
   - `Ctrl+R`: Toggle the Context Panel on the right.
 - 💬 **Floating Input Bar:** A clean, bottom-docked prompt area that clearly displays your currently active Mode, Model, and Provider (e.g., `[BUILD] Dizel Lite Local`).
 - 📊 **Reactive Context Panel:** A dynamic right sidebar that tracks your live token usage and compute budget in real-time as the model streams its responses.
