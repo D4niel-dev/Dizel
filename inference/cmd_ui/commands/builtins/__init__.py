@@ -14,6 +14,7 @@ from .history import HistoryCommand
 from .export import ExportCommand
 from .reset import ResetCommand
 from .load import LoadCommand
+from .settings import SettingsCommand
 
 def register_builtins():
     registry.register(HelpCommand())
@@ -31,3 +32,5 @@ def register_builtins():
     registry.register(ExportCommand())
     registry.register(ResetCommand())
     registry.register(LoadCommand())
+    registry.register(SettingsCommand())
+

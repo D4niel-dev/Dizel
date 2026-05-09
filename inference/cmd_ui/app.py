@@ -2,6 +2,7 @@ import os
 import threading
 
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.reactive import reactive
 from textual.widgets import Static
@@ -27,9 +28,9 @@ class DizelCMDApp(App):
         ("ctrl+c", "interrupt_or_quit", "Interrupt/Quit"),
         ("escape", "interrupt", "Interrupt"),
         ("ctrl+l", "clear_workspace", "Clear"),
-        ("ctrl+k", "toggle_palette", "Command Palette"),
-        ("ctrl+h", "toggle_session", "Toggle Sessions"),
-        ("ctrl+r", "toggle_context", "Toggle Context"),
+        Binding("ctrl+k", "toggle_palette", "Command Palette", priority=True),
+        Binding("ctrl+h", "toggle_session", "Toggle Sessions", priority=True),
+        Binding("ctrl+r", "toggle_context", "Toggle Context", priority=True),
     ]
 
     # Reactive state
@@ -69,6 +70,14 @@ class DizelCMDApp(App):
         self.active_provider = mgr.active_provider_slug
         if mgr.active_api_model:
             self.active_model = mgr.active_api_model
+        
+        # If API provider is active, validate connection on startup
+        if self.active_provider != "local" and mgr._api_provider:
+            try:
+                mgr._api_provider.validate(key=mgr._api_key)
+                self._log_system(f"✓ {self.active_provider} connected · model: {mgr._api_model or '(not set)'}")
+            except Exception as e:
+                self._log_system(f"✗ {self.active_provider} unreachable: {e}")
 
         # Auto-load model
         self.call_after_refresh(self._auto_load_model)
@@ -90,7 +99,9 @@ class DizelCMDApp(App):
 
         # If using an API provider, no local model needed
         if self.active_provider != "local":
-            self._log_system(f"Connected to {self.active_provider} provider.")
+            model_info = self.active_model or "(no model set — use /model <id>)"
+            self._log_system(f"Using {self.active_provider} provider · {model_info}")
+            self._log_system("Type /model to see available models, or /provider to change.")
             return
 
         if not checkpoint:
@@ -251,10 +262,7 @@ class DizelCMDApp(App):
 
     def action_toggle_session(self):
         panel = self.query_one("SessionPanel")
-        if panel.styles.display == "none":
-            panel.styles.display = "block"
-        else:
-            panel.styles.display = "none"
+        panel.toggle_panel()
 
     def action_toggle_context(self):
         panel = self.query_one("ContextPanel")

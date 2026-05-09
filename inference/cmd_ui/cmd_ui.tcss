@@ -31,18 +31,52 @@ StatusBar {
 }
 
 SessionPanel {
-    width: 25;
+    width: 28;
     height: 100%;
-    background: #18181B;
-    display: none; /* hidden by default, toggled with ctrl+h */
+    background: #111113;
     border-right: solid #27272A;
 }
 
+SessionPanel.-hidden {
+    display: none;
+}
+
+#session-inner {
+    height: 100%;
+}
+
+#session-header {
+    color: #71717A;
+    text-style: bold;
+    padding: 1 1;
+    background: #111113;
+}
+
+#session-search {
+    border: none;
+    background: #1E1E22;
+    height: 1;
+    margin: 0 1 1 1;
+    padding: 0 1;
+}
+
 #session-list {
-    background: #18181B;
+    background: #111113;
     border: none;
     height: 1fr;
     padding: 0 1;
+}
+
+#session-list > .option-list--option-highlighted {
+    background: #27272A;
+    color: #F4F4F5;
+}
+
+#session-footer {
+    height: 1;
+    color: #52525B;
+    padding: 0 1;
+    background: #111113;
 }
 
 .panel-header {

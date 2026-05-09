@@ -30,8 +30,7 @@ class InputBar(Container):
     def update_indicator(self, *args):
         app = self.app
         from inference.cmd_ui.theme import STYLE_TOOL
-        # Example format: "Build Claude Opus 4.5 Anthropic" using rich markup
-        text = f"[{STYLE_TOOL}]{app.active_mode.capitalize()}[/]  [dim]{app.active_model} {app.active_provider.capitalize()}[/]"
+        text = f"[{STYLE_TOOL}]{app.active_mode.capitalize()}[/]  [dim]{app.active_model} | {app.active_provider.capitalize()}[/]"
         self.query_one("#input-mode-indicator").update(text)
 
     @on(Input.Submitted, "#prompt-input")

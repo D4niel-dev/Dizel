@@ -2,7 +2,7 @@ from textual.message import Message
 from inference.dizel_ui.logic.chat_manager import ChatManager
 from inference.dizel_ui.logic.token_budget import allocate_token_budget, classify_task
 from textual.app import App
-from textual.app import App
+
 
 class ChatBridge:
     class TokenReceived(Message):
@@ -32,6 +32,9 @@ class ChatBridge:
     def send(self, text: str) -> None:
         workspace = self.app.query_one("WorkspacePanel")
         
+        # Sync provider/model state from app reactive props into ChatManager
+        self._sync_provider_state()
+
         # 1. Budgeting
         has_tools = False
         if hasattr(self.app, "_tool_states"):
@@ -49,7 +52,9 @@ class ChatBridge:
         )
         self.app.budget_tokens = budget
         
-        self.app.call_from_thread(workspace.post_message, self.SystemLog(f"Routing to {self.app.active_provider} · {self.app.active_model}"))
+        provider_label = self.app.active_provider
+        model_label = self.app.active_model
+        self.app.call_from_thread(workspace.post_message, self.SystemLog(f"Routing to {provider_label} · {model_label}"))
         self.app.call_from_thread(workspace.post_message, self.SystemLog(f"Task: {task_type.value} | Budget: {budget} | Context: {self.app.context_tokens}/{max_cap}"))
         
         def on_token(token: str) -> None:
@@ -80,6 +85,30 @@ class ChatBridge:
             on_done=on_done,
             on_error=on_error,
         )
+
+    def _sync_provider_state(self) -> None:
+        """Ensure ChatManager's internal provider state matches the app's reactive state.
+        
+        This is needed because the user can switch providers via /provider
+        at any time, and the ChatManager needs to pick up those changes
+        before each generation call.
+        """
+        mgr = self.manager
+        app_provider = self.app.active_provider
+        app_model = self.app.active_model
+        
+        needs_reload = False
+        
+        # Check if provider slug changed
+        if mgr._provider_slug != app_provider:
+            needs_reload = True
+        
+        # Check if API model changed
+        if app_provider != "local" and mgr._api_model != app_model:
+            mgr._api_model = app_model
+        
+        if needs_reload:
+            mgr.reload_provider()
 
     def stop(self) -> None:
         self.manager.stop_generation()
