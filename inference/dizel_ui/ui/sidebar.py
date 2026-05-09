@@ -190,7 +190,8 @@ class Sidebar(QFrame):
         workspaces = [
             ("image", "Image"),
             ("layout", "Presentation"), ("search", "Riset"),
-            ("archive", "Archived"), ("book", "Library")
+            ("archive", "Archived"), ("book", "Library"),
+            ("activity", "Monitor")
         ]
         for icon_name, text in workspaces:
             btn = QPushButton(f"  {text}", self._work_container)
@@ -421,8 +422,8 @@ class Sidebar(QFrame):
             self.toggle()
         self._workspaces_open = not self._workspaces_open
         
-        # 5 buttons * 32px + 4 spaces * 2px = 168
-        target_h = 168 if self._workspaces_open else 0
+        # 6 buttons * 32px + 5 spaces * 2px = 202
+        target_h = 202 if self._workspaces_open else 0
         
         self._work_anim.stop()
         if self._workspaces_open:

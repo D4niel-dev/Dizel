@@ -74,13 +74,20 @@ class SessionPanel(Container):
     def _format_session(self, session: dict, current_id: str) -> str:
         """Format a session entry as a stable one-line row."""
         title = self._clip_text(session.get("title") or "Untitled", 26)
+        
+        tags_str = ""
+        tags = session.get("tags", [])
+        if tags:
+            tag_badges = " ".join([f"[cyan]#{t}[/cyan]" for t in tags[:2]])
+            tags_str = f" {tag_badges}"
+
         if session["id"] == current_id:
             prefix = ">*" if session.get("pinned") else ">"
         elif session.get("pinned"):
             prefix = "*"
         else:
             prefix = " "
-        return f"{prefix} {escape(title)}"
+        return f"{prefix} {escape(title)}{tags_str}"
 
     def _clip_text(self, value: str, max_length: int) -> str:
         text = " ".join(str(value).split())

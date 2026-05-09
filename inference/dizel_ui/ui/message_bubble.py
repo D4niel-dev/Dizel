@@ -8,7 +8,7 @@ from PySide6.QtGui import QTextOption, QTextCursor
 
 from dizel_ui.theme.colors import (
     BUBBLE_USER, BUBBLE_ASST, BUBBLE_USER_TXT, BUBBLE_ASST_TXT,
-    BG_CHAT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM, ACCENT, ACCENT_LIGHT, WELCOME_CARD_HOVER, BORDER, resolve
+    BG_CHAT, BG_INPUT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_DIM, ACCENT, ACCENT_LIGHT, ACCENT_HOVER, WELCOME_CARD_HOVER, BORDER, resolve
 )
 from dizel_ui.theme.fonts import MSG_TEXT, MSG_META, LABEL_SM
 from dizel_ui.logic.config_manager import ConfigManager
@@ -16,6 +16,75 @@ from dizel_ui.theme.stylesheets import get_frame_style, get_button_style
 from dizel_ui.utils.icons import get_icon
 from dizel_ui.utils.anim_helpers import AnimHelpers
 import re
+
+class _CodeBlockWidget(QFrame):
+    def __init__(self, code: str, lang: str = "", parent=None):
+        super().__init__(parent)
+        self.code_text = code
+        
+        # Style the container
+        bg_color = resolve(BG_INPUT)
+        border_color = resolve(BORDER)
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Header bar
+        header = QFrame(self)
+        header.setStyleSheet(f"background-color: rgba(0,0,0,0.2); border-bottom: 1px solid {border_color}; border-top-left-radius: 8px; border-top-right-radius: 8px;")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(12, 6, 8, 6)
+        
+        lang_lbl = QLabel(lang if lang else "code")
+        lang_lbl.setFont(MSG_META)
+        lang_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent; border: none;")
+        header_layout.addWidget(lang_lbl)
+        
+        header_layout.addStretch(1)
+        
+        self.copy_btn = QPushButton(" Copy")
+        cp_ico = get_icon("copy", size=(14,14), color=TEXT_DIM)
+        if cp_ico: self.copy_btn.setIcon(cp_ico)
+        self.copy_btn.setFont(MSG_META)
+        self.copy_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=4) + " border: none;")
+        self.copy_btn.setCursor(Qt.PointingHandCursor)
+        self.copy_btn.setFixedHeight(24)
+        self.copy_btn.clicked.connect(self._copy_code)
+        header_layout.addWidget(self.copy_btn)
+        
+        layout.addWidget(header)
+        
+        # Code content
+        self.text_edit = _AutoResizingTextEdit('transparent', TEXT_PRIMARY, self)
+        self.text_edit.setPlainText(code)
+        # Use a monospaced font for code
+        from PySide6.QtGui import QFontDatabase
+        code_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        code_font.setPointSize(10)
+        self.text_edit.setFont(code_font)
+        self.text_edit.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none; padding: 8px;")
+        layout.addWidget(self.text_edit)
+        
+    def _copy_code(self):
+        QApplication.clipboard().setText(self.code_text)
+        self.copy_btn.setText(" Copied")
+        chk = get_icon("check", size=(14,14), color=ACCENT)
+        if chk: self.copy_btn.setIcon(chk)
+        QTimer.singleShot(1500, self._reset_copy)
+        
+    def _reset_copy(self):
+        self.copy_btn.setText(" Copy")
+        cp = get_icon("copy", size=(14,14), color=TEXT_DIM)
+        if cp: self.copy_btn.setIcon(cp)
+
 
 class _ThoughtWidget(QFrame):
     def __init__(self, parent=None):
@@ -128,11 +197,12 @@ class MessageBubble(QFrame):
     }
 
     def __init__(self, role: str, content: str, meta: str = "", attachments: list = None,
-                 bubble_width: int = 500, on_regenerate=None,
+                 bubble_width: int = 500, on_regenerate=None, on_edit_submit=None,
                  provider_slug: str = "local", model_name: str = "",
                  parent=None):
         super().__init__(parent)
         self._on_regenerate = on_regenerate
+        self._on_edit_submit = on_edit_submit
 
         self._role = role
         self._content = content
@@ -233,6 +303,13 @@ class MessageBubble(QFrame):
         self._bubble_layout.addWidget(role_container)
 
         self._thought_widget = None
+        self._block_widgets = []  # Store dynamically generated code/text blocks
+        self._main_content_container = QFrame(self._bubble_frame)
+        self._main_content_container.setStyleSheet("background: transparent; border: none;")
+        self._main_content_layout = QVBoxLayout(self._main_content_container)
+        self._main_content_layout.setContentsMargins(0, 0, 0, 0)
+        self._main_content_layout.setSpacing(8)
+        self._bubble_layout.addWidget(self._main_content_container)
 
         # Attachments Preview
         if attachments:
@@ -287,11 +364,12 @@ class MessageBubble(QFrame):
                     
             if has_valid:
                 att_layout.addStretch(1)
-                self._bubble_layout.addWidget(att_scroll)
+                self._bubble_layout.insertWidget(1, att_scroll)  # Insert right after role container
 
-        # Message text
-        self._textbox = _AutoResizingTextEdit(bg_color, txt_color, self._bubble_frame)
-        self._bubble_layout.addWidget(self._textbox)
+        # Message text (Used during streaming)
+        self._streaming_textbox = _AutoResizingTextEdit(bg_color, txt_color, self._main_content_container)
+        self._main_content_layout.addWidget(self._streaming_textbox)
+        
         self._parse_and_update(content)
 
         # Bottom row (action bar)
@@ -301,9 +379,8 @@ class MessageBubble(QFrame):
         bottom_layout.setContentsMargins(0, 4, 0, 0)
         bottom_layout.setSpacing(6)
         
-        if not self._is_user:
-            # Action bar starts hidden for assistant — revealed on finalise()
-            self._action_bar.hide()
+        # Action bar starts hidden
+        self._action_bar.hide()
             
         self._copy_btn = None
         def create_btn(lbl, icon_name, is_copy=False):
@@ -334,8 +411,8 @@ class MessageBubble(QFrame):
             create_btn("", "thumbs-down")
             create_btn("Share", "share")
         else:
-            # Hide action bar initially for user, only show on hover
-            self._action_bar.hide()
+            self._edit_btn = create_btn("Edit", "edit-2")
+            self._edit_btn.clicked.connect(self._toggle_edit_mode)
             bottom_layout.addStretch(1)
 
         # Meta line (token count / latency)
@@ -356,22 +433,85 @@ class MessageBubble(QFrame):
             bottom_layout.addWidget(ts_lbl)
 
         self._bubble_layout.addWidget(self._action_bar)
+        
+        # Edit Action Bar (hidden by default)
+        self._edit_action_bar = QFrame(self._bubble_frame)
+        self._edit_action_bar.setStyleSheet("background: transparent; border: none;")
+        e_layout = QHBoxLayout(self._edit_action_bar)
+        e_layout.setContentsMargins(0, 8, 0, 0)
+        e_layout.setSpacing(8)
+        
+        save_btn = QPushButton("Save & Regenerate", self._edit_action_bar)
+        save_btn.setFixedHeight(32)
+        save_btn.setFont(MSG_META)
+        save_btn.setStyleSheet(get_button_style(ACCENT, ACCENT_HOVER, "#ffffff", radius=6))
+        save_btn.setCursor(Qt.PointingHandCursor)
+        save_btn.clicked.connect(self._submit_edit)
+        e_layout.addWidget(save_btn)
+        
+        cancel_btn = QPushButton("Cancel", self._edit_action_bar)
+        cancel_btn.setFixedHeight(32)
+        cancel_btn.setFont(MSG_META)
+        cancel_btn.setStyleSheet(get_button_style("transparent", BUBBLE_USER, TEXT_PRIMARY, radius=6))
+        cancel_btn.setCursor(Qt.PointingHandCursor)
+        cancel_btn.clicked.connect(self._cancel_edit)
+        e_layout.addWidget(cancel_btn)
+        e_layout.addStretch(1)
+        
+        self._edit_action_bar.hide()
+        self._bubble_layout.addWidget(self._edit_action_bar)
+        
         outer_layout.addWidget(self._bubble_frame)
         
         if not self._is_user:
             outer_layout.addStretch(1)
+            
+        self._is_editing = False
 
     def enterEvent(self, event):
         # On Hover: show action bar
-        if self._is_user:
+        if self._is_user and not self._is_editing:
             self._action_bar.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         # On Leave: hide user action bar
-        if self._is_user:
+        if self._is_user and not self._is_editing:
             self._action_bar.hide()
         super().leaveEvent(event)
+        
+    def _toggle_edit_mode(self):
+        self._is_editing = True
+        self._action_bar.hide()
+        self._edit_action_bar.show()
+        
+        # Change streaming textbox to editable
+        self._streaming_textbox.setReadOnly(False)
+        self._streaming_textbox.setStyleSheet(f"QTextEdit {{ background-color: {resolve(BG_CHAT)}; color: {resolve(BUBBLE_USER_TXT)}; border: 1px solid {resolve(BORDER)}; border-radius: 6px; padding: 4px; }}")
+        self._streaming_textbox.setFocus()
+        self._streaming_textbox._adjust_height()
+        
+    def _cancel_edit(self):
+        self._is_editing = False
+        self._edit_action_bar.hide()
+        self._action_bar.show()
+        
+        # Revert text and readonly
+        self._streaming_textbox.setPlainText(self._content)
+        bg = resolve(BUBBLE_USER) if self._is_user else resolve(BUBBLE_ASST)
+        self._streaming_textbox.setStyleSheet(f"QTextEdit {{ background-color: {bg if bg != 'transparent' else 'transparent'}; color: {resolve(BUBBLE_USER_TXT)}; border: none; }}")
+        self._streaming_textbox.setReadOnly(True)
+        self._streaming_textbox._adjust_height()
+        
+    def _submit_edit(self):
+        if not self._on_edit_submit: return
+        new_text = self._streaming_textbox.toPlainText().strip()
+        if not new_text: return
+        
+        self._cancel_edit() # Reset UI state
+        self._content = new_text
+        self._streaming_textbox.setPlainText(new_text)
+        self._on_edit_submit(self, new_text)
 
     def _copy_text(self):
         QApplication.clipboard().setText(self._content)
@@ -397,21 +537,62 @@ class MessageBubble(QFrame):
             
             if not self._thought_widget and thought_text:
                 self._thought_widget = _ThoughtWidget(self._bubble_frame)
-                # Insert it right below the role label, above the main textbox
-                # Indexes: 0 = role_container, 1 = thought_widget (or att_scroll)
-                insert_idx = self._bubble_layout.indexOf(self._textbox)
-                self._bubble_layout.insertWidget(insert_idx, self._thought_widget)
+                # Insert it right below the role label (index 1)
+                self._bubble_layout.insertWidget(1, self._thought_widget)
                 
             if self._thought_widget:
                 self._thought_widget.set_text(thought_text, is_finished=is_final)
                 
             # Strip thought blocks to show only pure answer in main textbox
             main_text = re.sub(r'<think>.*?(?:</think>|$)', '', full_text, flags=re.DOTALL).strip()
-            self._textbox.setPlainText(main_text)
         else:
-            self._textbox.setPlainText(full_text)
+            main_text = full_text.strip()
             
-        self._textbox._adjust_height()
+        if not is_final:
+            self._streaming_textbox.setPlainText(main_text)
+            self._streaming_textbox.show()
+            for w in self._block_widgets:
+                w.hide()
+            self._streaming_textbox._adjust_height()
+        else:
+            self._streaming_textbox.hide()
+            self._render_final_blocks(main_text)
+
+    def _render_final_blocks(self, main_text: str):
+        # Clear previous block widgets
+        for w in self._block_widgets:
+            self._main_content_layout.removeWidget(w)
+            w.deleteLater()
+        self._block_widgets.clear()
+        
+        # Split by markdown code blocks
+        parts = re.split(r'(```[\s\S]*?```)', main_text)
+        
+        for part in parts:
+            if not part: continue
+            
+            if part.startswith('```') and part.endswith('```'):
+                # Extract lang and code
+                inner = part[3:-3]
+                lines = inner.split('\n', 1)
+                lang = lines[0].strip() if len(lines) > 1 and lines[0].strip() else ""
+                code = lines[1] if len(lines) > 1 else lines[0]
+                
+                # For inline ```` that isn't multiline
+                if len(lines) == 1 and lang:
+                    code = lang
+                    lang = ""
+                    
+                code_w = _CodeBlockWidget(code.strip("\n"), lang, self._main_content_container)
+                self._main_content_layout.addWidget(code_w)
+                self._block_widgets.append(code_w)
+            else:
+                # Normal text
+                txt_w = _AutoResizingTextEdit('transparent', BUBBLE_USER_TXT if self._is_user else BUBBLE_ASST_TXT, self._main_content_container)
+                # Apply simple markdown (PySide6 supports basic HTML parsing from Markdown via setMarkdown)
+                txt_w.setMarkdown(part.strip())
+                self._main_content_layout.addWidget(txt_w)
+                self._block_widgets.append(txt_w)
 
     def append_text(self, piece: str):
         new_text = self._content + piece

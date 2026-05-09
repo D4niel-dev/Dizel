@@ -22,13 +22,9 @@ class ToolsCommand(Command):
             app._tool_states = {name: True for name in AVAILABLE_TOOLS}
 
         if not invocation.args:
-            lines = ["Available Tools:", ""]
-            for name, desc in AVAILABLE_TOOLS.items():
-                status = "ON" if app._tool_states.get(name, True) else "OFF"
-                lines.append(f"  [{status}] {name} - {desc}")
-            lines.append("")
-            lines.append("Toggle: /tools <name> on|off")
-            return "\n".join(lines)
+            from inference.cmd_ui.panels.tools_menu import ToolsMenuModal
+            app.push_screen(ToolsMenuModal())
+            return ""
 
         tool_name = invocation.args[0].lower()
         if tool_name not in AVAILABLE_TOOLS:

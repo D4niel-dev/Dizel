@@ -6,6 +6,7 @@ from textual.widgets import Static
 class StatusBar(Container):
     def compose(self) -> ComposeResult:
         yield Static(id="status-text")
+        yield Static("v2.0.2", id="status-version")
 
     def on_mount(self):
         self.update_status()

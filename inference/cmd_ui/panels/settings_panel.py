@@ -102,7 +102,9 @@ class SettingsPanel(Container):
         return f"current: {value}"
 
     def _format_option(self, command: str, label: str, detail: str) -> str:
-        return f"[#60A5FA]{escape(command)}[/]  [#F4F4F5]{escape(label)}[/]  [dim]{escape(detail)}[/]"
+        padded_cmd = f"{command:<35}"
+        padded_label = f"{label:<30}"
+        return f"[#60A5FA]{escape(padded_cmd)}[/] [#F4F4F5]{escape(padded_label)}[/] [dim]{escape(detail)}[/]"
 
     @on(Input.Changed, "#settings-input")
     def on_input_changed(self, event: Input.Changed) -> None:

@@ -33,6 +33,7 @@ class DizelCMDApp(App):
         Binding("ctrl+t", "toggle_session", "Toggle Sessions", priority=True),
         Binding("ctrl+h", "toggle_session", "Toggle Sessions", priority=True),
         Binding("ctrl+r", "toggle_context", "Toggle Context", priority=True),
+        Binding("ctrl+y", "multiline_input", "Multi-line Input", priority=True),
     ]
 
     # Reactive state
@@ -192,11 +193,19 @@ class DizelCMDApp(App):
             self._update_loader_status(msg)
         else:
             self._update_loader_status("Model loaded.")
+            
+        if self._loader_widget:
+            widget = self._loader_widget
+            self.set_timer(10.0, lambda: widget.remove())
         self._loader_widget = None
 
     def _on_model_error(self, msg: str) -> None:
         self.generation_state = "IDLE"
         self._update_loader_status(f"Load error: {msg}")
+        if self._loader_widget:
+            widget = self._loader_widget
+            self.set_timer(10.0, lambda: widget.remove())
+        self._loader_widget = None
         self._loader_widget = None
 
     def _log_system(self, msg: str) -> None:
@@ -241,6 +250,29 @@ class DizelCMDApp(App):
     def action_clear_workspace(self) -> None:
         workspace = self.query_one("WorkspacePanel")
         workspace.clear_workspace()
+
+    def action_multiline_input(self) -> None:
+        from inference.cmd_ui.panels.multiline_input import MultilineInputModal
+        from textual.widgets import Input
+
+        try:
+            inp = self.query_one("#prompt-input", Input)
+            current_text = inp.value
+        except Exception:
+            return
+
+        def _on_dismiss(text: str | None) -> None:
+            if text is not None:
+                try:
+                    inp = self.query_one("#prompt-input", Input)
+                    inp.value = text
+                    inp.focus()
+                    # Optionally, we could call inp.action_submit() here if we want Ctrl+S to auto-send,
+                    # but bringing it back to the input bar is safer for review.
+                except Exception:
+                    pass
+
+        self.push_screen(MultilineInputModal(current_text), _on_dismiss)
 
     def action_interrupt_or_quit(self):
         if self.generation_state in ("STREAMING", "THINKING"):

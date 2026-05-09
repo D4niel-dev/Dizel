@@ -1,12 +1,17 @@
 from rich.console import RenderableType, Group
 from rich.text import Text
 from rich.padding import Padding
+from rich.markdown import Markdown
 from inference.cmd_ui.theme import STYLE_USER, STYLE_ASSISTANT, STYLE_SYSTEM
 
 class MessageBlock:
     def __init__(self, role: str, content: str | RenderableType):
         self.role = role
-        self.content = content
+        # If content is a plain string, wrap it in Markdown
+        if isinstance(content, str):
+            self.content = Markdown(content)
+        else:
+            self.content = content
 
     def __rich__(self) -> RenderableType:
         if self.role == "USER":

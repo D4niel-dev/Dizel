@@ -56,9 +56,13 @@ class CommandPalette(Container):
     def _format_command(self, command: Command) -> str:
         aliases = f" aliases: {', '.join(command.aliases)}" if command.aliases else ""
         usage = command.usage or f"/{command.name}"
+        
+        padded_usage = f"{usage:<35}"
+        padded_help = f"{command.help_text:<45}"
+        
         return (
-            f"[#60A5FA]{escape(usage)}[/]  "
-            f"[#F4F4F5]{escape(command.help_text)}[/]  "
+            f"[#60A5FA]{escape(padded_usage)}[/] "
+            f"[#F4F4F5]{escape(padded_help)}[/] "
             f"[dim]{escape(command.category + aliases)}[/]"
         )
 

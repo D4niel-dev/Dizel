@@ -15,6 +15,8 @@ from .export import ExportCommand
 from .reset import ResetCommand
 from .load import LoadCommand
 from .settings import SettingsCommand
+from .tag import TagCommand
+from .diff import DiffCommand
 
 def register_builtins():
     registry.register(HelpCommand())
@@ -33,4 +35,5 @@ def register_builtins():
     registry.register(ResetCommand())
     registry.register(LoadCommand())
     registry.register(SettingsCommand())
-
+    registry.register(TagCommand())
+    registry.register(DiffCommand())

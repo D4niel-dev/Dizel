@@ -341,6 +341,7 @@ class ChatManager:
         on_token:    Callable[[str], None],
         on_done:     Callable[[str], None],
         on_error:    Callable[[str], None],
+        verbosity:   Optional[str] = None,
     ) -> None:
         """Regenerate the last prompt by popping the assistant message."""
         if not self.history:
@@ -359,7 +360,7 @@ class ChatManager:
         user_text = last_user_msg.get("content", "")
         attachments = last_user_msg.get("attachments", [])
 
-        self.send_message(user_text, attachments, on_token, on_done, on_error)
+        self.send_message(user_text, attachments, on_token, on_done, on_error, verbosity)
 
     def send_message(
         self,
@@ -368,6 +369,7 @@ class ChatManager:
         on_token:    Callable[[str], None],
         on_done:     Callable[[str], None],
         on_error:    Callable[[str], None],
+        verbosity:   Optional[str] = None,
     ) -> None:
         """
         Send a user message and generate a response asynchronously.
@@ -375,6 +377,64 @@ class ChatManager:
         Routes to API provider or local torch inference based on active provider.
         Callbacks are called from the background thread.
         """
+        # --- Native Tools Interception ---
+        if user_text.startswith("/sh "):
+            cmd = user_text[4:].strip()
+            import subprocess
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                output = result.stdout
+                if result.stderr:
+                    output += "\n[stderr]\n" + result.stderr
+                if not output.strip():
+                    output = "[Command executed successfully with no output]"
+            except Exception as e:
+                output = str(e)
+            user_text = f"User ran shell command: `{cmd}`\nOutput:\n```\n{output}\n```\nAnalyze the output or acknowledge it."
+            
+        elif user_text.startswith("/read "):
+            filepath = user_text[6:].strip()
+            import os
+            if os.path.exists(filepath):
+                try:
+                    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read(8000)
+                    user_text = f"User requested to read file: `{filepath}`\nContents:\n```\n{content}\n```\nAnalyze the file contents."
+                except Exception as e:
+                    user_text = f"User requested to read file: `{filepath}`, but an error occurred: {e}"
+            else:
+                user_text = f"User requested to read file: `{filepath}`, but it was not found."
+                
+        elif user_text.startswith("/py "):
+            code = user_text[4:].strip()
+            import subprocess
+            try:
+                result = subprocess.run(["python", "-c", code], capture_output=True, text=True, timeout=10)
+                output = result.stdout
+                if result.stderr:
+                    output += "\n[stderr]\n" + result.stderr
+                if not output.strip():
+                    output = "[Python script executed successfully with no output]"
+            except Exception as e:
+                output = str(e)
+            user_text = f"User ran python code:\n```python\n{code}\n```\nOutput:\n```\n{output}\n```\nAnalyze the result."
+            
+        elif user_text.startswith("/fetch "):
+            url = user_text[7:].strip()
+            import urllib.request
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    html = response.read().decode('utf-8', errors='ignore')
+                # Simple strip of HTML tags for text context
+                import re
+                text_content = re.sub('<[^<]+>', ' ', html)
+                text_content = " ".join(text_content.split())
+                user_text = f"User requested to fetch URL: `{url}`\nExtracted Text (truncated):\n```\n{text_content[:8000]}\n```\nAnalyze the content."
+            except Exception as e:
+                user_text = f"User requested to fetch URL: `{url}`, but an error occurred: {e}"
+        # ---------------------------------
+
         if not self.is_ready:
             on_error("Model not loaded. Configure a provider or checkpoint in Settings.")
             return
@@ -393,7 +453,7 @@ class ChatManager:
         else:
             thread = threading.Thread(
                 target=self._generate_worker,
-                args=(user_text, attachments, on_token, on_done, on_error),
+                args=(user_text, attachments, on_token, on_done, on_error, verbosity),
                 daemon=True,
             )
         thread.start()
@@ -519,6 +579,7 @@ class ChatManager:
         on_token:    Callable[[str], None],
         on_done:     Callable[[str], None],
         on_error:    Callable[[str], None],
+        verbosity:   Optional[str] = None,
     ) -> None:
         """Background thread: runs generation and fires callbacks."""
         import time
@@ -558,7 +619,10 @@ class ChatManager:
             print(f"[ChatManager] Prompt length: {len(prompt_ids)} tokens (trimmed {n_trimmed} msgs)", flush=True)
 
             # ── Step 5: Allocate dynamic token budget ────────────────────
-            verbosity = budget_cfg.get("verbosity", "normal")
+            # Try to get verbosity from the argument, fallback to config
+            if verbosity is None:
+                verbosity = budget_cfg.get("verbosity", "normal")
+            
             hard_limit = budget_cfg.get("hard_output_limit", 0)
             custom_budgets = {
                 "chat":       budget_cfg.get("chat_budget", 150),
@@ -652,9 +716,9 @@ class ChatManager:
 
                     logits = logits[:, -1, :].float()
 
-                    # Repetition penalty (applied to recent 64 tokens)
+                    # Repetition penalty (applied to recent 128 tokens)
                     if self.repetition_penalty != 1.0:
-                        for tid in set(generated_ids[-64:]):
+                        for tid in set(generated_ids[-128:]):
                             if 0 <= tid < logits.size(-1):
                                 if logits[0, tid] > 0:
                                     logits[0, tid] /= self.repetition_penalty
@@ -756,6 +820,7 @@ class ChatManager:
         on_token,
         on_done,
         on_error,
+        verbosity:      Optional[str] = None,
     ) -> None:
         """
         Send a message with tool-augmented context.
@@ -765,7 +830,7 @@ class ChatManager:
         after generation completes.
         """
         if not deep_think:
-            self.send_message(augmented_text, attachments, on_token, on_done, on_error)
+            self.send_message(augmented_text, attachments, on_token, on_done, on_error, verbosity)
             return
 
         # Save originals
@@ -812,7 +877,7 @@ class ChatManager:
             _restore()
             on_error(msg)
 
-        self.send_message(augmented_text, attachments, on_token, on_done_wrapper, on_error_wrapper)
+        self.send_message(augmented_text, attachments, on_token, on_done_wrapper, on_error_wrapper, verbosity)
 
 
 # ---------------------------------------------------------------------------

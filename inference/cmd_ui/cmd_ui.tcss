@@ -6,12 +6,22 @@ Screen {
 
 /* Footer / Status Bar */
 StatusBar {
+    layout: horizontal;
     height: 1;
     background: #18181B;
     color: #71717A;
-    content-align: left middle;
-    margin: 1 1 0 1;
+    margin: 1 1 1 1;
     padding: 0 2;
+}
+
+#status-text {
+    width: 1fr;
+    content-align: left middle;
+}
+
+#status-version {
+    width: auto;
+    content-align: right middle;
 }
 
 /* Main horizontal layout */

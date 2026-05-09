@@ -217,6 +217,7 @@ class SecondarySidebar(QFrame):
         self._init_riset_view()
         self._init_archive_view()
         self._init_library_view()
+        self._init_monitor_view()
         
         main_layout.addWidget(self.stack)
 
@@ -470,6 +471,86 @@ class SecondarySidebar(QFrame):
         lyt.addStretch(1)
         self.stack.addWidget(page) # Index 5
 
+    # 7. MONITOR VIEW
+    def _init_monitor_view(self):
+        page = QWidget()
+        lyt = QVBoxLayout(page)
+        lyt.setContentsMargins(0, 0, 0, 0)
+        lyt.setSpacing(16)
+        
+        # System Resource Usage
+        sys_group = QFrame(page)
+        sys_group.setStyleSheet(f"background: {resolve(BG_SIDEBAR)}; border-radius: 8px; border: 1px solid {resolve(SIDEBAR_BORDER)};")
+        sys_lyt = QVBoxLayout(sys_group)
+        sys_lyt.setContentsMargins(16, 16, 16, 16)
+        sys_lyt.setSpacing(12)
+        
+        sys_title = QLabel("System Resources")
+        sys_title.setFont(NAV_ITEM)
+        sys_title.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none;")
+        sys_lyt.addWidget(sys_title)
+        
+        self.cpu_lbl = QLabel("CPU: -- %")
+        self.cpu_lbl.setFont(LABEL_DIM)
+        self.cpu_lbl.setStyleSheet(f"color: {resolve(SIDEBAR_TEXT)}; background: transparent; border: none;")
+        sys_lyt.addWidget(self.cpu_lbl)
+        
+        self.ram_lbl = QLabel("RAM: -- %")
+        self.ram_lbl.setFont(LABEL_DIM)
+        self.ram_lbl.setStyleSheet(f"color: {resolve(SIDEBAR_TEXT)}; background: transparent; border: none;")
+        sys_lyt.addWidget(self.ram_lbl)
+        
+        lyt.addWidget(sys_group)
+        
+        # Active Model / Provider
+        mdl_group = QFrame(page)
+        mdl_group.setStyleSheet(f"background: {resolve(BG_SIDEBAR)}; border-radius: 8px; border: 1px solid {resolve(SIDEBAR_BORDER)};")
+        mdl_lyt = QVBoxLayout(mdl_group)
+        mdl_lyt.setContentsMargins(16, 16, 16, 16)
+        mdl_lyt.setSpacing(12)
+        
+        mdl_title = QLabel("Current Session")
+        mdl_title.setFont(NAV_ITEM)
+        mdl_title.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent; border: none;")
+        mdl_lyt.addWidget(mdl_title)
+        
+        self.provider_lbl = QLabel("Provider: --")
+        self.provider_lbl.setFont(LABEL_DIM)
+        self.provider_lbl.setStyleSheet(f"color: {resolve(SIDEBAR_TEXT)}; background: transparent; border: none;")
+        mdl_lyt.addWidget(self.provider_lbl)
+        
+        self.model_lbl = QLabel("Model: --")
+        self.model_lbl.setFont(LABEL_DIM)
+        self.model_lbl.setStyleSheet(f"color: {resolve(SIDEBAR_TEXT)}; background: transparent; border: none;")
+        self.model_lbl.setWordWrap(True)
+        mdl_lyt.addWidget(self.model_lbl)
+        
+        lyt.addWidget(mdl_group)
+        
+        lyt.addStretch(1)
+        
+        self.stack.addWidget(page) # Index 6
+        
+        # Setup polling
+        from PySide6.QtCore import QTimer
+        self._monitor_timer = QTimer(self)
+        self._monitor_timer.setInterval(2000)
+        self._monitor_timer.timeout.connect(self._poll_system_stats)
+        
+    def _poll_system_stats(self):
+        try:
+            import psutil
+            cpu = psutil.cpu_percent()
+            ram = psutil.virtual_memory().percent
+            self.cpu_lbl.setText(f"CPU: {cpu:.1f} %")
+            self.ram_lbl.setText(f"RAM: {ram:.1f} %")
+        except ImportError:
+            self.cpu_lbl.setText("CPU: N/A (psutil not installed)")
+            self.ram_lbl.setText("RAM: N/A (psutil not installed)")
+            
+    def update_monitor_info(self, provider: str, model: str):
+        self.provider_lbl.setText(f"Provider: {provider}")
+        self.model_lbl.setText(f"Model: {model}")
 
     def refresh_data(self, sessions: list):
         """Scans ALL sessions to build History, Image Gallery, and Archive files dynamically."""
@@ -544,9 +625,18 @@ class SecondarySidebar(QFrame):
             "Presentation": 2,
             "Riset": 3,
             "Archived": 4,
-            "Library": 5
+            "Library": 5,
+            "Monitor": 6
         }
         idx = mapping.get(view_name, 0)
+        
+        # Handle timer start/stop based on visibility
+        if idx == 6:
+            if not getattr(self, "_monitor_timer", None).isActive():
+                self._monitor_timer.start()
+        else:
+            if getattr(self, "_monitor_timer", None).isActive():
+                self._monitor_timer.stop()
         
         # If open and user clicks the active view button again, close it
         if self._is_open and self.stack.currentIndex() == idx and self._header_lbl.text() == view_name:

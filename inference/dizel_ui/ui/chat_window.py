@@ -47,10 +47,11 @@ class ChatState(Enum):
     RESPONSE_COMPLETE = "complete"      # generation done, action bar visible
 
 class ChatWindow(QFrame):
-    def __init__(self, on_quick_action: callable, on_regenerate: callable = None, parent=None):
+    def __init__(self, on_quick_action: callable, on_regenerate: callable = None, on_edit_message: callable = None, parent=None):
         super().__init__(parent)
         self._on_quick_action = on_quick_action
         self._on_regenerate = on_regenerate
+        self._on_edit_message = on_edit_message
         
         self.setStyleSheet(get_frame_style(BG_CHAT, radius=0))
         
@@ -105,15 +106,21 @@ class ChatWindow(QFrame):
         
         welcome_layout.addStretch(1)
 
-        # Static Avatar
+        # Dynamic Avatar
         logo_lbl = QLabel(self._welcome_frame)
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        avatar_path = os.path.join(base_dir, "assets", "avatars", "Diszi_beta2.png")
+        
+        # Determine avatar based on model name
+        mdl_lower = self._model_name.lower()
+        if "mila" in mdl_lower:
+            avatar_path = os.path.join(base_dir, "assets", "app", "Mila.png")
+        else:
+            avatar_path = os.path.join(base_dir, "assets", "app", "Dizel.png")
+            
         if os.path.exists(avatar_path):
-            original = QPixmap(avatar_path)
-            if not original.isNull():
-                cropped = original.copy(240, 240, 600, 600) # Static crop out the massive void padding without erasing glowing bounds
-                logo_lbl.setPixmap(cropped.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            pixmap = QPixmap(avatar_path)
+            if not pixmap.isNull():
+                logo_lbl.setPixmap(pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         welcome_layout.addWidget(logo_lbl, 0, Qt.AlignCenter)
 
         # Dynamic Greeting based on time
@@ -352,7 +359,7 @@ class ChatWindow(QFrame):
         
         def _step_2_user_bubble():
             # Create user bubble
-            bubble = MessageBubble(role="user", content=text, attachments=attachments, bubble_width=self._bubble_width(), parent=self._content_widget)
+            bubble = MessageBubble(role="user", content=text, attachments=attachments, bubble_width=self._bubble_width(), on_edit_submit=self._on_edit_message, parent=self._content_widget)
             self._content_layout.addWidget(bubble)
             
             if not self._skip_animations:
@@ -395,7 +402,8 @@ class ChatWindow(QFrame):
     def add_user_message_instant(self, text: str, attachments: list = None) -> MessageBubble:
         """For loading history instantly without triggering inference flow."""
         self._dismiss_welcome()
-        bubble = MessageBubble(role="user", content=text, attachments=attachments, bubble_width=self._bubble_width(), parent=self._content_widget)
+        bubble = MessageBubble(role="user", content=text, attachments=attachments, bubble_width=self._bubble_width(), on_edit_submit=self._on_edit_message, parent=self._content_widget)
+        bubble.finalise(text, "")
         self._content_layout.addWidget(bubble)
         self._scroll_to_bottom()
         return bubble

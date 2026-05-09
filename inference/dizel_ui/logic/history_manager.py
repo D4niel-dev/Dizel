@@ -53,6 +53,7 @@ def save_session(
     session_id: str = None,
     title:      str = None,
     pinned:     bool = None,
+    tags:       List[str] = None,
 ) -> str:
     """
     Save a conversation to disk.
@@ -81,9 +82,11 @@ def save_session(
         title = title or "New Chat"
 
     is_pinned = False
+    existing_tags = []
     existing_data = load_session(session_id)
     if existing_data:
         is_pinned = existing_data.get("pinned", False)
+        existing_tags = existing_data.get("tags", [])
         # Preserve original creation time if available
         created_time = existing_data.get("created", datetime.now().isoformat(timespec="seconds"))
     else:
@@ -92,12 +95,16 @@ def save_session(
     if pinned is not None:
         is_pinned = pinned
 
+    if tags is not None:
+        existing_tags = list(set(existing_tags + tags))
+
     data = {
         "id":       session_id,
         "title":    title,
         "created":  created_time,
         "messages": messages,
         "pinned":   is_pinned,
+        "tags":     existing_tags,
     }
 
     slug = _safe_filename(title)
@@ -153,12 +160,39 @@ def list_sessions() -> List[Dict]:
                 "created": data.get("created", ""),
                 "preview": preview,
                 "pinned":  data.get("pinned", False),
+                "tags":    data.get("tags", []),
             })
         except Exception:
             continue
 
     sessions.sort(key=lambda s: (not s.get("pinned", False), s["created"]), reverse=True)
     return sessions
+
+
+def add_tag_to_session(session_id: str, tag: str) -> bool:
+    """Add a single tag to a session by ID."""
+    _ensure_dir()
+    tag = tag.strip().lower()
+    if tag.startswith("#"):
+        tag = tag[1:]
+    
+    for fname in os.listdir(HISTORY_DIR):
+        if fname.startswith(session_id) and fname.endswith(".json"):
+            path = os.path.join(HISTORY_DIR, fname)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                tags = set(data.get("tags", []))
+                tags.add(tag)
+                data["tags"] = list(tags)
+                
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                return True
+            except Exception:
+                pass
+    return False
 
 
 def delete_session(session_id: str) -> bool:

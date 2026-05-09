@@ -180,12 +180,14 @@ class ModelModePopup(QFrame):
         c_layout.setContentsMargins(6, 6, 6, 6)
         c_layout.setSpacing(4)
         
-        # Format: Name, Icon, Description
+        # Format: Name, Icon, Description, Accent Color
         modes = [
-            ("Fast", "zap", "For standard queries and chat"),
-            ("Planning", "command", "Deep analytical thinking and planning")
+            ("Fast", "zap", "For standard queries and chat", "#22c55e"),
+            ("Planning", "command", "Deep analytical thinking and planning", "#3b82f6"),
+            ("Coding", "code", "Developer mode for clean code output", "#f97316"),
+            ("Thinking", "light-bulb", "Careful reasoning with step-by-step logic", "#a855f7"),
         ]
-        for name, ico_name, desc in modes:
+        for name, ico_name, desc, color in modes:
             btn = QPushButton(container)
             btn.setFixedHeight(48)
             is_active = (name == current)
@@ -194,11 +196,11 @@ class ModelModePopup(QFrame):
             b_layout.setContentsMargins(10, 8, 10, 8)
             b_layout.setSpacing(12)
             
-            c_text = resolve(ACCENT) if is_active else resolve(TEXT_PRIMARY)
+            c_text = color if is_active else resolve(TEXT_PRIMARY)
             
             # Icon
             ico_lbl = QLabel(btn)
-            i_obj = get_icon(ico_name, size=(18, 18), color=ACCENT if is_active else TEXT_DIM)
+            i_obj = get_icon(ico_name, size=(18, 18), color=color if is_active else TEXT_DIM)
             if i_obj: ico_lbl.setPixmap(i_obj.pixmap(18, 18))
             ico_lbl.setStyleSheet("background: transparent;")
             ico_lbl.setAlignment(Qt.AlignTop)
@@ -227,7 +229,7 @@ class ModelModePopup(QFrame):
             # Checkmark
             if is_active:
                 chk = QLabel(btn)
-                c_obj = get_icon("check", size=(16, 16), color=ACCENT)
+                c_obj = get_icon("check", size=(16, 16), color=color)
                 if c_obj: chk.setPixmap(c_obj.pixmap(16, 16))
                 chk.setStyleSheet("background: transparent;")
                 chk.setAlignment(Qt.AlignTop)
@@ -406,11 +408,17 @@ class InputPanel(QFrame):
 
         # Model Mode Selection toggle
         self._mode_btn = QPushButton(f"  {self._current_mode}", self._action_row)
-        ico_name = "command" if self._current_mode == "Planning" else "zap"
-        ico_mode = get_icon(ico_name, size=(14,14), color=TEXT_DIM)
+        _init_mode_config = {
+            "Fast": ("zap", "#22c55e"),
+            "Planning": ("command", "#3b82f6"),
+            "Coding": ("code", "#f97316"),
+            "Thinking": ("light-bulb", "#a855f7"),
+        }
+        _init_ico_name, _init_color = _init_mode_config.get(self._current_mode, ("zap", "#22c55e"))
+        ico_mode = get_icon(_init_ico_name, size=(14,14), color=_init_color)
         if ico_mode: self._mode_btn.setIcon(ico_mode)
         self._mode_btn.setFont(BTN_LABEL)
-        self._mode_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_DIM, radius=8))
+        self._mode_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, _init_color, radius=8))
         self._mode_btn.setCursor(Qt.PointingHandCursor)
         self._mode_btn.clicked.connect(self._show_mode_menu)
         action_layout.addWidget(self._mode_btn)
@@ -788,10 +796,20 @@ class InputPanel(QFrame):
 
     def _on_mode_selected(self, mode_name):
         self._current_mode = mode_name
+        
+        # Mode-specific colors and icons
+        mode_config = {
+            "Fast": ("zap", "#22c55e"),
+            "Planning": ("command", "#3b82f6"),
+            "Coding": ("code", "#f97316"),
+            "Thinking": ("light-bulb", "#a855f7"),
+        }
+        ico_name, color = mode_config.get(mode_name, ("zap", resolve(TEXT_DIM)))
+        
         self._mode_btn.setText(f"  {mode_name}")
-        ico_name = "command" if mode_name == "Planning" else "zap"
-        ico_mode = get_icon(ico_name, size=(14,14), color=TEXT_DIM)
+        ico_mode = get_icon(ico_name, size=(14,14), color=color)
         if ico_mode: self._mode_btn.setIcon(ico_mode)
+        self._mode_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, color, radius=8))
 
 
     def set_generating(self, generating: bool):

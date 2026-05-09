@@ -31,18 +31,46 @@ class ToolBridge:
     def _run(self, text: str, files: list = None) -> None:
         workspace = self.app.query_one("WorkspacePanel")
         
-        # Simulated tools based on active mode
+        # Parse files if any
+        file_context = ""
         if files:
             for f in files:
                 self.app.call_from_thread(workspace.post_message, self.ToolStarted("LilyAgent", f"Processing {f}"))
+                # TODO: Wire real file extractors if needed, currently simulated
                 time.sleep(0.5)
                 self.app.call_from_thread(workspace.post_message, self.ToolCompleted("LilyAgent", "tokens extracted"))
+                file_context += f"[FILE: {f}]\nContent processed.\n"
 
-        if self.app.active_mode == "Planning":
+        # Real Web Search Integration
+        web_results = ""
+        # Check if tools state exists and if web search is enabled (default True for Planning)
+        is_web_enabled = getattr(self.app, "_tool_states", {}).get("web_search", self.app.active_mode == "Planning")
+        
+        if is_web_enabled:
+            from core.tools.web_search import search_web
             self.app.call_from_thread(workspace.post_message, self.ToolStarted("web_search", f'Searching "{text[:20]}..."'))
-            time.sleep(1.0)
-            self.app.call_from_thread(workspace.post_message, self.ToolCompleted("web_search", "results found"))
+            results = search_web(text)
+            if results:
+                self.app.call_from_thread(workspace.post_message, self.ToolCompleted("web_search", "results found"))
+                web_results = results
+            else:
+                self.app.call_from_thread(workspace.post_message, self.ToolFailed("web_search", "no results"))
+
+        # Check if thinking is enabled
+        is_thinking_enabled = getattr(self.app, "_tool_states", {}).get("thinking", False)
+
+        # Inject context directly into text for the LLM
+        final_text = text
+        if web_results or file_context or is_thinking_enabled:
+            context_block = ""
+            if file_context:
+                context_block += f"[FILE CONTEXT]\n{file_context}\n\n"
+            if web_results:
+                context_block += f"[WEB SEARCH RESULTS]\n{web_results}\n\n"
+            if is_thinking_enabled:
+                context_block += f"[SYSTEM]\nPlease think step-by-step and output your reasoning inside <think>...</think> tags before providing your final answer.\n\n"
+            final_text = f"{context_block}[USER REQUEST]\n{text}"
 
         # Now start assistant generation
         self.app.call_from_thread(workspace.start_assistant_message)
-        self.app.chat_bridge.send(text)
+        self.app.chat_bridge.send(final_text)

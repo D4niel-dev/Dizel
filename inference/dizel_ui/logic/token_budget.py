@@ -177,11 +177,11 @@ class SamplingOverrides:
 
 
 _TASK_SAMPLING: Dict[TaskType, SamplingOverrides] = {
-    TaskType.CHAT:       SamplingOverrides(temperature=0.7, top_k=40, top_p=0.92, repetition_penalty=1.15),
-    TaskType.CODING:     SamplingOverrides(temperature=0.3, top_k=30, top_p=0.90, repetition_penalty=1.20),
-    TaskType.COMPLEX:    SamplingOverrides(temperature=0.6, top_k=50, top_p=0.92, repetition_penalty=1.15),
-    TaskType.FACTUAL:    SamplingOverrides(temperature=0.2, top_k=20, top_p=0.85, repetition_penalty=1.25),
-    TaskType.TOOL_BASED: SamplingOverrides(temperature=0.5, top_k=40, top_p=0.90, repetition_penalty=1.15),
+    TaskType.CHAT:       SamplingOverrides(temperature=0.7, top_k=40, top_p=0.92, repetition_penalty=1.35),
+    TaskType.CODING:     SamplingOverrides(temperature=0.3, top_k=30, top_p=0.90, repetition_penalty=1.40),
+    TaskType.COMPLEX:    SamplingOverrides(temperature=0.6, top_k=50, top_p=0.92, repetition_penalty=1.35),
+    TaskType.FACTUAL:    SamplingOverrides(temperature=0.2, top_k=20, top_p=0.85, repetition_penalty=1.45),
+    TaskType.TOOL_BASED: SamplingOverrides(temperature=0.5, top_k=40, top_p=0.90, repetition_penalty=1.35),
 }
 
 
@@ -277,6 +277,19 @@ _PLANNING_MODE_SUFFIX = (
     "Structure your response with clear sections and numbered steps when appropriate."
 )
 
+_CODING_MODE_SUFFIX = (
+    "\n\nMode: Coding — You are in developer mode. "
+    "Provide clean, well-structured code with brief explanations. "
+    "Use proper formatting with markdown code blocks. "
+    "Focus on correctness, readability, and best practices."
+)
+
+_THINKING_MODE_SUFFIX = (
+    "\n\nMode: Thinking — Reason carefully through the problem before giving your final answer. "
+    "Show your reasoning process step by step. Consider edge cases. "
+    "Be thorough but stay focused on what matters most."
+)
+
 # ── Profile Definitions ─────────────────────────────────────────────────────
 
 _PROFILES: Dict[str, Dict[str, ModelProfile]] = {
@@ -285,56 +298,104 @@ _PROFILES: Dict[str, Dict[str, ModelProfile]] = {
         "Fast": ModelProfile(
             system_prompt=_DIZEL_LITE_PROMPT + _FAST_MODE_SUFFIX,
             budget_multiplier=0.7,
-            sampling=SamplingOverrides(temperature=0.6, top_k=35, top_p=0.90, repetition_penalty=1.15),
+            sampling=SamplingOverrides(temperature=0.6, top_k=35, top_p=0.90, repetition_penalty=1.35),
             label="Dizel Lite · Fast",
         ),
         "Planning": ModelProfile(
             system_prompt=_DIZEL_LITE_PROMPT + _PLANNING_MODE_SUFFIX,
             budget_multiplier=1.0,
-            sampling=SamplingOverrides(temperature=0.5, top_k=40, top_p=0.92, repetition_penalty=1.15),
+            sampling=SamplingOverrides(temperature=0.5, top_k=40, top_p=0.92, repetition_penalty=1.35),
             label="Dizel Lite · Planning",
+        ),
+        "Coding": ModelProfile(
+            system_prompt=_DIZEL_LITE_PROMPT + _CODING_MODE_SUFFIX,
+            budget_multiplier=1.2,
+            sampling=SamplingOverrides(temperature=0.3, top_k=30, top_p=0.90, repetition_penalty=1.40),
+            label="Dizel Lite · Coding",
+        ),
+        "Thinking": ModelProfile(
+            system_prompt=_DIZEL_LITE_PROMPT + _THINKING_MODE_SUFFIX,
+            budget_multiplier=1.0,
+            sampling=SamplingOverrides(temperature=0.5, top_k=40, top_p=0.92, repetition_penalty=1.35),
+            label="Dizel Lite · Thinking",
         ),
     },
     "Dizel Pro": {
         "Fast": ModelProfile(
             system_prompt=_DIZEL_PRO_PROMPT + _FAST_MODE_SUFFIX,
             budget_multiplier=1.0,
-            sampling=SamplingOverrides(temperature=0.5, top_k=45, top_p=0.92, repetition_penalty=1.15),
+            sampling=SamplingOverrides(temperature=0.5, top_k=45, top_p=0.92, repetition_penalty=1.35),
             label="Dizel Pro · Fast",
         ),
         "Planning": ModelProfile(
             system_prompt=_DIZEL_PRO_PROMPT + _PLANNING_MODE_SUFFIX,
             budget_multiplier=1.5,
-            sampling=SamplingOverrides(temperature=0.4, top_k=50, top_p=0.95, repetition_penalty=1.10),
+            sampling=SamplingOverrides(temperature=0.4, top_k=50, top_p=0.95, repetition_penalty=1.30),
             label="Dizel Pro · Planning",
+        ),
+        "Coding": ModelProfile(
+            system_prompt=_DIZEL_PRO_PROMPT + _CODING_MODE_SUFFIX,
+            budget_multiplier=1.5,
+            sampling=SamplingOverrides(temperature=0.3, top_k=30, top_p=0.90, repetition_penalty=1.40),
+            label="Dizel Pro · Coding",
+        ),
+        "Thinking": ModelProfile(
+            system_prompt=_DIZEL_PRO_PROMPT + _THINKING_MODE_SUFFIX,
+            budget_multiplier=1.3,
+            sampling=SamplingOverrides(temperature=0.45, top_k=45, top_p=0.92, repetition_penalty=1.35),
+            label="Dizel Pro · Thinking",
         ),
     },
     "Mila Lite": {
         "Fast": ModelProfile(
             system_prompt=_MILA_LITE_PROMPT + _FAST_MODE_SUFFIX,
             budget_multiplier=0.7,
-            sampling=SamplingOverrides(temperature=0.75, top_k=40, top_p=0.92, repetition_penalty=1.10),
+            sampling=SamplingOverrides(temperature=0.75, top_k=40, top_p=0.92, repetition_penalty=1.30),
             label="Mila Lite · Fast",
         ),
         "Planning": ModelProfile(
             system_prompt=_MILA_LITE_PROMPT + _PLANNING_MODE_SUFFIX,
             budget_multiplier=1.0,
-            sampling=SamplingOverrides(temperature=0.6, top_k=45, top_p=0.92, repetition_penalty=1.10),
+            sampling=SamplingOverrides(temperature=0.6, top_k=45, top_p=0.92, repetition_penalty=1.30),
             label="Mila Lite · Planning",
+        ),
+        "Coding": ModelProfile(
+            system_prompt=_MILA_LITE_PROMPT + _CODING_MODE_SUFFIX,
+            budget_multiplier=1.0,
+            sampling=SamplingOverrides(temperature=0.35, top_k=30, top_p=0.90, repetition_penalty=1.40),
+            label="Mila Lite · Coding",
+        ),
+        "Thinking": ModelProfile(
+            system_prompt=_MILA_LITE_PROMPT + _THINKING_MODE_SUFFIX,
+            budget_multiplier=1.0,
+            sampling=SamplingOverrides(temperature=0.55, top_k=40, top_p=0.92, repetition_penalty=1.30),
+            label="Mila Lite · Thinking",
         ),
     },
     "Mila Pro": {
         "Fast": ModelProfile(
             system_prompt=_MILA_PRO_PROMPT + _FAST_MODE_SUFFIX,
             budget_multiplier=1.0,
-            sampling=SamplingOverrides(temperature=0.65, top_k=45, top_p=0.92, repetition_penalty=1.10),
+            sampling=SamplingOverrides(temperature=0.65, top_k=45, top_p=0.92, repetition_penalty=1.30),
             label="Mila Pro · Fast",
         ),
         "Planning": ModelProfile(
             system_prompt=_MILA_PRO_PROMPT + _PLANNING_MODE_SUFFIX,
             budget_multiplier=1.5,
-            sampling=SamplingOverrides(temperature=0.5, top_k=50, top_p=0.95, repetition_penalty=1.05),
+            sampling=SamplingOverrides(temperature=0.5, top_k=50, top_p=0.95, repetition_penalty=1.25),
             label="Mila Pro · Planning",
+        ),
+        "Coding": ModelProfile(
+            system_prompt=_MILA_PRO_PROMPT + _CODING_MODE_SUFFIX,
+            budget_multiplier=1.3,
+            sampling=SamplingOverrides(temperature=0.3, top_k=30, top_p=0.90, repetition_penalty=1.40),
+            label="Mila Pro · Coding",
+        ),
+        "Thinking": ModelProfile(
+            system_prompt=_MILA_PRO_PROMPT + _THINKING_MODE_SUFFIX,
+            budget_multiplier=1.3,
+            sampling=SamplingOverrides(temperature=0.5, top_k=45, top_p=0.92, repetition_penalty=1.30),
+            label="Mila Pro · Thinking",
         ),
     },
 }
@@ -347,7 +408,7 @@ _DEFAULT_PROFILE = ModelProfile(
         "You use formatting like markdown to organize your thoughts and provide clear, structured text."
     ),
     budget_multiplier=1.0,
-    sampling=SamplingOverrides(temperature=0.7, top_k=40, top_p=0.92, repetition_penalty=1.15),
+    sampling=SamplingOverrides(temperature=0.7, top_k=40, top_p=0.92, repetition_penalty=1.35),
     label="Dizel (default)",
 )
 

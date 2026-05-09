@@ -38,7 +38,7 @@ class SessionBridge:
         sessions = list_sessions()
         if query:
             q = query.lower()
-            sessions = [s for s in sessions if q in s["title"].lower() or q in s["preview"].lower()]
+            sessions = [s for s in sessions if q in s.get("title", "").lower() or q in s.get("preview", "").lower() or any(q in t.lower() for t in s.get("tags", []))]
         return sessions
         
     def delete(self, session_id: str) -> bool:

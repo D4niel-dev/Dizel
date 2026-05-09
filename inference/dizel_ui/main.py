@@ -37,7 +37,7 @@ from dizel_ui.logic.config_manager import ConfigManager
 from dizel_ui.logic.usage_manager import UsageManager
 from dizel_ui.theme.colors import (
     BG_ROOT, BG_CHAT, BG_INPUT, ACCENT, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
-    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, resolve
+    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, BORDER, resolve
 )
 from dizel_ui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 from dizel_ui.utils.icons import get_icon
@@ -228,6 +228,20 @@ class DizelApp(QMainWindow):
         
         status_layout.addSpacing(16)
         
+        # Response Length Toggle
+        self._verbosity = "normal"
+        self._verbosity_btn = QPushButton(" Normal  ", self._status_bar)
+        self._verbosity_btn.setFixedHeight(32)
+        self._verbosity_btn.setLayoutDirection(Qt.RightToLeft)
+        verb_ico = get_icon("align-left", size=(14, 14), color=TEXT_PRIMARY)
+        if verb_ico: self._verbosity_btn.setIcon(verb_ico)
+        self._verbosity_btn.setFont(LABEL_SM)
+        self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
+        self._verbosity_btn.setCursor(Qt.PointingHandCursor)
+        self._verbosity_btn.clicked.connect(self._cycle_verbosity)
+        self._verbosity_btn.setToolTip("Response length: Short / Normal / Detailed")
+        status_layout.addWidget(self._verbosity_btn)
+        
         self._export_btn = QPushButton(" Export  ", self._status_bar)
         self._export_btn.setFixedHeight(32)
         self._export_btn.setLayoutDirection(Qt.RightToLeft)
@@ -281,6 +295,7 @@ class DizelApp(QMainWindow):
         self._chat_window = ChatWindow(
             on_quick_action=self._on_quick_action,
             on_regenerate=self._on_regenerate,
+            on_edit_message=self._on_edit_message,
             parent=right_area
         )
         right_layout.addWidget(self._chat_window, stretch=1)
@@ -561,12 +576,20 @@ class DizelApp(QMainWindow):
         self._show_status("Model ready.", dim=True)
         self._update_model_info()
         
+        # Clear status after 10 seconds
+        QTimer.singleShot(10000, lambda: self._show_status("" if self._status_lbl.text() == "Model ready." else self._status_lbl.text(), dim=True))
+        
         # Detect context capacity from model info
         info = self._chat_mgr.model_info
         if info:
             ctx_len = info.get("ctx_len", 1024)
             self._usage_mgr.set_capacity(ctx_len)
             self._update_usage_display()
+            
+            # Update monitor UI
+            provider = info.get("provider", "Local Checkpoint")
+            model_name = os.path.basename(self._checkpoint) if self._checkpoint else "Unknown"
+            self._secondary_sidebar.update_monitor_info(provider, model_name)
             
         self._input_panel.focus_input()
 
@@ -579,6 +602,28 @@ class DizelApp(QMainWindow):
         fpath, _ = QFileDialog.getOpenFileName(self, "Select File to Attach")
         if fpath:
             self._input_panel.add_attachment(fpath)
+
+    # ── Response Length Toggle ──────────────────────────────────────────────
+    def _cycle_verbosity(self):
+        """Cycle through Short → Normal → Detailed response length."""
+        cycle = {
+            "low": ("normal", " Normal  ", "align-left", TEXT_PRIMARY),
+            "normal": ("high", " Detailed  ", "align-justify", "#3b82f6"),
+            "high": ("low", " Short  ", "minus", "#f97316"),
+        }
+        next_v, label, icon_name, color = cycle[self._verbosity]
+        self._verbosity = next_v
+        
+        self._verbosity_btn.setText(label)
+        ico = get_icon(icon_name, size=(14, 14), color=color)
+        if ico: self._verbosity_btn.setIcon(ico)
+        
+        if isinstance(color, str) and color.startswith("#"):
+            self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, color, radius=16))
+        else:
+            self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
+        
+        self._show_status(f"Response length: {label.strip()}", dim=True)
 
     def _do_voice(self):
         if self._nova_overlay.isVisible():
@@ -764,6 +809,7 @@ class DizelApp(QMainWindow):
             on_token=on_token,
             on_done=on_done,
             on_error=on_error,
+            verbosity=self._verbosity,
         )
 
     def _start_generation_with_tools(self, text: str, deep_think: bool, files: list = None):
@@ -776,6 +822,7 @@ class DizelApp(QMainWindow):
             on_token=on_token,
             on_done=on_done,
             on_error=on_error,
+            verbosity=self._verbosity,
         )
 
     def _make_gen_callbacks(self, deep_think: bool = False):
@@ -823,7 +870,6 @@ class DizelApp(QMainWindow):
                 border-radius: 2px;
             }}
         """)
-
     def _finish_generation(self, full_text: str):
         self._chat_window.finish_assistant_message(full_text)
         self._input_panel.set_generating(False)
@@ -835,19 +881,87 @@ class DizelApp(QMainWindow):
         self._input_panel.set_generating(False)
         self._show_status(f"Error: {msg}")
 
+    def _on_stop_generation(self):
+        self._chat_mgr.stop_generation()
+
     def _on_regenerate(self):
-        if not self._chat_mgr.is_ready:
-            self._show_status("Model not loaded.")
+        """Regenerate the last AI response by removing it and sending the previous user context again."""
+        if self._chat_window._state != 1 and self._chat_window._state.value != "idle":
             return
             
-        self._chat_window.pop_last_assistant_message()
+        history = self._chat_mgr.get_history(self._session_id)
+        if len(history) < 2: return
+        
+        # Pop assistant message
+        if history[-1]["role"] == "assistant":
+            self._chat_mgr.pop_message(self._session_id)
+            self._chat_window.pop_last_assistant_message()
+            
+        self._chat_window.set_skip_animations(True)
+        self._input_panel.box.hide()
+        
+        # Resend the context
+        QTimer.singleShot(50, lambda: self._do_generation(prompt=""))
+
+    def _on_edit_message(self, bubble, new_text):
+        """Handle user editing a previous message."""
+        # Find the index of this bubble in the layout to know how many history items to pop
+        layout = self._chat_window._content_layout
+        target_idx = -1
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item and item.widget() == bubble:
+                target_idx = i
+                break
+                
+        if target_idx == -1: return
+        
+        # We need to pop from the model history as well
+        bubbles = []
+        for i in range(layout.count()):
+            w = layout.itemAt(i).widget()
+            from dizel_ui.ui.message_bubble import MessageBubble
+            if isinstance(w, MessageBubble):
+                bubbles.append((i, w))
+                
+        # Find bubble in list
+        bubble_list_idx = -1
+        for i, (l_idx, b) in enumerate(bubbles):
+            if b == bubble:
+                bubble_list_idx = i
+                break
+                
+        if bubble_list_idx != -1:
+            # We must pop history from the end until we reach bubble_list_idx
+            history = self._chat_mgr.get_history(self._session_id)
+            pops_needed = len(history) - bubble_list_idx - 1
+            
+            # Remove from model
+            for _ in range(pops_needed):
+                self._chat_mgr.pop_message(self._session_id)
+                
+            # Remove from UI
+            for i in reversed(range(target_idx + 1, layout.count())):
+                w = layout.takeAt(i).widget()
+                if w: w.deleteLater()
+                
+            # Update the user message in the model history
+            history = self._chat_mgr.get_history(self._session_id)
+            if bubble_list_idx < len(history):
+                history[bubble_list_idx]["content"] = new_text
+                
+            # Hide input panel and trigger regeneration using the new context
+            self._chat_window.set_skip_animations(True)
+            self._input_panel.box.hide()
+            QTimer.singleShot(50, lambda: self._do_generation(prompt=""))
         self._input_panel.set_generating(True)
         
         on_token, on_done, on_error = self._make_gen_callbacks()
         self._chat_mgr.regenerate_last(
             on_token=on_token,
             on_done=on_done,
-            on_error=on_error
+            on_error=on_error,
+            verbosity=self._verbosity
         )
 
     def _on_stop(self):
