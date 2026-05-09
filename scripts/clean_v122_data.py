@@ -352,10 +352,14 @@ def main():
     # Find files to process
     if args.all and os.path.isdir(args.input):
         files = []
-        for root, dirs, filenames in os.walk(args.input):
-            for fname in filenames:
-                if fname.endswith(".jsonl"):
-                    files.append(os.path.join(root, fname))
+        # Only look for {subdir}/{subdir}.jsonl files (our download convention)
+        # This avoids picking up random old JSONL files from pre-existing datasets
+        for entry in sorted(os.listdir(args.input)):
+            subdir = os.path.join(args.input, entry)
+            if os.path.isdir(subdir):
+                expected_jsonl = os.path.join(subdir, f"{entry}.jsonl")
+                if os.path.exists(expected_jsonl):
+                    files.append(expected_jsonl)
     elif os.path.isfile(args.input):
         files = [args.input]
     else:

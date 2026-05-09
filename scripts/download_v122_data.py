@@ -47,20 +47,50 @@ DATASETS = {
         "domain": "math",
         "description": "Mathematical reasoning and problem solving",
     },
-    "stack-edu": {
+    "stack-edu-python": {
         "hf_path": "HuggingFaceTB/stack-edu",
+        "hf_name": "Python",
         "split": "train",
         "streaming": True,
-        "max_samples": 150_000,  # ~150M tokens
+        "max_samples": 80_000,
         "text_field": "text",
         "filter_fn": lambda x: (
             x.get("max_score", 0) >= 3
-            and x.get("lang", "") in ["Python", "JavaScript", "TypeScript", "Java", "C", "C++", "Go", "Rust"]
             and 50 < len(x.get("text", "")) < 32000
         ),
         "targets": ["dizel", "mila"],
         "domain": "code",
-        "description": "Educational code (Python/JS/TS focus, score≥3)",
+        "description": "Educational Python code (score≥3)",
+    },
+    "stack-edu-javascript": {
+        "hf_path": "HuggingFaceTB/stack-edu",
+        "hf_name": "JavaScript",
+        "split": "train",
+        "streaming": True,
+        "max_samples": 40_000,
+        "text_field": "text",
+        "filter_fn": lambda x: (
+            x.get("max_score", 0) >= 3
+            and 50 < len(x.get("text", "")) < 32000
+        ),
+        "targets": ["dizel", "mila"],
+        "domain": "code",
+        "description": "Educational JavaScript code (score≥3)",
+    },
+    "stack-edu-typescript": {
+        "hf_path": "HuggingFaceTB/stack-edu",
+        "hf_name": "TypeScript",
+        "split": "train",
+        "streaming": True,
+        "max_samples": 30_000,
+        "text_field": "text",
+        "filter_fn": lambda x: (
+            x.get("max_score", 0) >= 3
+            and 50 < len(x.get("text", "")) < 32000
+        ),
+        "targets": ["dizel"],
+        "domain": "code",
+        "description": "Educational TypeScript code (score≥3)",
     },
     "cosmopedia": {
         "hf_path": "HuggingFaceTB/cosmopedia",

@@ -27,23 +27,26 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ── Mixture Configs ───────────────────────────────────────────────────────
 
 DIZEL_PRETRAIN_MIX = {
-    "fineweb-edu":  {"weight": 0.40, "max_samples": 400_000},
-    "finemath":     {"weight": 0.12, "max_samples": 80_000},
-    "stack-edu":    {"weight": 0.15, "max_samples": 120_000},
-    "cosmopedia":   {"weight": 0.10, "max_samples": 60_000},
-    "oasst2":       {"weight": 0.05, "max_samples": 15_000},
-    "codealpaca":   {"weight": 0.08, "max_samples": 15_000},
-    "codefeedback": {"weight": 0.05, "max_samples": 15_000},
-    "ultrachat":    {"weight": 0.05, "max_samples": 30_000},
+    "fineweb-edu":          {"weight": 0.40, "max_samples": 400_000},
+    "finemath":             {"weight": 0.12, "max_samples": 80_000},
+    "stack-edu-python":     {"weight": 0.08, "max_samples": 60_000},
+    "stack-edu-javascript": {"weight": 0.04, "max_samples": 30_000},
+    "stack-edu-typescript": {"weight": 0.03, "max_samples": 20_000},
+    "cosmopedia":           {"weight": 0.10, "max_samples": 60_000},
+    "oasst2":               {"weight": 0.05, "max_samples": 15_000},
+    "codealpaca":           {"weight": 0.08, "max_samples": 15_000},
+    "codefeedback":         {"weight": 0.05, "max_samples": 15_000},
+    "ultrachat":            {"weight": 0.05, "max_samples": 30_000},
 }
 
 MILA_PRETRAIN_MIX = {
-    "fineweb-edu":  {"weight": 0.40, "max_samples": 200_000},
-    "cosmopedia":   {"weight": 0.15, "max_samples": 50_000},
-    "oasst2":       {"weight": 0.15, "max_samples": 20_000},
-    "ultrachat":    {"weight": 0.15, "max_samples": 40_000},
-    "stack-edu":    {"weight": 0.10, "max_samples": 30_000},
-    "dolly":        {"weight": 0.05, "max_samples": 10_000},
+    "fineweb-edu":          {"weight": 0.40, "max_samples": 200_000},
+    "cosmopedia":           {"weight": 0.15, "max_samples": 50_000},
+    "oasst2":               {"weight": 0.15, "max_samples": 20_000},
+    "ultrachat":            {"weight": 0.15, "max_samples": 40_000},
+    "stack-edu-python":     {"weight": 0.05, "max_samples": 15_000},
+    "stack-edu-javascript": {"weight": 0.05, "max_samples": 15_000},
+    "dolly":                {"weight": 0.05, "max_samples": 10_000},
 }
 
 DIZEL_SFT_MIX = {
