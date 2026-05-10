@@ -199,9 +199,13 @@ If you have downloaded a pre-trained Dizel checkpoint (e.g. `dizel-sft-best.pt`)
 *(Or if there was a `dizel-sft-best.pt` in the `checkpoints` folder in the project directory, you can just use that file.)*
 
 1. Install the dependencies (see Setup above).
-2. Launch the Desktop App:
+2. Launch the Desktop GUI/TUI:
    ```bash
-   python inference/dizel_gui/main.py
+   # GUI
+   python -m inference.dizel_gui.main
+
+   # TUI
+   python -m inference.cmd_tui.main
    ```
 3. Click the **⚙ Configuration** button in the UI.
 4. Use the **Checkpoint Loader** to select your `.pt` file.
