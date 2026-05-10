@@ -127,7 +127,6 @@ def phase_b(target: str = "dizel", resume: str = None):
     # Stage 1: General pretraining
     print("\n[Phase B.1] Stage 1 — General Pretraining")
     resume_flag = f"--resume {resume}" if resume else ""
-    amp_flag = "--no_amp" if not has_gpu else ""
 
     cmd = (
         f"{PYTHON} training/pretrain.py "
@@ -136,7 +135,7 @@ def phase_b(target: str = "dizel", resume: str = None):
         f"--lr 3e-5 "
         f"--batch_size 4 "
         f"--grad_accum 16 "
-        f"{resume_flag} {amp_flag}"
+        f"{resume_flag}"
     )
     run(cmd, "Stage 1: General pretraining (15K steps)...")
 
@@ -231,7 +230,9 @@ def main():
     parser.add_argument("--target", choices=["dizel", "mila"], default="dizel",
                         help="Which model to train")
     parser.add_argument("--resume", default=None,
-                        help="Path to checkpoint to resume from")
+                        help="Path to checkpoint to resume training from (Phase B)")
+    parser.add_argument("--base_checkpoint", default=None,
+                        help="Pretrain checkpoint to use as SFT base (Phase C)")
     args = parser.parse_args()
 
     t0 = time.time()
@@ -249,7 +250,7 @@ def main():
         phase_b(args.target, args.resume)
 
     if args.phase == "C" or args.phase == "all":
-        phase_c(args.target, args.resume)
+        phase_c(args.target, args.base_checkpoint)
 
     elapsed = time.time() - t0
     hours = elapsed / 3600

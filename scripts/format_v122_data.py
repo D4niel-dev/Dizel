@@ -137,9 +137,9 @@ def to_pretrain_text_file(records: list, output_path: str):
 # ── Sampling Logic ────────────────────────────────────────────────────────
 
 def load_and_sample(input_dir: str, mixture: dict, seed: int = 42) -> list:
-    """Load JSONL files according to mixture config and sample."""
+    """Load JSONL files according to mixture config with weighted oversampling."""
     rng = random.Random(seed)
-    all_records = []
+    loaded_sources = {}
 
     for source_name, cfg in mixture.items():
         max_samples = cfg.get("max_samples", -1)
@@ -184,8 +184,22 @@ def load_and_sample(input_dir: str, mixture: dict, seed: int = 42) -> list:
             rng.shuffle(records)
             records = records[:max_samples]
 
+        loaded_sources[source_name] = records
         print(f"  [load] {source_name}: {len(records):,} samples (weight={cfg['weight']})")
-        all_records.extend(records)
+
+    # Apply weighted oversampling
+    if not loaded_sources:
+        return []
+
+    weights = {name: mixture[name]["weight"] for name in loaded_sources}
+    min_weight = min(weights.values())
+
+    all_records = []
+    for source_name, records in loaded_sources.items():
+        repeat = max(1, round(weights[source_name] / min_weight))
+        all_records.extend(records * repeat)
+        if repeat > 1:
+            print(f"  [oversample] {source_name}: {repeat}x -> {len(records) * repeat:,} effective samples")
 
     rng.shuffle(all_records)
     return all_records
@@ -242,7 +256,9 @@ def main():
     print(f"  Formatted: {len(formatted):,} ({dropped:,} dropped during conversion)")
 
     # Write JSONL
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    parent = os.path.dirname(args.output)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         for r in formatted:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")

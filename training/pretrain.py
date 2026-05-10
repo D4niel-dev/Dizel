@@ -141,7 +141,7 @@ def load_checkpoint(
     device: str = "cpu",
 ) -> int:
     """Load checkpoint and return the step it was saved at."""
-    ckpt = torch.load(path, map_location=device, weights_only=False)
+    ckpt = torch.load(path, map_location=device, weights_only=True)
     state_dict = ckpt["model_state"]
     model_keys = set(model.state_dict().keys())
     ckpt_keys = set(state_dict.keys())

@@ -207,7 +207,8 @@ def download_dataset(name: str, config: dict, output_dir: str):
 
     # Check if already downloaded
     if os.path.exists(out_file):
-        existing_lines = sum(1 for _ in open(out_file, "r", encoding="utf-8"))
+        with open(out_file, "r", encoding="utf-8") as f:
+            existing_lines = sum(1 for _ in f)
         if existing_lines >= config["max_samples"]:
             print(f"  [skip] {name}: already has {existing_lines:,} samples")
             return existing_lines
@@ -248,12 +249,25 @@ def download_dataset(name: str, config: dict, output_dir: str):
     t0 = time.time()
 
     mode = "a" if skip_count > 0 else "w"
+
+    # Use HF's skip() for efficient resume instead of iterating one-by-one
+    ds_iter = ds
+    if skip_count > 0:
+        try:
+            ds_iter = ds.skip(skip_count)
+            print(f"    [resume] Skipping {skip_count:,} samples via HF skip()...")
+        except (AttributeError, TypeError):
+            # Fallback: manual skip if .skip() isn't available
+            print(f"    [resume] Falling back to manual skip of {skip_count:,} samples...")
+            ds_iter = iter(ds)
+            for _ in range(skip_count):
+                try:
+                    next(ds_iter)
+                except StopIteration:
+                    break
+
     with open(out_file, mode, encoding="utf-8") as f:
-        for sample in ds:
-            # Skip already-saved samples on resume
-            if skipped < skip_count:
-                skipped += 1
-                continue
+        for sample in ds_iter:
 
             # Apply filter
             if filter_fn and not filter_fn(sample):

@@ -245,7 +245,16 @@ def parse_args():
                    help="Path to an SFT checkpoint (.pt) to resume from.")
     p.add_argument("--lr",        type=float, default=None)
     p.add_argument("--max_steps", type=int,   default=None)
-    p.add_argument("--no_amp",    action="store_true")
+    p.add_argument("--batch_size", type=int,  default=None)
+    p.add_argument("--grad_accum", type=int,  default=None)
+    p.add_argument("--no_amp",    action="store_true",
+                   help="Disable AMP even on CUDA")
+    p.add_argument("--use_amp",   action="store_true",
+                   help="Enable AMP (overrides config)")
+    p.add_argument("--amp_dtype", type=str, default=None, choices=["float16", "bfloat16"],
+                   help="AMP dtype to use")
+    p.add_argument("--sft_data",  type=str, default=None,
+                   help="Path to SFT JSONL data file")
     p.add_argument("--no_mix",    action="store_true",
                    help="Disable mixed dataset loading, use single sft_data_path")
     p.add_argument("--mix_config", type=str, default="",
@@ -263,7 +272,12 @@ def main() -> None:
         
     if args.lr        is not None: cfg.sft.lr        = args.lr
     if args.max_steps is not None: cfg.sft.max_steps = args.max_steps
+    if args.batch_size is not None: cfg.sft.batch_size = args.batch_size
+    if args.grad_accum is not None: cfg.sft.grad_accum = args.grad_accum
     if args.no_amp:                cfg.sft.use_amp   = False
+    if args.use_amp:               cfg.sft.use_amp   = True
+    if args.amp_dtype is not None: cfg.sft.amp_dtype = args.amp_dtype
+    if args.sft_data is not None:  cfg.sft.sft_data_path = args.sft_data
     if args.base_checkpoint:       cfg.sft.base_checkpoint = args.base_checkpoint
 
     # Mixed dataset control

@@ -192,7 +192,8 @@ def process_dataset(name: str, info: dict):
     if info.get("local"):
         local_path = info["path"]
         if os.path.exists(local_path):
-            count = sum(1 for _ in open(local_path, "r", encoding="utf-8"))
+            with open(local_path, "r", encoding="utf-8") as f:
+                count = sum(1 for _ in f)
             print(f"  [local] {name}: {count} samples ({local_path})")
             return local_path
         else:
@@ -201,7 +202,8 @@ def process_dataset(name: str, info: dict):
 
     out_path = os.path.join(PROCESSED_DIR, f"{name}.jsonl")
     if os.path.exists(out_path):
-        count = sum(1 for _ in open(out_path, "r", encoding="utf-8"))
+        with open(out_path, "r", encoding="utf-8") as f:
+            count = sum(1 for _ in f)
         print(f"  [skip] {name}: already exists ({count} samples)")
         return out_path
 
@@ -213,7 +215,8 @@ def process_dataset(name: str, info: dict):
 
     print(f"  [download] {name} from {info['hf_id']}...")
     try:
-        ds = load_dataset(info["hf_id"], split=info["split"], trust_remote_code=True)
+        trust = info.get("trust_remote_code", False)
+        ds = load_dataset(info["hf_id"], split=info["split"], trust_remote_code=trust)
     except Exception as e:
         print(f"  [error] Failed to load {name}: {e}")
         return None
@@ -254,7 +257,8 @@ def check_data():
     for name, info in SFT_DATASETS.items():
         path = os.path.join(PROCESSED_DIR, f"{name}.jsonl")
         if os.path.exists(path):
-            count = sum(1 for _ in open(path, "r", encoding="utf-8"))
+            with open(path, "r", encoding="utf-8") as f:
+                count = sum(1 for _ in f)
             total += count
             print(f"    ✅ {name:16s}  {count:>6,} samples  (weight={info['weight']})")
         else:

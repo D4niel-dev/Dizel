@@ -41,7 +41,13 @@ MODEL_REGISTRY: Dict[str, ModelEntry] = {}
 
 
 def register_model(entry: ModelEntry) -> None:
-    """Add a model to the registry."""
+    """Add a model to the registry with validation."""
+    cfg = entry.config
+    if cfg.d_model % cfg.n_heads != 0:
+        raise ValueError(
+            f"Model '{entry.key}': d_model ({cfg.d_model}) must be divisible by "
+            f"n_heads ({cfg.n_heads}). Got remainder {cfg.d_model % cfg.n_heads}."
+        )
     MODEL_REGISTRY[entry.key] = entry
 
 

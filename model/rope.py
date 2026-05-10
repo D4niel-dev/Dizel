@@ -41,7 +41,7 @@ class RotaryPositionalEmbedding(nn.Module):
         super().__init__()
         assert dim % 2 == 0, f"RoPE dim must be even, got {dim}"
 
-        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim))
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
         self._cached_seq_len = 0

@@ -78,7 +78,8 @@ if os.path.exists(train_path):
                             count += 1
                 print(f"  Merged {src}: {count} samples")
 
-    total = sum(1 for _ in open(combined_path))
+    with open(combined_path) as f:
+        total = sum(1 for _ in f)
     print(f"\\nCombined SFT data: {total} samples -> {combined_path}")
 else:
     print(f"Looking for data at: {train_path}")
@@ -139,22 +140,17 @@ CELL_4B = '''
 CELL_4B_AMP = '''
 # --- Dizel v1.2 SFT with AMP (recommended for T4) ---
 # float16 AMP cuts VRAM usage ~40%, enabling larger effective batches.
-
-import sys, os
-sys.path.insert(0, os.getcwd())
-
-# Override AMP settings before running
-from config import CONFIG
-CONFIG.sft.use_amp = True
-CONFIG.sft.amp_dtype = "float16"
-CONFIG.sft.batch_size = 1
-CONFIG.sft.grad_accum = 64
+# Pass AMP flags directly via CLI instead of mutating CONFIG in-process.
 
 !python training/sft.py \\
     --base_checkpoint checkpoints/dizel-v12-pretrain-best.pt \\
     --no_mix \\
     --lr 2e-5 \\
-    --max_steps 20000
+    --max_steps 20000 \\
+    --use_amp \\
+    --amp_dtype float16 \\
+    --batch_size 1 \\
+    --grad_accum 64
 '''
 
 # =============================================================================
@@ -255,7 +251,7 @@ CONFIG.model.vocab_size = len(tokenizer)
 model = DizelLM(CONFIG.model)
 
 # Load checkpoint
-ckpt = torch.load("checkpoints/dizel-v12-sft-best.pt", map_location="cpu", weights_only=False)
+ckpt = torch.load("checkpoints/dizel-v12-sft-best.pt", map_location="cpu", weights_only=True)
 model.load_state_dict(ckpt["model_state"])
 model.eval()
 
