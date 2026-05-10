@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="inference/dizel_ui/assets/app/Dizel_banner.png" 
+  <img src="inference/dizel_gui/assets/app/Dizel_banner.png" 
     width="60%"
     height="60%"/>
 </div>
@@ -18,6 +18,52 @@ single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training 
 But it has grown into **so much more**—shipping with a state-of-the-art **Native Desktop App** featuring voice transcription, cross-provider API routing (BYOK), and rich markdown UI.
 
 ---
+
+## 📑 Table of Contents
+
+- [📑 Table of Contents](#-table-of-contents)
+- [🌟 What You Will Build](#-what-you-will-build)
+- [Folder Structure](#folder-structure)
+- [Setup](#setup)
+  - [1. Install dependencies](#1-install-dependencies)
+  - [2. Verify your installation](#2-verify-your-installation)
+- [Execution Steps](#execution-steps)
+  - [Step 0 — Quick Start (If you already have a checkpoint)](#step-0--quick-start-if-you-already-have-a-checkpoint)
+  - [Step 1 — Review and tune configuration (optional)](#step-1--review-and-tune-configuration-optional)
+  - [Step 2 — Add training data](#step-2--add-training-data)
+  - [Step 3 — Train the tokenizer](#step-3--train-the-tokenizer)
+  - [Step 4 — Run sanity checks](#step-4--run-sanity-checks)
+  - [Step 5 — Pre-train Dizel](#step-5--pre-train-dizel)
+  - [Step 6 — Generate SFT training data](#step-6--generate-sft-training-data)
+  - [Step 7 — Supervised fine-tuning (SFT)](#step-7--supervised-fine-tuning-sft)
+  - [Step 8 — Dizel CMD UI (v2.0.3)](#step-8--dizel-cmd-ui-v203)
+  - [Step 9 — Desktop GUI (v1.0.1) *(Recommended)*](#step-9--desktop-gui-v101-recommended)
+- [🌐 Interactive Web UI Demo](#-interactive-web-ui-demo)
+  - [What is the Web Demo?](#what-is-the-web-demo)
+  - [What You Can Experience:](#what-you-can-experience)
+  - [Important Limitations:](#important-limitations)
+- [Weekend Timeline](#weekend-timeline)
+- [Architecture Deep-Dive](#architecture-deep-dive)
+  - [Core Attention Mechanism (Flash Attention \& RoPE)](#core-attention-mechanism-flash-attention--rope)
+  - [Transformer Block (Pre-LayerNorm \& SwiGLU)](#transformer-block-pre-layernorm--swiglu)
+- [Overfitting on Small Data](#overfitting-on-small-data)
+- [VRAM Usage Guide](#vram-usage-guide)
+- [Extending Dizel](#extending-dizel)
+  - [1. Build Custom Agents](#1-build-custom-agents)
+  - [2. Change Model Architecture](#2-change-model-architecture)
+  - [3. Expand SFT Datasets](#3-expand-sft-datasets)
+  - [4. Export to ONNX / C++](#4-export-to-onnx--c)
+- [Frequently Asked Questions](#frequently-asked-questions)
+  - [🧠 Training \& Model Architecture](#-training--model-architecture)
+  - [🖥️ Hardware \& Compatibility](#️-hardware--compatibility)
+  - [🎨 Desktop App (PySide6) \& UI](#-desktop-app-pyside6--ui)
+  - [⌨️ Terminal (CMD UI) \& Workflows](#️-terminal-cmd-ui--workflows)
+- [References](#references)
+  - [Architecture \& Papers](#architecture--papers)
+  - [Libraries \& Inspiration](#libraries--inspiration)
+
+---
+
 
 ## 🌟 What You Will Build
 
@@ -86,16 +132,16 @@ Dizel/
 │   └── chat.jsonl               ← (generated) ~60 conversation examples
 │
 ├── inference/
-│   ├── cmd_ui/                  ← Terminal UI v2.0 Application! (NEW)
+│   ├── cmd_tui/                  ← Terminal UI v2.0 Application! (NEW)
 │   │   ├── main.py              ← Run this to start the Terminal UI
 │   │   ├── app.py               ← Textual App runtime & bindings
 │   │   ├── bridge/              ← Streaming & threading logic
 │   │   ├── commands/            ← Slash command registry & parser
 │   │   ├── panels/              ← InputBar, Workspace, Context panels
 │   │   ├── rendering/           ← Markdown blocks, ASCII empty state
-│   │   └── cmd_ui.tcss          ← Textual CSS styles & layouts
+│   │   └── cmd_tui.tcss          ← Textual CSS styles & layouts
 │   │
-│   └── dizel_ui/                ← Full Desktop GUI Application! (v1.0.0)
+│   └── dizel_gui/                ← Full Desktop GUI Application! (v1.0.0)
 │       ├── main.py              ← Run this to start the desktop app
 │       ├── theme/               ← Theme manager, colors, fonts, stylesheets
 │       ├── history/             ← Saved chats via JSON    (auto-created)
@@ -155,7 +201,7 @@ If you have downloaded a pre-trained Dizel checkpoint (e.g. `dizel-sft-best.pt`)
 1. Install the dependencies (see Setup above).
 2. Launch the Desktop App:
    ```bash
-   python inference/dizel_ui/main.py
+   python inference/dizel_gui/main.py
    ```
 3. Click the **⚙ Configuration** button in the UI.
 4. Use the **Checkpoint Loader** to select your `.pt` file.
@@ -334,36 +380,39 @@ python training/sft.py --resume checkpoints/dizel-sft-best.pt
 
 ---
 
-### Step 8 — Dizel CMD UI (v2.0.2)
+### Step 8 — Dizel CMD UI (v2.0.3)
 
 The Terminal UI for Dizel has been completely reimagined from the ground up to provide a premium, developer-first experience inspired by modern keyboard-centric CLI tools. It is built using the robust Textual framework + Rich for better rendering.
 
 Launch it via:
 ```bash
 # Option 1 (Recommended)
-python -m inference.cmd_ui.main
+python -m inference.cmd_tui.main
 
 # Option 2 (Optional)
-python -m inference.cmd_ui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
+python -m inference.cmd_tui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
 **Features of the Reworked CMD UI:**
-- 🎨 **Minimalist Dark Theme & Aesthetics:** A seamless, deep dark gray layout featuring floating components, a centered gradient ASCII logo for the empty state, and an overall distraction-free environment.
-- ⌨️ **Keyboard-First Workflow:** Navigate the entire app without a mouse.
+- 🎨 **Terminal-Native Aesthetics:** A seamless, deep dark gray layout featuring floating components, a centered gradient ASCII logo, and an overall distraction-free environment for power users.
+- ⌨️ **Keyboard-First Workflow:** Navigate the entire app without a mouse:
   - `Tab`: Cycle between AI Agent modes (Fast, Planning, Coding, Review).
   - `Ctrl+K`: Open the floating Command Palette for quick actions.
-  - `Ctrl+T`: Toggle the Session History Panel on the left.
-  - `Ctrl+R`: Toggle the Context Panel on the right.
-- 💬 **Floating Input Bar:** A clean, bottom-docked prompt area that clearly displays your currently active Mode, Model, and Provider (e.g., `[BUILD] Dizel Lite Local`).
-- 📊 **Reactive Context Panel:** A dynamic right sidebar that tracks your live token usage and compute budget in real-time as the model streams its responses.
-- 🚀 **Advanced Slash Commands:** Fully integrated slash commands for instant adjustments right from the chat bar:
+  - `Ctrl+T`: Toggle the Session History Panel (with fuzzy search and pinning).
+  - `Ctrl+A`: Toggle the Code Artifacts Panel for syntax-highlighted snippets.
+  - `Ctrl+R`: Toggle the Context Panel for telemetry and budgets.
+- 💬 **Floating Input Bar & Tracker:** A clean, bottom-docked prompt area paired with a dedicated Session Tracker, keeping you informed of your active context without clutter.
+- 📊 **Context Panel & Live Monitor:** A dynamic right sidebar that tracks live token usage, generation speed (t/s), and real-time hardware telemetry (CPU & RAM) during streaming.
+- 💻 **Code Artifacts Viewer:** Instantly extracts and syntax-highlights markdown code blocks from LLM responses into a dedicated side panel for easy reading and analysis.
+- 🤖 **Persistent Macro System:** Define complex pipe-chained commands (e.g., `/macro define audit /clear | /mode Review`) that survive application restarts.
+- 🚀 **Advanced Slash Commands:** Fully integrated commands for instant workflow adjustments:
   - `/model [name]` - Swap models on the fly.
   - `/provider [name]` - Switch between local inference and API routing.
   - `/mode [name]` - Change your AI persona/agent mode.
-  - `/session [new|rename|delete]` - Manage your chat sessions natively.
+  - `/session` - Manage your chat sessions natively.
   - `/settings` - Manage runtime configuration and persist API keys securely.
-- 🛠 **Real-Time Generation & Tool Use:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
-- 🔍 **Enhanced Session Panel:** The `Ctrl+H` history panel now features fuzzy search and session pinning for better workspace organization.
+  - `/macro` - Create, run, and manage custom shortcut macros.
+- 🛠 **Real-Time Generation:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
 ---
 
 ### Step 9 — Desktop GUI (v1.0.1) *(Recommended)*
@@ -373,10 +422,10 @@ Dizel includes a fully localized, premium Desktop Interface built entirely from 
 Launch it via:
 ```bash
 # Launch the app (Default)
-python -m inference.dizel_ui.main
+python -m inference.dizel_gui.main
 
 # Pass a checkpoint right from the command line (Optional)
-python -m inference.dizel_ui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
+python -m inference.dizel_gui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
 ```
 
 **Core Capabilities & Architecture:**
@@ -402,7 +451,6 @@ python -m inference.dizel_ui.main --checkpoint checkpoints/dizel-sft-best.pt --d
 - 📏 **Verbosity Control:** Instantly toggle response lengths (Short, Normal, Detailed) from the status bar, modifying token budgets dynamically without entering settings.
 - 🧠 **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` mode toggles right in the chatbox.
 - ⚡ **Hardware & Limits Info:** Live UI tracking of generation tokens/sec, context limits, and hardware overhead.
-- ⌨️ **Keyboard Shortcut:** `Ctrl+K` opens the command palette with a lot of options.
 
 ---
 
@@ -610,7 +658,7 @@ RuntimeError: CUDA out of memory
 **A:** Yes. All API keys are encrypted using AES encryption before being saved locally to `.dizel/settings.json`.
 
 **Q: Where are my chat histories saved?**  
-**A:** They are saved natively on your machine as JSON files inside the `inference/dizel_ui/history/` directory. You can easily back them up or delete them.
+**A:** They are saved natively on your machine as JSON files inside the `inference/dizel_gui/history/` directory. You can easily back them up or delete them.
 
 **Q: How does the Context Trimmer work?**  
 **A:** When your conversation approaches the token limit of the model, the `ContextTrimmer` automatically drops the oldest messages to prevent an Out-Of-Memory error. It rigorously protects your System Prompt and the most recent messages.

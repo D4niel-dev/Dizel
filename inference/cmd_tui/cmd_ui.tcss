@@ -1,0 +1,293 @@
+Screen {
+    layout: vertical;
+    layers: base overlay;
+    background: #18181B; /* Deep dark gray */
+}
+
+/* Footer / Status Bar */
+StatusBar {
+    layout: horizontal;
+    height: 1;
+    background: #18181B;
+    color: #71717A;
+    margin: 1 1 1 1;
+    padding: 0 2;
+}
+
+#status-text {
+    width: 1fr;
+    content-align: left middle;
+}
+
+#status-session-info {
+    width: auto;
+    content-align: right middle;
+    color: #A855F7; /* Purple accent */
+    margin-right: 2;
+}
+
+#status-version {
+    width: auto;
+    content-align: right middle;
+}
+
+/* Main horizontal layout */
+#main-layout {
+    layer: base;
+    layout: horizontal;
+    height: 1fr;
+    background: #18181B;
+}
+
+/* Workspace wrapper */
+#workspace-container {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+}
+
+SessionPanel {
+    width: 32;
+    height: 100%;
+    background: #0F0F12;
+    border-right: solid #2A2A31;
+}
+
+SessionPanel.-hidden {
+    display: none;
+}
+
+#session-inner {
+    height: 100%;
+    padding: 1 1;
+    background: #0F0F12;
+}
+
+#session-header {
+    height: 1;
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 0 1;
+    background: #0F0F12;
+}
+
+#session-search {
+    border: none;
+    background: #1A1A1F;
+    height: 1;
+    margin: 1 0;
+    padding: 0 1;
+}
+
+#session-list {
+    background: #0F0F12;
+    border: none;
+    height: 1fr;
+    padding: 0;
+}
+
+#session-list > .option-list--option-highlighted {
+    background: #27272F;
+    color: #F4F4F5;
+}
+
+#session-list > .option-list--option-disabled {
+    color: #71717A;
+    text-style: bold;
+}
+
+#session-footer {
+    height: 1;
+    color: #52525B;
+    padding: 0 1;
+    background: #0F0F12;
+}
+
+.panel-header {
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 1 2;
+}
+
+WorkspacePanel {
+    width: 1fr;
+    height: 1fr;
+    background: #18181B;
+    padding: 1 4;
+}
+
+EmptyStateBlock {
+    width: 1fr;
+    height: 1fr;
+    align: center middle;
+}
+
+.empty-state-logo {
+    width: auto;
+    height: auto;
+    text-align: center;
+    content-align: center middle;
+}
+
+/* The floating input bar */
+InputBar {
+    height: auto;
+    background: #1E1E1E;
+    margin: 1 1 0 1; /* Aligns contents with workspace padding */
+    border-left: thick #3B82F6; /* Blue accent */
+    padding: 1 2;
+}
+
+#input-row {
+    height: 1;
+    layout: horizontal;
+    margin-bottom: 1;
+}
+
+#prompt-icon {
+    width: 2;
+    color: #60A5FA;
+    text-style: bold;
+}
+
+InputBar Input {
+    border: none;
+    background: #1E1E1E;
+    height: 1;
+    padding: 0 0;
+    width: 1fr;
+}
+
+#input-mode-indicator {
+    color: #A1A1AA;
+}
+
+ContextPanel {
+    width: 30;
+    height: 100%;
+    background: #18181B;
+    border-left: solid #27272A;
+}
+
+/* Command Palette Overlay */
+CommandPalette {
+    layer: overlay;
+    display: none;
+    width: 80%;
+    height: auto;
+    max-height: 70%;
+    background: #09090B;
+    border: none;
+    content-align: center middle;
+    offset-x: 10%;
+    offset-y: 15%;
+    box-sizing: border-box;
+}
+
+#palette-title {
+    height: 1;
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 0 1;
+    background: #09090B;
+}
+
+CommandPalette Input {
+    border: none;
+    border-bottom: solid #27272A;
+    background: #09090B;
+}
+
+CommandPalette OptionList {
+    height: 1fr;
+    border: none;
+    background: #09090B;
+}
+
+/* Overriding Textual default highlights for OptionList */
+CommandPalette OptionList > .option-list--option-highlighted {
+    background: #3B82F6;
+    color: #FFFFFF;
+    text-style: bold;
+}
+
+SettingsPanel {
+    layer: overlay;
+    display: none;
+    width: 80%;
+    height: auto;
+    max-height: 70%;
+    background: #09090B;
+    border: none;
+    content-align: center middle;
+    offset-x: 10%;
+    offset-y: 15%;
+    box-sizing: border-box;
+}
+
+#settings-title {
+    height: 1;
+    color: #A1A1AA;
+    text-style: bold;
+    padding: 0 1;
+    background: #09090B;
+}
+
+SettingsPanel Input {
+    border: none;
+    border-bottom: solid #27272A;
+    background: #09090B;
+}
+
+SettingsPanel OptionList {
+    height: 1fr;
+    border: none;
+    background: #09090B;
+}
+
+SettingsPanel OptionList > .option-list--option-highlighted {
+    background: #3B82F6;
+    color: #FFFFFF;
+    text-style: bold;
+}
+
+.ctx-item {
+    color: #D4D4D8;
+    padding: 0 0;
+}
+
+/* Tool and Message Blocks */
+MessageBlock {
+    margin: 1 0;
+}
+
+ToolBlock {
+    background: #27272A;
+    border-left: wide #A855F7; /* Purple accent */
+    margin: 1 0;
+    padding: 1 2;
+}
+
+StatusBlock {
+    color: #A855F7;
+    text-style: bold;
+}
+
+/* Artifact Panel */
+ArtifactPanel {
+    width: 40;
+    height: 100%;
+    background: #0F0F12;
+    border-left: solid #2A2A31;
+    display: none;
+}
+
+ArtifactPanel.-visible {
+    display: block;
+}
+
+#artifact-container {
+    height: 1fr;
+    overflow-y: scroll;
+    padding: 1 2;
+}
