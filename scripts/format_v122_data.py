@@ -105,6 +105,35 @@ def to_sft_format(record: dict) -> dict:
     inp = record.get("input", "")
     output = record.get("output", "")
 
+    # Handle messages format (chat_expanded, oasst2, codefeedback, etc.)
+    if not instruction and "messages" in record:
+        msgs = record["messages"]
+        if isinstance(msgs, list) and len(msgs) >= 2:
+            user_parts = []
+            assistant_parts = []
+            for m in msgs:
+                role = m.get("role", "").lower()
+                content = m.get("content", "")
+                if role in ("user", "human"):
+                    user_parts.append(content)
+                elif role in ("assistant", "bot", "gpt"):
+                    assistant_parts.append(content)
+            if user_parts and assistant_parts:
+                instruction = user_parts[0]
+                output = assistant_parts[0]
+
+    # Handle conversations format (ShareGPT style)
+    if not instruction and "conversations" in record:
+        convos = record["conversations"]
+        if isinstance(convos, list) and len(convos) >= 2:
+            for c in convos:
+                role = c.get("from", c.get("role", "")).lower()
+                value = c.get("value", c.get("content", ""))
+                if role in ("human", "user") and not instruction:
+                    instruction = value
+                elif role in ("gpt", "assistant") and not output:
+                    output = value
+
     # Handle different source formats
     if not instruction and "text" in record:
         # Plain text — skip for SFT
