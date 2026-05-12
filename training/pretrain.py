@@ -37,6 +37,8 @@ from config import CONFIG, DizelConfig, ModelConfig, PretrainConfig
 from model.architecture import DizelLM
 from training.dataset import Tokenizer, build_pretrain_loaders
 
+# IMPORTANT!!
+torch.serialization.add_safe_globals([ModelConfig])
 
 # ---------------------------------------------------------------------------
 # LR schedule
