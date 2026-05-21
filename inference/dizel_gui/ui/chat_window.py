@@ -133,179 +133,87 @@ class ChatWindow(QFrame):
             greeting = f"Good evening, {username}!"
 
         # Central Title
-        titles = [
-            greeting,
-            "Ready to Create Something New?",
-            "What shall we build today?",
-            "Start a new masterpiece.",
-            "Let's spark some creativity.",
-            "Your next big idea starts here.",
-            "How can I help you today?",
-            "How shall I assist you today?",
-            "Ready to architect the future?",
-            "Let's brainstorm something brilliant.",
-            "What's on your mind?",
-            "Design, code, create.",
-            "Let's bring your ideas to life.",
-            "Ready when you are.",
-            "Unleash your imagination.",
-            "The blank canvas awaits you.",
-            "Code with passion, create with purpose.",
-            "Transforming thoughts into reality.",
-            "Where logic meets creativity.",
-            "Dive into the world of Dizel.",
-            "Let's make some magic happen.",
-            "Innovate. Iterate. Implement.",
-            "Your creative companion is ready.",
-            "Dream big, build bigger.",
-            "Solving problems, one prompt at a time.",
-            "Beyond expectations, into reality.",
-            "Your vision, powered by Dizel.",
-            "Crafting the future, together.",
-            "What's the next big milestone?",
-            "Let's solve the unsolvable.",
-            "Empowering your workflow.",
-            "Simple prompts, complex achievements.",
-            "Ignite your workflow.",
-            "Code, create, conquer.",
-            "Let's build something extraordinary.",
-            "Thinking outside the context window.",
-            "From concept to perfection.",
-            "Unlocking new possibilities.",
-            "Let's turn coffee into code.",
-            "Bringing your boldest ideas to life.",
-            "Redefining the development experience.",
-            "Accelerate your creative engine.",
-            "Your intelligent coding partner.",
-            "Making the impossible, achievable.",
-            "Start your next masterpiece here."
-        ]
-        title_lbl = QLabel(random.choice(titles), self._welcome_frame)
+        title_lbl = QLabel(greeting, self._welcome_frame)
         title_lbl.setFont(WELCOME_TITLE)
         title_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)};")
         title_lbl.setAlignment(Qt.AlignCenter)
         welcome_layout.addWidget(title_lbl)
+        
+        # Dynamic greeting and randomized subtitle
+        import random
+        sub_titles = [
+            "What would you like to build?",
+            "What shall we create today?",
+            "How can I help you innovate?",
+            "Ready to write some code?",
+            "What's on your mind?",
+            "Let's bring your ideas to life.",
+            "What challenge are we tackling today?",
+            "How can I assist your workflow?",
+            "Let's explore some new ideas.",
+            "What are we designing today?",
+            "Let's build something amazing.",
+            "How can I help you be productive?",
+            "Ready to start a new project?"
+        ]
+        
+        sub_lbl = QLabel(random.choice(sub_titles), self._welcome_frame)
+        sub_lbl.setFont(WELCOME_SUB)
+        sub_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)};")
+        sub_lbl.setAlignment(Qt.AlignCenter)
+        welcome_layout.addWidget(sub_lbl)
+        
+        welcome_layout.addSpacing(16)
 
-        # Action Pills Row (Carousel)
+        # Action Pills Row (Static, centered)
         pills_row = QFrame(self._welcome_frame)
         pills_layout = QHBoxLayout(pills_row)
         pills_layout.setAlignment(Qt.AlignCenter)
-        pills_layout.setSpacing(8)
+        pills_layout.setSpacing(12)
         
-        # Carousel fixed constraints
-        page_width = 480
-        
-        # Left Button
-        self._pill_left_btn = QPushButton(pills_row)
-        self._pill_left_btn.setFixedSize(36, 36)
-        left_ico = get_icon("chevron-left", size=(18, 18), color=TEXT_PRIMARY)
-        if left_ico: self._pill_left_btn.setIcon(left_ico)
-        self._pill_left_btn.setCursor(Qt.PointingHandCursor)
-        self._pill_left_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_PRIMARY, radius=18))
-        pills_layout.addWidget(self._pill_left_btn)
-        
-        # Scroll Area
-        self._pill_scroll = QScrollArea(pills_row)
-        self._pill_scroll.setWidgetResizable(True)
-        self._pill_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._pill_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._pill_scroll.setStyleSheet("background: transparent; border: none;")
-        self._pill_scroll.setFixedHeight(60)
-        self._pill_scroll.setFixedWidth(page_width)
-        
-        self._pill_inner = QWidget()
-        self._pill_inner.setStyleSheet("background: transparent;")
-        inner_lyt = QHBoxLayout(self._pill_inner)
-        inner_lyt.setSpacing(0)
-        inner_lyt.setContentsMargins(0, 0, 0, 0)
-        
-        # Render pills in pages
         c_text = resolve(TEXT_PRIMARY)
         c_bg = resolve(BG_CARD)
         c_border = resolve(BORDER)
         c_hover = resolve(WELCOME_CARD_HOVER)
         c_hover_border = resolve(BORDER)
         
-        chunk_size = 3
-        chunks = [ACTION_PILLS[i:i + chunk_size] for i in range(0, len(ACTION_PILLS), chunk_size)]
+        # Select exactly 3 random action pills
+        selected_pills = random.sample(ACTION_PILLS, 3)
         
-        for chunk in chunks:
-            page = QWidget()
-            page.setFixedWidth(page_width)
-            page.setStyleSheet("background: transparent;")
-            page_lyt = QHBoxLayout(page)
-            page_lyt.setAlignment(Qt.AlignCenter)
-            page_lyt.setSpacing(12)
-            page_lyt.setContentsMargins(0, 0, 0, 0)
+        for (icon_name, label, prompt) in selected_pills:
+            btn = QPushButton(f"{label}  ", pills_row)
+            btn.setFixedHeight(40)
+            btn.setLayoutDirection(Qt.RightToLeft)
+            ico = get_icon(icon_name, size=(16, 16), color=TEXT_PRIMARY)
+            if ico: btn.setIcon(ico)
+            btn.setFont(BTN_LABEL)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {c_bg};
+                    color: {c_text};
+                    border: 1px solid {c_border};
+                    border-radius: 20px;
+                    padding: 0 24px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{ 
+                    background-color: {c_hover}; 
+                    border: 1px solid {c_hover_border};
+                    color: #ffffff;
+                }}
+            """)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, p=prompt: self._on_quick_action(p))
+            pills_layout.addWidget(btn)
             
-            for (icon_name, label, prompt) in chunk:
-                btn = QPushButton(f"{label}  ", page)
-                btn.setFixedHeight(40)
-                btn.setLayoutDirection(Qt.RightToLeft)
-                ico = get_icon(icon_name, size=(16, 16), color=TEXT_PRIMARY)
-                if ico: btn.setIcon(ico)
-                btn.setFont(BTN_LABEL)
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {c_bg};
-                        color: {c_text};
-                        border: 1px solid {c_border};
-                        border-radius: 18px;
-                        padding: 0 20px;
-                        font-weight: 500;
-                    }}
-                    QPushButton:hover {{ 
-                        background-color: {c_hover}; 
-                        border: 1px solid {c_hover_border};
-                        color: #ffffff;
-                    }}
-                """)
-                btn.setCursor(Qt.PointingHandCursor)
-                btn.clicked.connect(lambda checked=False, p=prompt: self._on_quick_action(p))
-                page_lyt.addWidget(btn)
-                
-            inner_lyt.addWidget(page)
-            
-        self._pill_scroll.setWidget(self._pill_inner)
-        pills_layout.addWidget(self._pill_scroll)
-        
-        # Right Button
-        self._pill_right_btn = QPushButton(pills_row)
-        self._pill_right_btn.setFixedSize(36, 36)
-        right_ico = get_icon("chevron-right", size=(18, 18), color=TEXT_PRIMARY)
-        if right_ico: self._pill_right_btn.setIcon(right_ico)
-        self._pill_right_btn.setCursor(Qt.PointingHandCursor)
-        self._pill_right_btn.setStyleSheet(get_button_style("transparent", WELCOME_CARD_HOVER, TEXT_PRIMARY, radius=18))
-        pills_layout.addWidget(self._pill_right_btn)
-        
-        # Animation logic for carousel
-        self._pill_anim = QPropertyAnimation(self._pill_scroll.horizontalScrollBar(), b"value")
-        self._pill_anim.setDuration(400) # Slightly slower for smoother page transition
-        self._pill_anim.setEasingCurve(QEasingCurve.OutCubic)
-        
-        self._current_page = 0
-        self._max_pages = len(chunks) - 1
-        
-        def _scroll_carousel(direction):
-            # Evaluate new page index
-            self._current_page = max(0, min(self._max_pages, self._current_page + direction))
-            
-            # Scroll scrollbar to absolute multiples of page_width
-            target = self._current_page * page_width
-            
-            self._pill_anim.stop()
-            self._pill_anim.setStartValue(self._pill_scroll.horizontalScrollBar().value())
-            self._pill_anim.setEndValue(target)
-            self._pill_anim.start()
-            
-        self._pill_left_btn.clicked.connect(lambda: _scroll_carousel(-1))
-        self._pill_right_btn.clicked.connect(lambda: _scroll_carousel(1))
-        
         welcome_layout.addWidget(pills_row)
         
         welcome_layout.addStretch(1)
         
         self._content_layout.addWidget(self._welcome_frame)
+        
+        if not self._skip_animations:
+            AnimHelpers.fade_in(self._welcome_frame, duration=250)
 
 
 

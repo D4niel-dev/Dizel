@@ -213,6 +213,7 @@ class ChatManager:
             )
 
         _report(f"Loading checkpoint from {checkpoint_path}…")
+        self._checkpoint_path = checkpoint_path
         ckpt      = _torch.load(checkpoint_path, map_location=device, weights_only=False)
         model_cfg = ckpt.get("model_cfg", _CONFIG.model)
 
@@ -526,10 +527,45 @@ class ChatManager:
 
     # ── Internal generation ────────────────────────────────────────────
 
+    @property
+    def _is_pretrain_only(self) -> bool:
+        """Detect if the loaded checkpoint is pretrain-only (no SFT)."""
+        # Heuristic: if the checkpoint filename contains 'pretrain' and NOT 'sft',
+        # treat it as a raw pretrain model that doesn't understand chat format.
+        if not hasattr(self, '_checkpoint_path'):
+            return False
+        name = os.path.basename(self._checkpoint_path).lower()
+        return 'pretrain' in name and 'sft' not in name
+
     def _build_prompt_ids(self, history_subset=None) -> list:
         """
         Build the full token id sequence for the current conversation.
-        Follows the same format as inference/chat.py.
+
+        For SFT checkpoints: uses the chat format with role tokens.
+        For pretrain-only checkpoints: uses raw text (no special tokens).
+        """
+        if self._is_pretrain_only:
+            return self._build_prompt_ids_raw(history_subset)
+        return self._build_prompt_ids_sft(history_subset)
+
+    def _build_prompt_ids_raw(self, history_subset=None) -> list:
+        """
+        Build a raw-text prompt for pretrain-only models.
+        No chat format tokens — just concatenated text.
+        """
+        history = history_subset if history_subset is not None else self.history
+        # For pretrain models, just feed the last user message as raw text
+        # (they don't understand system prompts or role tokens)
+        if history:
+            last_msg = history[-1].get("content", "")
+        else:
+            last_msg = ""
+        return self._tokenizer.encode(last_msg)
+
+    def _build_prompt_ids_sft(self, history_subset=None) -> list:
+        """
+        Build SFT-formatted prompt with role tokens.
+        Used for checkpoints that were fine-tuned with chat format.
         """
         ids = []
         messages = [{"role": "system", "content": self.system_prompt}] + (history_subset if history_subset is not None else self.history)
@@ -681,10 +717,10 @@ class ChatManager:
             prompt_ids = self._trim_history_if_needed(prompt_ids, effective_max)
 
             # Build end-token set (stop generation at these ids)
+            # IMPORTANT: Only use eos_id as the stop token.
+            # Do NOT add subword pieces of <|end|> — they are common chars
+            # like '<', '|', 'e' that would cause instant stop at step 0.
             end_ids = [self._tokenizer.eos_id]
-            for et in self._tokenizer.encode(_END_TOKEN):
-                if et not in end_ids:
-                    end_ids.append(et)
 
             # Limit PyTorch CPU threads to reduce GIL contention with Tkinter
             if self._device == "cpu":

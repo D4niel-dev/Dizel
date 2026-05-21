@@ -37,7 +37,7 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
   - [Step 6 — Generate SFT training data](#step-6--generate-sft-training-data)
   - [Step 7 — Supervised fine-tuning (SFT)](#step-7--supervised-fine-tuning-sft)
   - [Step 8 — Dizel CMD UI (v2.0.3)](#step-8--dizel-cmd-ui-v203)
-  - [Step 9 — Desktop GUI (v1.0.1) *(Recommended)*](#step-9--desktop-gui-v101-recommended)
+  - [Step 9 — Desktop GUI (v1.0.2) *(Recommended)*](#step-9--desktop-gui-v102-recommended)
 - [🌐 Interactive Web UI Demo](#-interactive-web-ui-demo)
   - [What is the Web Demo?](#what-is-the-web-demo)
   - [What You Can Experience:](#what-you-can-experience)
@@ -419,7 +419,7 @@ python -m inference.cmd_tui.main --checkpoint checkpoints/dizel-sft-best.pt --de
 - 🛠 **Real-Time Generation:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
 ---
 
-### Step 9 — Desktop GUI (v1.0.1) *(Recommended)*
+### Step 9 — Desktop GUI (v1.0.2) *(Recommended)*
 
 Dizel includes a fully localized, premium Desktop Interface built entirely from scratch with **PySide6**. It pushes the boundaries of native Python UI development with highly fluid animations, rich data management, and an uncompromising aesthetic heavily inspired by state-of-the-art developer tools.
 

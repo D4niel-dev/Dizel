@@ -367,6 +367,17 @@ class InputPanel(QFrame):
         self._chip_row.hide()
         box_layout.addWidget(self._chip_row)
 
+        # 1b-2. Suggested Tool Chips Row (Phase 7)
+        self._suggestion_row = QFrame(self.box)
+        self._suggestion_row.setStyleSheet("background: transparent; border: none;")
+        self._suggestion_layout = QHBoxLayout(self._suggestion_row)
+        self._suggestion_layout.setContentsMargins(0, 0, 0, 0)
+        self._suggestion_layout.setSpacing(8)
+        self._suggestion_layout.setAlignment(Qt.AlignLeft)
+        self._suggestion_row.hide()
+        self._current_suggestions = set()
+        box_layout.addWidget(self._suggestion_row)
+
         # 1c. Text input
         self._input = _InputTextEdit(self.box)
         self._input.setPlaceholderText(PLACEHOLDER)
@@ -499,13 +510,38 @@ class InputPanel(QFrame):
         self._action_menu.menu_hidden.connect(self._on_menu_hidden)
 
     def _apply_box_style(self, focused: bool):
-        bg = resolve(BG_INPUT)
-        border = resolve(BORDER_FOCUS) if focused else resolve(BORDER)
-        style = get_frame_style(bg, radius=20, border_color=border)
-        # Thicker border on focus for glow effect
+        # Slightly offset background so it doesn't blend with BG_ROOT
+        bg = resolve(BG_INPUT_FIELD) if focused else resolve(BG_INPUT)
+        border = resolve(ACCENT) if focused else resolve(BORDER)
+        
+        style = f"""
+            QFrame#InputBox {{
+                background-color: {bg};
+                border: 1px solid {border};
+                border-radius: 20px;
+            }}
+        """
+        self.box.setStyleSheet(style)
+        
+        # Soft glow effect using DropShadow
+        from PySide6.QtWidgets import QGraphicsDropShadowEffect
+        from PySide6.QtGui import QColor
+        
+        eff = QGraphicsDropShadowEffect(self)
+        eff.setOffset(0, 2)
         if focused:
-            style += f" QFrame#InputBox {{ border: 1.5px solid {border}; }}"
-        self.box.setStyleSheet(style.replace("QFrame", "QFrame#InputBox"))
+            accent_hex = resolve(ACCENT)
+            # Create a glowing color with alpha
+            c = QColor(accent_hex)
+            c.setAlpha(80) # 30% opacity glow
+            eff.setColor(c)
+            eff.setBlurRadius(20)
+        else:
+            # Subtle shadow when unfocused
+            eff.setColor(QColor(0, 0, 0, 40))
+            eff.setBlurRadius(10)
+            
+        self.box.setGraphicsEffect(eff)
 
     def _wrap_focus_in(self, original_event_handler):
         def focusInEvent(event):
@@ -630,6 +666,86 @@ class InputPanel(QFrame):
         lines = text.count("\n") + 1
         h = max(44, min(lines * 22 + 20, 150))
         self._input.setFixedHeight(h)
+        
+        # Phase 7: Contextual tool suggestions
+        self._update_suggestions(text)
+
+    def _update_suggestions(self, text: str):
+        text_lower = text.lower()
+        new_suggestions = set()
+        
+        # Simple content-based heuristics
+        if any(w in text_lower for w in ["search", "google", "look up", "weather", "news", "current"]):
+            new_suggestions.add("web")
+        if any(w in text_lower for w in ["think", "plan", "complex", "reason", "step by step"]):
+            new_suggestions.add("deep")
+            
+        # Remove already active tools from suggestions
+        new_suggestions -= self._active_contexts
+        
+        if new_suggestions != self._current_suggestions:
+            self._current_suggestions = new_suggestions
+            self._rebuild_suggestion_chips()
+
+    def _rebuild_suggestion_chips(self):
+        while self._suggestion_layout.count():
+            item = self._suggestion_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+                
+        if not self._current_suggestions:
+            self._suggestion_row.hide()
+            return
+            
+        self._suggestion_row.show()
+        
+        labels = {
+            "web": ("Suggest: Web Search", "globe"),
+            "deep": ("Suggest: Deep Think", "cpu"),
+        }
+        
+        for cid in sorted(self._current_suggestions):
+            if cid not in labels: continue
+            lbl, ico_name = labels[cid]
+            
+            chip = QPushButton(self._suggestion_row)
+            chip.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    border: 1px solid {resolve(BORDER)};
+                    border-radius: 12px;
+                    color: {resolve(TEXT_DIM)};
+                    text-align: left;
+                    padding: 2px 8px;
+                }}
+                QPushButton:hover {{
+                    background: {resolve(WELCOME_CARD_HOVER)};
+                    color: {resolve(TEXT_PRIMARY)};
+                    border: 1px solid {resolve(ACCENT)};
+                }}
+            """)
+            chip.setFixedHeight(24)
+            chip.setFont(LABEL_DIM)
+            
+            ico = get_icon(ico_name, size=(12,12), color=TEXT_DIM)
+            if ico:
+                chip.setIcon(ico)
+                
+            chip.setText(" " + lbl)
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.clicked.connect(lambda _, x=cid: self._accept_suggestion(x))
+            
+            self._suggestion_layout.addWidget(chip)
+            
+        self._suggestion_layout.addStretch(1)
+
+    def _accept_suggestion(self, cid):
+        self._active_contexts.add(cid)
+        self._current_suggestions.discard(cid)
+        self._rebuild_active_chips()
+        self._rebuild_suggestion_chips()
+        if self._action_menu.isVisible():
+            self._action_menu.sync_state(self._active_contexts)
 
     def focus_input(self):
         self._input.setFocus()

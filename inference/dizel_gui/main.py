@@ -36,13 +36,15 @@ from dizel_gui.logic.history_manager import (
 from dizel_gui.logic.config_manager import ConfigManager
 from dizel_gui.logic.usage_manager import UsageManager
 from dizel_gui.theme.colors import (
-    BG_ROOT, BG_CHAT, BG_INPUT, ACCENT, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
-    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, BORDER, resolve
+    BG_ROOT, BG_CHAT, BG_INPUT, BG_SIDEBAR, ACCENT, TEXT_PRIMARY, TEXT_DIM, TEXT_SECONDARY,
+    ACTION_PILL, SIDEBAR_BTN_HOVER, SIDEBAR_BORDER, ACCENT_LIGHT, BG_CARD, BORDER, resolve,
+    MOD_DIZEL, MOD_MILA, MOD_CODELX, MOD_NOVA, MOD_DICT, MOD_LILY
 )
 from dizel_gui.theme.fonts import LABEL, BTN_LABEL, LABEL_SM
 from dizel_gui.utils.icons import get_icon
 from dizel_gui.theme.theme_manager import Theme
 from dizel_gui.theme.stylesheets import get_button_style, get_frame_style
+from dizel_gui.logic.core_integration import setup_core_ecosystem
 
 try:
     from model.dizel_info import MODEL_NAME, VERSION
@@ -65,6 +67,9 @@ class DizelApp(QMainWindow):
         self._session_id = new_session_id()
         self._model_loaded = False
         self._usage_mgr = UsageManager()
+        
+        # Initialize Ecosystem Core
+        self.memory, self.tools, self.dispatcher, self.orchestrator = setup_core_ecosystem(self._chat_mgr)
 
         self.setWindowTitle("Dizel AI")
         self.resize(1100, 700)
@@ -174,15 +179,22 @@ class DizelApp(QMainWindow):
         left_pill_layout = QHBoxLayout(left_pill)
         left_pill_layout.setContentsMargins(12, 0, 12, 0)
         
-        self._status_lbl = QLabel(f"{MODEL_NAME} {VERSION} ⌵", left_pill)
+        self._status_lbl = QLabel(f"{MODEL_NAME} {VERSION} ", left_pill)
         self._status_lbl.setFont(LABEL_SM)
-        self._status_lbl.setStyleSheet(f"color: {resolve(TEXT_PRIMARY)}; background: transparent;")
+        self._status_lbl.setStyleSheet(f"color: {resolve(MOD_DIZEL)}; background: transparent; font-weight: 600;")
         left_pill_layout.addWidget(self._status_lbl)
         
         self._model_info_lbl = QLabel("", left_pill)
         self._model_info_lbl.setFont(LABEL_SM)
         self._model_info_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent;")
         left_pill_layout.addWidget(self._model_info_lbl)
+        
+        # Generation Dot (Animated streaming dot)
+        self._gen_dot_lbl = QLabel("•", left_pill)
+        self._gen_dot_lbl.setFont(LABEL_SM)
+        self._gen_dot_lbl.setStyleSheet(f"color: {resolve(ACCENT)}; background: transparent; font-size: 16px; font-weight: bold;")
+        self._gen_dot_lbl.hide()
+        left_pill_layout.addWidget(self._gen_dot_lbl)
         
         status_layout.addWidget(left_pill)
         status_layout.addStretch(1)
@@ -219,50 +231,23 @@ class DizelApp(QMainWindow):
         """)
         ctx_layout.addWidget(self._token_progress)
         
-        self._token_lbl = QLabel(f"{self._usage_mgr.percentage}%", self._ctx_widget)
-        self._token_lbl.setFont(LABEL_SM)
-        self._token_lbl.setStyleSheet(f"color: {resolve(TEXT_DIM)}; background: transparent;")
-        ctx_layout.addWidget(self._token_lbl)
+        # Removed text label, relying on tooltip for clean visual indicator
+        self._ctx_widget.setToolTip(f"Context Usage: {self._usage_mgr.percentage}%")
         
         status_layout.addWidget(self._ctx_widget)
         
         status_layout.addSpacing(16)
         
-        # Response Length Toggle
+        # Dropdown Menu Button (...)
         self._verbosity = "normal"
-        self._verbosity_btn = QPushButton(" Normal  ", self._status_bar)
-        self._verbosity_btn.setFixedHeight(32)
-        self._verbosity_btn.setLayoutDirection(Qt.RightToLeft)
-        verb_ico = get_icon("align-left", size=(14, 14), color=TEXT_PRIMARY)
-        if verb_ico: self._verbosity_btn.setIcon(verb_ico)
-        self._verbosity_btn.setFont(LABEL_SM)
-        self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
-        self._verbosity_btn.setCursor(Qt.PointingHandCursor)
-        self._verbosity_btn.clicked.connect(self._cycle_verbosity)
-        self._verbosity_btn.setToolTip("Response length: Short / Normal / Detailed")
-        status_layout.addWidget(self._verbosity_btn)
-        
-        self._export_btn = QPushButton(" Export  ", self._status_bar)
-        self._export_btn.setFixedHeight(32)
-        self._export_btn.setLayoutDirection(Qt.RightToLeft)
-        export_ico = get_icon("external-link", size=(14, 14), color=TEXT_PRIMARY)
-        if export_ico: self._export_btn.setIcon(export_ico)
-        self._export_btn.setFont(LABEL_SM)
-        self._export_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
-        self._export_btn.setCursor(Qt.PointingHandCursor)
-        self._export_btn.clicked.connect(self._export_chat)
-        status_layout.addWidget(self._export_btn)
-        
-        self._config_btn = QPushButton(" Configuration  ", self._status_bar)
-        self._config_btn.setFixedHeight(32)
-        self._config_btn.setLayoutDirection(Qt.RightToLeft)
-        config_ico = get_icon("settings", size=(14, 14), color=TEXT_PRIMARY)
-        if config_ico: self._config_btn.setIcon(config_ico)
-        self._config_btn.setFont(LABEL_SM)
-        self._config_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
-        self._config_btn.setCursor(Qt.PointingHandCursor)
-        self._config_btn.clicked.connect(self._open_settings)
-        status_layout.addWidget(self._config_btn)
+        self._more_btn = QPushButton(self._status_bar)
+        self._more_btn.setFixedSize(32, 32)
+        more_ico = get_icon("more-vertical", size=(16, 16), color=TEXT_PRIMARY)
+        if more_ico: self._more_btn.setIcon(more_ico)
+        self._more_btn.setStyleSheet(get_button_style("transparent", SIDEBAR_BTN_HOVER, "transparent", radius=16))
+        self._more_btn.setCursor(Qt.PointingHandCursor)
+        self._more_btn.clicked.connect(self._show_topbar_menu)
+        status_layout.addWidget(self._more_btn)
         
         right_layout.addWidget(self._status_clip)
 
@@ -359,7 +344,7 @@ class DizelApp(QMainWindow):
         self._tutorial_targets = {
             "welcome":  self._chat_window,
             "sidebar":  self._sidebar,
-            "config":   self._config_btn,
+            "config":   self._more_btn,
             "input":    self._input_panel.box,
             "tools":    self._input_panel._plus_btn,
             "modes":    self._input_panel._model_btn,
@@ -532,11 +517,25 @@ class DizelApp(QMainWindow):
 
     def _update_model_info(self):
         info = self._chat_mgr.model_info
+        
+        model_name = getattr(self._input_panel, "current_model", getattr(self._input_panel, "_current_model", MODEL_NAME))
+        lower_name = model_name.lower()
+        
+        if "mila" in lower_name: brand_color = MOD_MILA
+        elif "codelx" in lower_name: brand_color = MOD_CODELX
+        elif "nova" in lower_name: brand_color = MOD_NOVA
+        elif "dict" in lower_name: brand_color = MOD_DICT
+        elif "lily" in lower_name: brand_color = MOD_LILY
+        else: brand_color = MOD_DIZEL
+
+        self._status_lbl.setText(f"{model_name} {VERSION} ")
+        self._status_lbl.setStyleSheet(f"color: {resolve(brand_color)}; background: transparent; font-weight: 600;")
+        
         if not info:
             self._model_info_lbl.setText("")
             return
         txt = (
-            f"{MODEL_NAME} {VERSION}  •  {info.get('params','?')}  •  "
+            f"•  {info.get('params','?')}  •  "
             f"d={info.get('d_model','?')}  L={info.get('n_layers','?')}  •  "
             f"{self._chat_mgr._device.upper()}"
         )
@@ -603,27 +602,80 @@ class DizelApp(QMainWindow):
         if fpath:
             self._input_panel.add_attachment(fpath)
 
-    # ── Response Length Toggle ──────────────────────────────────────────────
-    def _cycle_verbosity(self):
-        """Cycle through Short → Normal → Detailed response length."""
-        cycle = {
-            "low": ("normal", " Normal  ", "align-left", TEXT_PRIMARY),
-            "normal": ("high", " Detailed  ", "align-justify", "#3b82f6"),
-            "high": ("low", " Short  ", "minus", "#f97316"),
-        }
-        next_v, label, icon_name, color = cycle[self._verbosity]
-        self._verbosity = next_v
+    # ── Topbar Menu ─────────────────────────────────────────────────────────
+    def _show_topbar_menu(self):
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
+        from PySide6.QtCore import Qt
         
-        self._verbosity_btn.setText(label)
-        ico = get_icon(icon_name, size=(14, 14), color=color)
-        if ico: self._verbosity_btn.setIcon(ico)
+        menu = QMenu(self)
+        menu.setWindowFlags(menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        menu.setAttribute(Qt.WA_TranslucentBackground)
         
-        if isinstance(color, str) and color.startswith("#"):
-            self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, color, radius=16))
-        else:
-            self._verbosity_btn.setStyleSheet(get_button_style(ACTION_PILL, SIDEBAR_BTN_HOVER, TEXT_PRIMARY, radius=16))
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: {resolve(BG_CARD)};
+                color: {resolve(TEXT_PRIMARY)};
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 12px;
+                padding: 6px;
+            }}
+            QMenu::item {{
+                padding: 8px 36px 8px 16px;
+                border-radius: 6px;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-size: 13px;
+                margin: 2px 4px;
+            }}
+            QMenu::item:selected {{
+                background-color: {resolve(BG_SIDEBAR)};
+                color: {resolve(TEXT_PRIMARY)};
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: {resolve(BORDER)};
+                margin: 6px 12px;
+            }}
+            QMenu::indicator {{
+                width: 16px;
+                height: 16px;
+            }}
+        """)
         
-        self._show_status(f"Response length: {label.strip()}", dim=True)
+        # Verbosity Setting
+        verb_menu = QMenu("Response Length", menu)
+        verb_menu.setWindowFlags(verb_menu.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+        verb_menu.setAttribute(Qt.WA_TranslucentBackground)
+        verb_menu.setStyleSheet(menu.styleSheet())
+        menu.addMenu(verb_menu)
+        
+        def set_verb(v):
+            self._verbosity = v
+            self._show_status(f"Response length set to {v.capitalize()}", dim=True)
+            
+        for v, label in [("low", "Short"), ("normal", "Normal"), ("high", "Detailed")]:
+            action = QAction(f"{label}{' (Active)' if self._verbosity == v else ''}", self)
+            action.triggered.connect(lambda checked=False, val=v: set_verb(val))
+            verb_menu.addAction(action)
+            
+        menu.addSeparator()
+        
+        # Export Action
+        export_action = QAction("Export Chat", self)
+        export_ico = get_icon("external-link", size=(14, 14), color=TEXT_PRIMARY)
+        if export_ico: export_action.setIcon(export_ico)
+        export_action.triggered.connect(self._export_chat)
+        menu.addAction(export_action)
+        
+        # Settings Action
+        settings_action = QAction("Settings", self)
+        settings_ico = get_icon("settings", size=(14, 14), color=TEXT_PRIMARY)
+        if settings_ico: settings_action.setIcon(settings_ico)
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
+        
+        # Show Menu under button
+        menu.exec(self._more_btn.mapToGlobal(self._more_btn.rect().bottomLeft()))
 
     def _do_voice(self):
         if self._nova_overlay.isVisible():
@@ -751,13 +803,10 @@ class DizelApp(QMainWindow):
                 QTimer.singleShot(800, mock_reply)
                 return
 
-            if state.has_active_tools():
-                threading.Thread(
-                    target=self._tool_pipeline, args=(state,), daemon=True
-                ).start()
-            else:
-                self._show_status("Generating…")
-                self._start_generation(text, files)
+            # Always route through the orchestrator to populate memory and run agent handlers
+            threading.Thread(
+                target=self._orchestration_pipeline, args=(state,), daemon=True
+            ).start()
                 
         self._chat_window.begin_response_flow(text, files, on_ready=_do_generate)
 
@@ -765,31 +814,75 @@ class DizelApp(QMainWindow):
         # Since it takes time for the animation, we shouldn't immediately load tools
         # until the flow reaches the processing step (handled by begin_response_flow)
 
-    def _tool_pipeline(self, state):
-        """Background thread: run tool preprocessing → build prompt → generate."""
+    def _orchestration_pipeline(self, state):
+        """Background thread: run the Core Orchestrator → build context → generate."""
         try:
-            from core.router import route_request
+            from core.memory.schema import MemoryItem, MemoryType
             from core.prompt_builder import build_tool_prompt
-
-            # Step 1: File parsing
+            
+            user_text = state.user_input
+            
+            # Step 1: Add user message to working memory
+            self.memory.working.write(MemoryItem(
+                type=MemoryType.WORKING,
+                content=user_text,
+                source="user",
+                metadata={"session_id": self._session_id}
+            ))
+            
+            # Step 2: Show statuses for UI feedback based on state toggles
             if state.parse_files_enabled and state.uploaded_files:
-                self.run_in_main(lambda: self._show_status("Parsing files…"))
-                self._usage_mgr.add_usage(50.0 * len(state.uploaded_files)) # Complexity: 50 per file
+                self.run_in_main(lambda: self._show_status("Parsing files via Orchestrator…"))
+                self._usage_mgr.add_usage(50.0 * len(state.uploaded_files))
                 self.run_in_main(self._update_usage_display)
 
-            # Step 2: Web search
             if state.web_search_enabled:
-                self.run_in_main(lambda: self._show_status("Searching the web…"))
-                self._usage_mgr.add_usage(80.0) # Complexity: 80 per search
+                self.run_in_main(lambda: self._show_status("Searching the web via Orchestrator…"))
+                self._usage_mgr.add_usage(80.0)
                 self.run_in_main(self._update_usage_display)
 
-            # Execute all tool pipelines
-            route_request(state)
+            # Note: We must translate state files to context for the orchestrator
+            context = {}
+            if state.uploaded_files:
+                # Attach file paths to context so Lily/Dict can access them
+                context["files"] = state.uploaded_files
+                
+            # If web search is forced ON, we could inject that into context or prompt 
+            # Or just let the planner decide if the query sounds like a search.
+            # For now, we trust the Planner to decompose based on user_text.
 
-            # Build final prompt with tool context
+            # Step 3: Run Orchestrator Pipeline
+            # This calls the planner, router, and executes the agent tasks.
+            # For `dizel` agent task, it currently just echoes in core_integration.py
+            # The actual output from other agents (lily, dict, etc.) is gathered.
+            orch_result = self.orchestrator.process(user_text, context=context)
+
+            # Extract any synthesized data if multiple tools ran
+            # E.g. 'web_results', 'file_context'
+            # We map this back to our legacy `state` so `build_tool_prompt` works,
+            # or we could directly fetch memory context. Let's fetch memory context!
+            
+            sys_context = self.memory.get_context(
+                agent="dizel"
+            )
+            
+            # Legacy fallback: To keep existing prompt builder intact,
+            # we can still build the final prompt, injecting our new sys_context as well.
+            # We simulate route_request's side effects if files were parsed by orchestrator:
+            # (In a fully refactored system, PromptBuilder would pull strictly from MemorySystem)
+            if "error" not in orch_result:
+                # Append orchestrator outputs to state for the prompt builder
+                # In our new architecture, the result might contain synthesis text
+                if "text" in orch_result:
+                    state.file_context = orch_result["text"]
+
             final_prompt = build_tool_prompt(state)
+            
+            # Optional: Prepend memory context to final prompt
+            if sys_context:
+                final_prompt = f"{sys_context}\n\n{final_prompt}"
 
-            # Generate with tool awareness
+            # Step 4: Stream Generation (handled by dizel agent conceptually, but physically here)
             self.run_in_main(
                 lambda p=final_prompt, dt=state.deep_think_enabled, f=state.uploaded_files: (
                     self._start_generation_with_tools(p, dt, f)
@@ -802,6 +895,7 @@ class DizelApp(QMainWindow):
     def _start_generation(self, text: str, files: list = None):
         """Direct generation — no tools active."""
         self._show_status("Generating…")
+        self._gen_dot_lbl.show()
         on_token, on_done, on_error = self._make_gen_callbacks(deep_think=False)
         self._chat_mgr.send_message(
             user_text=text,
@@ -815,6 +909,7 @@ class DizelApp(QMainWindow):
     def _start_generation_with_tools(self, text: str, deep_think: bool, files: list = None):
         """Tool-augmented generation — may apply Deep Think overrides."""
         self._show_status("Generating…")
+        self._gen_dot_lbl.show()
         on_token, on_done, on_error = self._make_gen_callbacks(deep_think=deep_think)
         self._chat_mgr.send_message_with_tools(
             augmented_text=text,
@@ -849,7 +944,9 @@ class DizelApp(QMainWindow):
         """Update the status bar usage percentage and progress bar."""
         perc = self._usage_mgr.percentage
         self._token_progress.setValue(perc)
-        self._token_lbl.setText(f"{perc}%")
+        
+        # Tooltip with detailed metrics
+        self._ctx_widget.setToolTip(f"Context Usage: {int(self._usage_mgr.usage)} / {int(self._usage_mgr.max_capacity)} tokens ({perc}%)")
         
         # Color coding: Green -> Yellow -> Red
         if perc < 60:
@@ -874,12 +971,14 @@ class DizelApp(QMainWindow):
         self._chat_window.finish_assistant_message(full_text)
         self._input_panel.set_generating(False)
         self._show_status("", dim=True)
+        self._gen_dot_lbl.hide()
         self._autosave_session()
 
     def _generation_error(self, msg: str):
         self._chat_window.show_error(msg)
         self._input_panel.set_generating(False)
         self._show_status(f"Error: {msg}")
+        self._gen_dot_lbl.hide()
 
     def _on_stop_generation(self):
         self._chat_mgr.stop_generation()
@@ -970,8 +1069,25 @@ class DizelApp(QMainWindow):
 
     def _new_chat(self):
         self._autosave_session()
+        
+        # Archive current session to Episodic Memory before clearing
+        # We run this in a background thread to prevent UI freezing if summarizing takes time
+        if self._chat_mgr.get_history():
+            current_session_id = self._session_id
+            def _archive():
+                try:
+                    self.memory.episodic.archive_session(
+                        session_id=current_session_id,
+                        working_memory=self.memory.working
+                    )
+                except Exception as e:
+                    print(f"Failed to archive session to episodic memory: {e}")
+            threading.Thread(target=_archive, daemon=True).start()
+            
         self._chat_mgr.new_session()
         self._session_id = new_session_id()
+        self.memory.working.clear(self._session_id)
+        
         cfg = ConfigManager.load()
         username = cfg.get("user_profile", {}).get("username", "User")
         self._chat_window.clear(username)

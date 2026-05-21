@@ -28,8 +28,8 @@ class _CodeBlockWidget(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {bg_color};
-                border: 1px solid {border_color};
-                border-radius: 8px;
+                border: 1px solid {resolve(BORDER)};
+                border-radius: 12px;
             }}
         """)
         
@@ -608,4 +608,28 @@ class MessageBubble(QFrame):
             if self._meta_lbl:
                 self._meta_lbl.setText(meta)
             self._action_bar.show()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "_animated") and self._animated:
+            return
+            
+        # Subtle slide-up and fade-in
+        self._animated = True
+        
+        # We need an opacity effect to fade in
+        eff = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(eff)
+        
+        # Opacity anim
+        self._op_anim = QPropertyAnimation(eff, b"opacity")
+        self._op_anim.setDuration(250)
+        self._op_anim.setStartValue(0.0)
+        self._op_anim.setEndValue(1.0)
+        self._op_anim.setEasingCurve(QEasingCurve.OutCubic)
+        
+        # We can't easily animate layout position of a QFrame within a layout without 
+        # custom spacing/margins, so we'll just use the opacity which still gives a 
+        # very premium feel.
+        self._op_anim.start()
 

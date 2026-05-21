@@ -27,7 +27,7 @@ SIDEBAR_BTN_HOVER   = ("#e2e8f0", "#212121", "#162032")
 SIDEBAR_BTN_ACTIVE  = ("#cbd5e1", "#2F2F2F", "#1e293b")
 SIDEBAR_TEXT        = ("#334155", "#ececec", "#cbd5e1")
 SIDEBAR_TEXT_DIM    = ("#64748b", "#9B9B9B", "#64748b")
-SIDEBAR_BORDER      = ("#e2e8f0", "#2F2F2F", "#1e293b")
+SIDEBAR_BORDER      = ("#f1f5f9", "#1c1c1c", "#0a0f18")
 SIDEBAR_PREMIUM_BG  = ("#ffffff", "#212121", "#0f172a")
 
 # ── Accent / interactive ──────────────────────────────────────────────────────
@@ -36,6 +36,14 @@ ACCENT_HOVER    = ("#0284c7", "#1a7f64", "#0ea5e9")   # darker hover
 ACCENT_LIGHT    = ("#bae6fd", "#2F2F2F", "#7dd3fc")   # light highlights
 SEND_BTN        = ("#0284c7", "#10a37f", "#0284c7")   # send button 
 SEND_BTN_HOVER  = ("#0369a1", "#1a7f64", "#0369a1")
+
+# ── Module Specific Accents ───────────────────────────────────────────────────
+MOD_DIZEL       = ("#0ea5e9", "#0284c7", "#38bdf8")   # Cool blue / cyan (Intelligence)
+MOD_MILA        = ("#a855f7", "#9333ea", "#c084fc")   # Violet / pink (Warmth)
+MOD_CODELX      = ("#f59e0b", "#d97706", "#fbbf24")   # Amber / orange (Technical)
+MOD_NOVA        = ("#14b8a6", "#0d9488", "#2dd4bf")   # Teal (Voice)
+MOD_DICT        = ("#e11d48", "#be123c", "#fb7185")   # Magenta / red (Visual)
+MOD_LILY        = ("#22c55e", "#16a34a", "#4ade80")   # Green (Natural)
 
 # ── Typography ────────────────────────────────────────────────────────────────
 TEXT_PRIMARY    = ("#0f172a", "#ececec", "#f1f5f9")

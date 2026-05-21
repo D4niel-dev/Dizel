@@ -3,7 +3,7 @@
 ## Model CLI
 APP_NAME = "Dizel CLI"
 MODEL_NAME = "Dizel"
-VERSION = "v1.2.1"
+VERSION = "v1.2.2"
 MODEL_SIZE = "205M parameters"
 CONTEXT_LENGTH = "2048 Tokens"
 VOCAB_SIZE = "32,000 tokens"

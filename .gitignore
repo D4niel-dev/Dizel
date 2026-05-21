@@ -14,6 +14,7 @@ venv/
 .env/
 .envrc
 .venv/
+*.ini
 
 # -----------------------
 # Training outputs
@@ -28,6 +29,7 @@ logs/
 *.pth
 *.bin
 *.safetensors
+evaluation/benchmarks/
 
 # -----------------------
 # Dataset files
