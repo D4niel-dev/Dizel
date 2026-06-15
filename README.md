@@ -19,62 +19,100 @@ But it has grown into **so much more**—shipping with a state-of-the-art **Nati
 
 ---
 
+## Current Status
+
+| Component | Status |
+|------------|---------|
+| Pretraining | 🚧 In Progress |
+| SFT | ⏳ Planned |
+| DPO | ⏳ Planned |
+| CMD UI v2 | ✅ Available |
+| Desktop GUI | ✅ Available |
+| Web Demo | ✅ Available |
+
+Current Model:
+- Dizel v1.2.2
+- ~205M Parameters
+- ~100M Tokens
+- Training on Tesla T4
+
+---
+
 ## 📑 Table of Contents
 
-- [📑 Table of Contents](#-table-of-contents)
 - [🌟 What You Will Build](#-what-you-will-build)
 - [📁 Folder Structure](#folder-structure)
+
 <details>
-<summary>Setup</summary>
+<summary><b>⚙️ Setup</b></summary>
+
 - [Setup](#setup)
-- [1. Install dependencies](#1-install-dependencies)
-- [2. Verify your installation](#2-verify-your-installation)
+  - [1. Install dependencies](#1-install-dependencies)
+  - [2. Verify your installation](#2-verify-your-installation)
+
 </details>
+
 <details>
-<summary>Execution Steps</summary>
+<summary><b>🚀 Execution Steps</b></summary>
+
 - [Execution Steps](#execution-steps)
-- [Step 0 — Quick Start (If you already have a checkpoint)](#step-0--quick-start-if-you-already-have-a-checkpoint)
-- [Step 1 — Review and tune configuration (optional)](#step-1--review-and-tune-configuration-optional)
-- [Step 2 — Add training data](#step-2--add-training-data)
-- [Step 3 — Train the tokenizer](#step-3--train-the-tokenizer)
-- [Step 4 — Run sanity checks](#step-4--run-sanity-checks)
-- [Step 5 — Pre-train Dizel](#step-5--pre-train-dizel)
-- [Step 6 — Generate SFT training data](#step-6--generate-sft-training-data)
-- [Step 7 — Supervised fine-tuning (SFT)](#step-7--supervised-fine-tuning-sft)
-- [Step 8 — Dizel CMD UI (v2.0.3)](#step-8--dizel-cmd-ui-v203)
-- [Step 9 — Desktop GUI (v1.0.2) *(Recommended)*](#step-9--desktop-gui-v102-recommended)
+  - [Step 0 — Quick Start](#step-0--quick-start-if-you-already-have-a-checkpoint)
+  - [Step 1 — Review and tune configuration](#step-1--review-and-tune-configuration-optional)
+  - [Step 2 — Add training data](#step-2--add-training-data)
+  - [Step 3 — Train the tokenizer](#step-3--train-the-tokenizer)
+  - [Step 4 — Run sanity checks](#step-4--run-sanity-checks)
+  - [Step 5 — Pre-train Dizel](#step-5--pre-train-dizel)
+  - [Step 6 — Generate SFT training data](#step-6--generate-sft-training-data)
+  - [Step 7 — Supervised Fine-Tuning (SFT)](#step-7--supervised-fine-tuning-sft)
+  - [Step 8 — Dizel CMD UI](#step-8--dizel-cmd-ui-v203)
+  - [Step 9 — Desktop GUI](#step-9--desktop-gui-v102-recommended)
+
 </details>
+
 <details>
-<summary>Web UI Demo</summary>
-- [🌐 Interactive Web UI Demo](#-interactive-web-ui-demo)
+<summary><b>🌐 Web Demo</b></summary>
+
+- [Interactive Web UI Demo](#-interactive-web-ui-demo)
 - [Weekend Timeline](#weekend-timeline)
+
 </details>
+
 <details>
-<summary>Architecture Deep-Dive</summary>
+<summary><b>🏗️ Architecture Deep Dive</b></summary>
+
 - [Architecture Deep-Dive](#architecture-deep-dive)
-- [Core Attention Mechanism (Flash Attention \& RoPE)](#core-attention-mechanism-flash-attention--rope)
-- [Transformer Block (Pre-LayerNorm \& SwiGLU)](#transformer-block-pre-layernorm--swiglu)
+  - [Core Attention Mechanism](#core-attention-mechanism-flash-attention--rope)
+  - [Transformer Block](#transformer-block-pre-layernorm--swiglu)
+
 </details>
-- [Overfitting on Small Data](#overfitting-on-small-data)
-- [VRAM Usage Guide](#vram-usage-guide)
+
+- [📉 Overfitting on Small Data](#overfitting-on-small-data)
+- [💾 VRAM Usage Guide](#vram-usage-guide)
+
 <details>
-<summary>Extending Dizel</summary>
+<summary><b>🛠️ Extending Dizel</b></summary>
+
 - [Extending Dizel](#extending-dizel)
-- [1. Build Custom Agents](#1-build-custom-agents)
-- [2. Change Model Architecture](#2-change-model-architecture)
-- [3. Expand SFT Datasets](#3-expand-sft-datasets)
-- [4. Export to ONNX / C++](#4-export-to-onnx--c)
+  - [Build Custom Agents](#1-build-custom-agents)
+  - [Change Model Architecture](#2-change-model-architecture)
+  - [Expand SFT Datasets](#3-expand-sft-datasets)
+  - [Export to ONNX / C++](#4-export-to-onnx--c)
+
 </details>
+
 <details>
-<summary>FAQ & Inspiration</summary>
+<summary><b>❓ FAQ & References</b></summary>
+
 - [Frequently Asked Questions](#frequently-asked-questions)
-- [🧠 Training \& Model Architecture](#-training--model-architecture)
-- [🖥️ Hardware \& Compatibility](#️-hardware--compatibility)
-- [🎨 Desktop App (PySide6) \& UI](#-desktop-app-pyside6--ui)
-- [⌨️ Terminal (CMD UI) \& Workflows](#️-terminal-cmd-ui--workflows)
+  - [🧠 Training & Model Architecture](#-training--model-architecture)
+  - [🖥️ Hardware & Compatibility](#️-hardware--compatibility)
+  - [🎨 Desktop App (PySide6) & UI](#-desktop-app-pyside6--ui)
+  - [⌨️ Terminal (CMD UI) & Workflows](#️-terminal-cmd-ui--workflows)
+
 - [References](#references)
-- [Architecture \& Papers](#architecture--papers)
-- [Libraries \& Inspiration](#libraries--inspiration)
+  - [Architecture & Papers](#architecture--papers)
+  - [Libraries & Inspiration](#libraries--inspiration)
+
 </details>
 
 ---
