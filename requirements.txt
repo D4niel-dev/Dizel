@@ -1,36 +1,78 @@
 # Dizel — Dependencies
-# Install: pip install -r requirements.txt
+# Install:  pip install -r requirements.txt
+#
+# Layout this file describes:
+#   inference/tui/   Textual terminal client   (python -m inference.tui.main)
+#   inference/gui/   Electron desktop client   (npm run dev — not a Python dep)
+#   api/             FastAPI sidecar the GUI talks to
+#   dizel_core/      Shared engine: ChatManager, token budget, usage window
+#
+# Everything below was derived from the actual imports, not from memory.
 
-# Core
+# ── Core: model + tokenizer ──────────────────────────────────────────────
 torch>=2.1.0
 numpy>=1.24.0
+transformers>=4.40.0
+tokenizers>=0.19.0
 sentencepiece>=0.1.99
-openai-whisper>=20231117
-sounddevice>=0.4.6
-soundfile>=0.12.1
+safetensors>=0.4.0
+huggingface-hub>=0.23.0
 
-# CLI Interface
-rich>=13.7.0
+# GGUF checkpoints (Dizel 1.5 Distill and friends).
+# CPU-only wheels are fine; a CUDA build needs an index-url, see the docs.
+llama-cpp-python>=0.2.70
+gguf>=0.6.0
+
+# ── Terminal UI (inference/tui) ──────────────────────────────────────────
 textual>=1.3.0
+rich>=13.7.0
+pyfiglet>=0.8.0
+psutil>=5.9.0
 
-# GUI Interface (Desktop App)
-pyside6>=6.6.0
+# ── API sidecar (api/) ───────────────────────────────────────────────────
+fastapi>=0.100.0
+uvicorn>=0.23.0
+sse-starlette>=3.4.2
+pydantic>=2.5.0
 
-# API Provider SDKs (BYOK Router)
+# ── Provider SDKs (BYOK router) ──────────────────────────────────────────
 httpx>=0.27.0
 openai>=1.30.0
 anthropic>=0.30.0
 google-genai>=1.0.0
 cryptography>=42.0.0
+python-dotenv>=1.0.0
 
-# Backend Server
-fastapi>=0.100.0
-uvicorn>=0.23.0
-sse-starlette>=3.4.2
+# ── Voice input ──────────────────────────────────────────────────────────
+openai-whisper>=20231117
+sounddevice>=0.4.6
+soundfile>=0.12.1
 
-# Optional: faster training logging
-# tensorboard>=2.14.0
+# ── Tools the model can call ─────────────────────────────────────────────
+requests>=2.31.0
+
+# Optional: web search. Imported lazily inside core/tools/web_search.py, which
+# degrades to "not installed" rather than crashing, so it is not required.
+# duckduckgo-search>=6.1.0
+
+# ── MCP client (external tool servers) ───────────────────────────────────
+mcp>=1.27.0,<2
+
+# ── Optional: training and evaluation ────────────────────────────────────
+# Only needed for training/ and evaluation/, not for running either UI.
+# datasets>=2.18.0
+# pyarrow>=15.0.0
+# pandas>=2.0.0
 # tqdm>=4.66.0
-
-# Optional: analysis / visualization
+# tensorboard>=2.14.0
 # matplotlib>=3.7.0
+
+# ── Optional: document tooling (scripts that build docs/) ────────────────
+# python-pptx>=0.6.23
+# python-docx>=1.1.0
+# pymupdf>=1.24.0
+# openpyxl>=3.1.0
+# Pillow>=10.0.0
+
+# ── Optional: screenshot tooling (scripts/snap_*.py) ─────────────────────
+# playwright>=1.40.0

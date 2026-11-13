@@ -1,0 +1,177 @@
+/**
+ * Design tokens.
+ *
+ * Dark values are sampled pixel-for-pixel from the running PySide6 app
+ * (see .pyside-welcome.png): bg #212121, chrome #171717, accent #10a37f,
+ * borders #303030. Light and dark-blue come from theme/colors.py tuples.
+ */
+
+@font-face {
+  font-family: "Outfit";
+  src: url("../assets/fonts/Outfit-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
+  --font-display: "Outfit", var(--font-sans);
+
+  /* Gemini's reading scale: 17px body on the web. 16px here keeps desktop
+     density while giving prose the room the 14px shell never had. */
+  --text-chat: 16px;
+  --text-chat-line: 1.62;
+  --text-display: 34px;
+  --brand-gradient: linear-gradient(135deg, #ffcaa8, #e9a0d4 50%, #b0a4ec);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  --titlebar-h: 38px;
+  --sidebar-w: 232px;
+  --sidebar-w-collapsed: 60px;
+  --gutter-left: 18px;
+  /* Only the title bar needs to clear the window controls. Everything in the
+     content column uses --gutter-left on both sides. The cap is generous on
+     purpose: it only binds on very wide monitors, where unbounded line length
+     gets unreadable. */
+  --gutter-right: 100px;
+  --content-max: 1100px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 150ms;
+}
+
+/* ── Dark (default) ────────────────────────────────────────────────────── */
+/* Surface ladder borrowed from Gemini's web theme: seven steps, not three. A
+   card sits two steps above the chat surface and a control one above the card —
+   that spacing is what stops a dark UI reading as one flat grey. */
+:root[data-theme="dark"] {
+  --bg-titlebar: #0e0e0f;
+  --bg-sidebar: #0e0e0f;
+  --bg-chat: #171717;
+  --bg-panel: #1e1f20;
+  --bg-card: #222327;
+  --bg-pill: #1e1f20;
+  --bg-bubble: #282a2c;
+  --bg-hover: #2a2b2e;
+  --bg-active: #303030;
+
+  --border: #37393b;
+  --border-soft: #2a2b2d;
+
+  --text-primary: #e3e3e3;
+  --text-secondary: #c4c7c5;
+  --text-dim: #9a9b9c;
+  --text-muted: #9a9b9c;
+
+  --accent: #8ab4f8;
+  --accent-hover: #a8c7fa;
+  --glow-alt: #9b72cb;
+  --accent-soft: rgba(138, 180, 248, 0.14);
+  --accent-ring: rgba(138, 180, 248, 0.3);
+
+  --danger: #f28b82;
+  --warn: #fdd663;
+
+  --code-bg: #1a1c1f;
+  --code-keyword: #c58af9;
+  --code-string: #81c995;
+  --code-number: #fa903e;
+  --code-comment: #80868b;
+  --code-func: #8ab4f8;
+  --code-attr: #fdd663;
+
+  --scrollbar: #3a3d40;
+  --scrollbar-hover: #4a4d51;
+
+}
+
+/* ── Light ─────────────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --bg-titlebar: #f8fafc;
+  --bg-sidebar: #f1f5f9;
+  --bg-chat: #ffffff;
+  --bg-panel: #f1f5f9;
+  --bg-card: #f8fafc;
+  --bg-pill: #f1f5f9;
+  --bg-bubble: #eff6ff;
+  --bg-hover: #e2e8f0;
+  --bg-active: #dbeafe;
+
+  --border: #e2e8f0;
+  --border-soft: #eef2f6;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-dim: #64748b;
+  --text-muted: #64748b;
+
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --glow-alt: #7c3aed;
+  --accent-soft: rgba(14, 165, 233, 0.1);
+  --accent-ring: rgba(14, 165, 233, 0.25);
+
+  --danger: #e11d48;
+  --warn: #b45309;
+
+  --code-bg: #f8fafc;
+  --code-keyword: #7c3aed;
+  --code-string: #047857;
+  --code-number: #b45309;
+  --code-comment: #94a3b8;
+  --code-func: #2563eb;
+  --code-attr: #b45309;
+
+  --scrollbar: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+
+}
+
+/* ── Dark blue ─────────────────────────────────────────────────────────── */
+:root[data-theme="dark-blue"] {
+  --bg-titlebar: #06090f;
+  --bg-sidebar: #06090f;
+  --bg-chat: #0f1725;
+  --bg-panel: #121a28;
+  --bg-card: #162032;
+  --bg-pill: #121a28;
+  --bg-bubble: #1a2436;
+  --bg-hover: #162032;
+  --bg-active: #1e293b;
+
+  --border: #1e293b;
+  --border-soft: #162032;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-dim: #64748b;
+  --text-muted: #64748b;
+
+  --accent: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --glow-alt: #a78bfa;
+
+  --accent-soft: rgba(56, 189, 248, 0.12);
+  --accent-ring: rgba(56, 189, 248, 0.28);
+
+  --danger: #f43f5e;
+  --warn: #f59e0b;
+
+  --code-bg: #0b1220;
+  --code-keyword: #c4b5fd;
+  --code-string: #86efac;
+  --code-number: #fbbf24;
+  --code-comment: #64748b;
+  --code-func: #7dd3fc;
+  --code-attr: #fcd34d;
+
+  --scrollbar: #1e293b;
+  --scrollbar-hover: #334155;
+}

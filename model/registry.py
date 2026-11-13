@@ -17,15 +17,15 @@ from typing import Dict, Optional
 import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from config import ModelConfig
+from config import ModelConfig, ModelConfigV15
 
 
 @dataclass
 class ModelEntry:
     """A registered model variant."""
-    name: str                       # Display name (e.g., "Dizel v1.2")
-    key: str                        # Lookup key (e.g., "dizel-v1.2")
-    config: ModelConfig             # Architecture config
+    name: str                       # Display name (e.g., "Dizel v1.5")
+    key: str                        # Lookup key (e.g., "dizel-v1.5")
+    config: any                     # Architecture config (ModelConfig or ModelConfigV15)
     description: str = ""           # Human-readable summary
     author: str = "D4niel-dev"
     version: str = ""
@@ -119,6 +119,32 @@ register_model(ModelEntry(
     description="~205.3M parameter model with RoPE, 2K context, and Code-First dataset mixing.",
     version="v1.2.1",
     param_count="~205.3M",
+    is_default=False,
+    status="available",
+))
+
+# Dizel v1.5 (current: SwiGLU + GQA + RMSNorm)
+register_model(ModelEntry(
+    name="Dizel v1.5",
+    key="dizel-v1.5",
+    config=ModelConfigV15(
+        vocab_size=100000,
+        context_length=2048,
+        d_model=1024,
+        n_layers=28,
+        n_heads=16,
+        kv_heads=8,
+        head_dim=64,
+        intermediate_size=3072,
+        norm_type="rmsnorm",
+        use_rope=True,
+        rope_theta=10000.0,
+        weight_tying=True,
+        dropout=0.0,
+    ),
+    description="454.78M parameter model with SwiGLU, GQA (8 KV heads), RMSNorm, RoPE, 100K vocab.",
+    version="v1.5.0",
+    param_count="~454.8M",
     is_default=True,
     status="available",
 ))

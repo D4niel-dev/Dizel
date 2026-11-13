@@ -155,6 +155,46 @@ class SFTConfig:
 
 
 # ---------------------------------------------------------------------------
+# Direct Preference Optimization (DPO)
+# ---------------------------------------------------------------------------
+@dataclass
+class DPOConfig:
+    dpo_data_path:  str   = "data/formatted/dizel_dpo.jsonl"
+    base_checkpoint: str  = ""          # path to SFT checkpoint (.pt)
+    output_dir:     str   = "checkpoints"
+    run_name:       str   = "dizel-dpo"
+
+    batch_size:     int   = 2           # T4 with gradient checkpointing can handle 2
+    grad_accum:     int   = 16          # effective batch = 32 pairs
+    max_steps:      int   = 2000        # DPO converges faster than SFT
+    warmup_steps:   int   = 100
+    gradient_checkpointing: bool = True # saves ~40% VRAM, enables larger batch
+    lr:             float = 5e-6        # very low LR for preference tuning
+    min_lr:         float = 5e-7
+    weight_decay:   float = 0.05
+    grad_clip:      float = 1.0
+
+    # DPO-specific
+    # NOTE: 205M model needs very strong KL penalty (beta >= 1.0) and
+    #       conservative DPO (label_smoothing) to prevent the rapid
+    #       distribution collapse observed at step 200 with beta=0.1.
+    #       The SFT reference model (205M) disagrees with GPT-4 preference
+    #       labels (ref_rejected > ref_chosen), making collapse inevitable
+    #       without aggressive KL clamping.
+    beta:           float = 1.0         # KL penalty strength (higher = closer to SFT)
+    label_smoothing: float = 0.1        # conservative DPO: 0 = standard, >0 = smoothed
+    max_length:     int   = 1024        # truncate pairs to save VRAM
+    max_prompt_length: int = 512        # max tokens for prompt portion
+
+    use_amp:        bool  = True
+    amp_dtype:      str   = "float16"   # T4 only supports float16
+
+    eval_interval:  int   = 200
+    eval_iters:     int   = 30
+    save_interval:  int   = 500
+
+
+# ---------------------------------------------------------------------------
 # Data Cleaning
 # ---------------------------------------------------------------------------
 @dataclass
@@ -189,6 +229,7 @@ class DizelConfig:
     tokenizer:  TokenizerConfig  = field(default_factory=TokenizerConfig)
     pretrain:   PretrainConfig   = field(default_factory=PretrainConfig)
     sft:        SFTConfig        = field(default_factory=SFTConfig)
+    dpo:        DPOConfig        = field(default_factory=DPOConfig)
     inference:  InferenceConfig  = field(default_factory=InferenceConfig)
     data_clean: DataCleanConfig  = field(default_factory=DataCleanConfig)
 
@@ -305,6 +346,243 @@ class SPECIAL:
     EOS_TAG    = "\u003c|end|\u003e"
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Dizel v1.5 — 500M+ Qwen-style architecture
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class ModelConfigV15:
+    """500M+ Qwen-style architecture with GQA, SwiGLU, RoPE."""
+    vocab_size: int = 100000
+    context_length: int = 2048
+    d_model: int = 1024
+    n_layers: int = 28
+    n_heads: int = 16
+    kv_heads: int = 8
+    head_dim: int = 64
+    intermediate_size: int = 3072          # SwiGLU gate/up dim
+    norm_type: str = "rmsnorm"
+    norm_eps: float = 1e-6
+    use_rope: bool = True
+    rope_theta: float = 10000.0
+    bias: bool = False
+    weight_tying: bool = True
+    dropout: float = 0.0
+
+    @property
+    def ffn_dim(self) -> int:
+        return self.intermediate_size
+
+    def param_estimate(self) -> int:
+        embed   = self.vocab_size * self.d_model
+        qkv = self.d_model * self.d_model * (1 + 2 * self.kv_heads / self.n_heads)
+        attn_out = self.d_model * self.d_model
+        attn = int(qkv) + attn_out
+        ffn = 3 * self.d_model * self.intermediate_size
+        norms = 2 * self.d_model
+        layer = (attn + ffn + norms) * self.n_layers
+        final_norm = self.d_model
+        lm_head = 0 if self.weight_tying else self.vocab_size * self.d_model
+        return embed + layer + final_norm + lm_head
+
+
+@dataclass
+class TokenizerConfigV15:
+    model_path: str = "tokenizer/dizel_v15.model"
+    vocab_size: int = 100000
+    character_coverage: float = 1.0
+    byte_fallback: bool = True
+    pad_id: int = 0
+    bos_id: int = 1
+    eos_id: int = 2
+    unk_id: int = 3
+
+
+@dataclass
+class DataConfigV15:
+    raw_dir: str = "data/raw"
+    cleaned_dir: str = "data/cleaned"
+    formatted_dir: str = "data/formatted"
+    math_output: str = "data/generated/math_samples.jsonl"
+    safety_output: str = "data/generated/safety_samples.jsonl"
+    distilled_output: str = "data/distilled"
+    math_samples: int = 25000
+    safety_samples: int = 2000
+
+
+@dataclass
+class PretrainConfigV15:
+    data_path: str = "data/formatted/v15_pretrain.txt"
+    batch_size: int = 2
+    grad_accum: int = 16
+    max_length: int = 2048
+
+    # --- Pretrain.py compatible fields (aliases to phase1_*) ---
+    max_steps: int = 15000       # alias for phase1_steps
+    lr: float = 2e-4             # alias for phase1_lr
+    min_lr: float = 2e-5         # alias for phase1_min_lr
+    warmup_steps: int = 500      # alias for phase1_warmup
+
+    # Phase-specific overrides (used by colab_v15_pipeline.py for multi-phase training)
+    phase1_steps: int = 15000
+    phase1_lr: float = 2e-4
+    phase1_min_lr: float = 2e-5
+    phase1_warmup: int = 500
+    phase2_steps: int = 5000
+    phase2_lr: float = 1e-4
+    phase2_min_lr: float = 1e-5
+    phase2_warmup: int = 200
+
+    weight_decay: float = 0.1
+    grad_clip: float = 1.0
+    adam_beta1: float = 0.9
+    adam_beta2: float = 0.95
+    adam_eps: float = 1e-8
+    use_amp: bool = True
+    amp_dtype: str = "float16"
+    gradient_checkpointing: bool = True
+    eval_interval: int = 500
+    eval_iters: int = 50
+    save_interval: int = 1000
+    checkpoint_dir: str = "checkpoints"
+    log_dir: str = "logs"
+    run_name: str = "dizel-v15-pretrain"
+
+    # --- Data loading (needed by pretrain.py build_pretrain_loaders) ---
+    train_split: float = 0.90
+    seed: int = 42
+    shard_size_mb: int = 100
+    cache_dir: str = ".cache/tokenized"
+    num_workers: int = 2
+    resume_enabled: bool = True
+    reshuffle_every_n_steps: int = 500
+
+
+@dataclass
+class SFTConfigV15:
+    base_checkpoint: str = ""
+    output_dir: str = "checkpoints"
+    run_name: str = "dizel-v15-sft"
+    sft_data_path: str = "data/formatted/v15_sft.jsonl"
+    batch_size: int = 2
+    grad_accum: int = 16
+    max_length: int = 2048
+
+    # --- sft.py compatible flat fields (aliases to phase1_*) ---
+    max_steps: int = 10000       # alias for phase1_steps
+    lr: float = 1e-4             # alias for phase1_lr
+    min_lr: float = 1e-5         # alias for phase1_min_lr
+    warmup_steps: int = 400      # alias for phase1_warmup
+
+    phase1_steps: int = 10000
+    phase1_lr: float = 1e-4
+    phase1_min_lr: float = 1e-5
+    phase1_warmup: int = 400
+    phase2_steps: int = 3000
+    phase2_lr: float = 5e-5
+    phase2_min_lr: float = 5e-6
+    phase2_warmup: int = 100
+    weight_decay: float = 0.05
+    grad_clip: float = 1.0
+    mask_prompt_loss: bool = True
+    use_amp: bool = True
+    amp_dtype: str = "float16"
+    gradient_checkpointing: bool = True
+    eval_interval: int = 250
+    eval_iters: int = 50
+    save_interval: int = 500
+
+
+@dataclass
+class DistillConfigV15:
+    """LoRA-based teacher distillation (replaces DPO for v1.5)."""
+    # Data
+    data_path: str = "data/formatted/v15_distill.jsonl"
+
+    teacher_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    lora_r: int = 32
+    lora_alpha: int = 64
+    lora_dropout: float = 0.05
+    lora_target_modules: tuple = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
+
+    # --- Flat aliases (used by distill.py's main() CLI overrides) ---
+    max_steps: int = 5000
+    lr: float = 2e-4
+    warmup_steps: int = 200
+
+    # Phase-specific (used by colab_v15_pipeline.py)
+    phase1_steps: int = 5000
+    phase1_lr: float = 2e-4
+    phase1_warmup: int = 200
+    phase2_steps: int = 5000
+    phase2_lr: float = 1e-4
+    phase2_warmup: int = 100
+    batch_size: int = 2
+    grad_accum: int = 16
+    max_length: int = 2048
+    weight_decay: float = 0.05
+    grad_clip: float = 1.0
+    use_amp: bool = True
+    # Gradient checkpointing trades compute for VRAM. Default ON: with
+    # max_length=2048 the 28-layer student's retained activations alone are
+    # ~9GB, which OOMs a T4 (14.5GB) when combined with the teacher + the
+    # fp32 CE softmax transient. Recomputation keeps the peak near ~5GB.
+    gradient_checkpointing: bool = True
+    amp_dtype: str = "float16"
+    eval_interval: int = 250
+    eval_iters: int = 30
+    save_interval: int = 500
+    log_dir: str = "logs"
+    checkpoint_dir: str = "checkpoints"
+    run_name: str = "dizel-v15-distill"
+    kl_weight: float = 0.5
+    temperature: float = 2.0
+    max_teacher_samples: int = 50000
+    min_teacher_score: float = 0.6
+    identity_filter: bool = True
+
+
+@dataclass
+class DPOConfigV15:
+    """DPO kept as experimental for v1.5 (not main release path)."""
+    dpo_data_path: str = "data/formatted/v15_dpo.jsonl"
+    base_checkpoint: str = ""
+    output_dir: str = "checkpoints"
+    run_name: str = "dizel-v15-dpo"
+    batch_size: int = 2
+    grad_accum: int = 16
+    max_steps: int = 2000
+    warmup_steps: int = 100
+    gradient_checkpointing: bool = True
+    lr: float = 5e-6
+    min_lr: float = 5e-7
+    weight_decay: float = 0.05
+    grad_clip: float = 1.0
+    beta: float = 1.0
+    label_smoothing: float = 0.1
+    max_length: int = 1024
+    max_prompt_length: int = 512
+    use_amp: bool = True
+    amp_dtype: str = "float16"
+    eval_interval: int = 200
+    eval_iters: int = 30
+    save_interval: int = 500
+
+
+@dataclass
+class DizelV15Config:
+    model: ModelConfigV15 = field(default_factory=ModelConfigV15)
+    tokenizer: TokenizerConfigV15 = field(default_factory=TokenizerConfigV15)
+    data: DataConfigV15 = field(default_factory=DataConfigV15)
+    pretrain: PretrainConfigV15 = field(default_factory=PretrainConfigV15)
+    sft: SFTConfigV15 = field(default_factory=SFTConfigV15)
+    distill: DistillConfigV15 = field(default_factory=DistillConfigV15)
+    dpo: DPOConfigV15 = field(default_factory=DPOConfigV15)
+
+
+V15_CONFIG = DizelV15Config()
+
+
 if __name__ == "__main__":
     for name, cfg in [("Dizel v1.2", DizelConfig()), ("Mila", MilaConfig())]:
         est = cfg.model.param_estimate()
@@ -319,4 +597,16 @@ if __name__ == "__main__":
         print(f"  weight_tying   : {cfg.model.weight_tying}")
         print(f"  rope_base      : {cfg.model.rope_base}")
         print(f"  ~ parameters   : {est / 1e6:.1f} M")
+
+    v15_est = V15_CONFIG.model.param_estimate()
+    print(f"\nDizel v1.5 Configuration")
+    print(f"  vocab_size     : {V15_CONFIG.model.vocab_size:,}")
+    print(f"  context_length : {V15_CONFIG.model.context_length}")
+    print(f"  d_model        : {V15_CONFIG.model.d_model}")
+    print(f"  n_layers       : {V15_CONFIG.model.n_layers}")
+    print(f"  n_heads        : {V15_CONFIG.model.n_heads}")
+    print(f"  kv_heads       : {V15_CONFIG.model.kv_heads}")
+    print(f"  intermediate   : {V15_CONFIG.model.intermediate_size}")
+    print(f"  weight_tying   : {V15_CONFIG.model.weight_tying}")
+    print(f"  ~ parameters   : {v15_est / 1e6:.1f} M")
 

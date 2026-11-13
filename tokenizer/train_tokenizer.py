@@ -64,8 +64,8 @@ def train_tokenizer(plain_text_path: str, model_prefix: str, vocab_size: int) ->
         bos_piece="<s>",
         eos_piece="</s>",
         unk_piece="<unk>",
-        # Chat role tokens
-        user_defined_symbols=["<|user|>", "<|assistant|>", "<|system|>", "<|json|>", "<|end|>"],
+        # Structural tokens — force newline/tab as single tokens (BPE tends to merge them otherwise)
+        user_defined_symbols=["<|user|>", "<|assistant|>", "<|system|>", "<|json|>", "<|end|>", "\n", "\t"],
         # Whitespace handling — preserve newlines!
         add_dummy_prefix=True,
         remove_extra_whitespaces=False,
@@ -78,36 +78,52 @@ def train_tokenizer(plain_text_path: str, model_prefix: str, vocab_size: int) ->
 
 
 def verify_tokenizer(model_path: str) -> None:
-    """Quick sanity-check: encode/decode a test sentence."""
+    """Sanity-check: encode/decode roundtrip, including newline preservation."""
     import sentencepiece as spm
     sp = spm.SentencePieceProcessor()
     sp.load(model_path)
 
+    # Test 1: Basic sentence
     test = "Hello! How are you doing today? I am Dizel, a small language model."
     ids = sp.encode(test)
     decoded = sp.decode(ids)
-
     print(f"[tokenizer] Test encode -> {len(ids)} tokens")
     print(f"[tokenizer] Tokens      : {sp.id_to_piece(ids[:12])} ...")
     print(f"[tokenizer] Decoded     : {decoded[:80]}")
     assert decoded.strip() == test.strip(), (
         f"Round-trip mismatch!\n  original : {test}\n  decoded  : {decoded}"
     )
-    print("[tokenizer] Round-trip OK")
+    print("[tokenizer] Basic round-trip OK")
 
-    # Verify newline preservation
+    # Test 2: Multi-line code (newline preservation)
+    code = "def hello():\n    print(\"hi\")\n    return True"
+    code_ids = sp.encode(code)
+    code_decoded = sp.decode(code_ids)
+    print(f"[tokenizer] Code encode -> {len(code_ids)} tokens")
     nl_ids = sp.encode("\n")
-    print(f"[tokenizer] Newline encode test: {nl_ids}")
-    if nl_ids:
-        print(f"[tokenizer] Newline token: {repr(sp.id_to_piece(nl_ids[0]))}")
+    print(f"[tokenizer] Newline token: {repr(sp.id_to_piece(nl_ids[0]) if nl_ids else 'N/A')}")
+    if code_decoded == code:
+        print("[tokenizer] Newline preservation: OK")
     else:
-        print("[tokenizer] WARNING: Newline still not tokenized!")
+        print(f"[tokenizer] NEWLINE BUG! Original: {repr(code[:50])}")
+        print(f"[tokenizer]              Decoded:  {repr(code_decoded[:50])}")
+
+    # Test 3: Tab preservation
+    tab_test = "column1\tcolumn2\tcolumn3"
+    tab_ids = sp.encode(tab_test)
+    tab_decoded = sp.decode(tab_ids)
+    if tab_decoded == tab_test:
+        print("[tokenizer] Tab preservation: OK")
+    else:
+        print(f"[tokenizer] TAB BUG! Original: {repr(tab_test)}")
+        print(f"[tokenizer]           Decoded:  {repr(tab_decoded)}")
 
 
 def main() -> None:
-    cfg = CONFIG.tokenizer
-    data_path   = CONFIG.pretrain.data_path
-    plain_path  = "tokenizer/corpus.txt"
+    from config import V15_CONFIG
+    cfg = V15_CONFIG.tokenizer
+    data_path = V15_CONFIG.pretrain.data_path
+    plain_path = "tokenizer/corpus_v15.txt"
     model_prefix = cfg.model_path.replace(".model", "")
 
     os.makedirs("tokenizer", exist_ok=True)

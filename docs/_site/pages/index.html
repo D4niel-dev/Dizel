@@ -1,0 +1,209 @@
+<!--meta
+{
+  "title": "Dizel 1.6 Flash Preview: a small model that stays yours",
+  "description": "Dizel 1.6 Flash Preview: a 435M-parameter sparse model built to run locally. The published v1.5 app runs today; the 1.6 preview is training in public.",
+  "nav": "home",
+  "layout": "public"
+}
+-->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Dizel",
+  "url": "https://d4niel-dev.github.io/Dizel/",
+  "description": "Dizel 1.6 Flash Preview: a local-first sparse language model and app.",
+  "inLanguage": "en"
+}
+</script>
+
+<div class="s-shell">
+          <div class="s-hero">
+            <div class="s-hero-copy">
+              <div class="s-kicker"><span>Model record</span><span>/</span><span>Preview</span><span class="s-rule" aria-hidden="true"></span><span>2026-11</span></div>
+              <h1>A small model that stays <em>yours.</em></h1>
+              <p class="s-deck">Dizel 1.6 Flash is a 435.3M-parameter sparse model with 293.7M active per token. It is training in public on one T4. The published v1.5 app runs locally today.</p>
+              <div class="s-actions">
+                <a class="s-btn is-primary" href="guide/install.html">Run v1.5 locally <span aria-hidden="true">→</span></a>
+                <a class="s-btn" href="model.html">Read the model card</a>
+                <a class="s-text-link" href="model.html#mc-training">Training log</a>
+              </div>
+              <p class="s-hero-meta"><span>MIT licensed</span><span>Windows · macOS · Linux</span><span>Python 3.10+</span></p>
+            </div>
+
+            <aside class="s-ledger" aria-label="Project evidence ledger">
+              <div class="s-ledger-head"><b>Evidence ledger</b><span>As of 13 Nov 2026</span></div>
+              <table>
+                <caption class="sr-only">Public status of the Dizel models and evidence</caption>
+                <tbody>
+                  <tr>
+                    <th scope="row">v1.5<small>Dense control</small></th>
+                    <td><span class="s-tag is-ok"><i></i>Published</span></td>
+                    <td><span class="s-val">454.78M</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">v1.6 Flash<small>Preview</small></th>
+                    <td><span class="s-tag is-warn"><i></i>Training</span></td>
+                    <td><span class="s-val">22.9%</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Held-out BPB<small>Step 10,500</small></th>
+                    <td><span class="s-tag is-ok"><i></i>Verified</span></td>
+                    <td><span class="s-val">1.1236</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Validation loss<small>Step 10,500</small></th>
+                    <td><span class="s-tag is-ok"><i></i>Verified</span></td>
+                    <td><span class="s-val">3.4479</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Holdout set<small>500 documents</small></th>
+                    <td><span class="s-tag is-muted"><i></i>Not published</span></td>
+                    <td><span class="s-val">—</span></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">v1.6 weights<small>Instruct release</small></th>
+                    <td><span class="s-tag is-muted"><i></i>Pending</span></td>
+                    <td><span class="s-val">—</span></td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="s-ledger-foot">Each value is copied from the last validation run; nothing here polls or animates. <b>Sources:</b> training log, held-out evaluation, and model card.</p>
+            </aside>
+          </div>
+        </div>
+
+        <section class="s-section" id="versions">
+          <div class="s-shell">
+            <div class="s-section-head">
+              <div>
+                <p class="s-kicker">Availability</p>
+                <h2>Two models.<br>One is ready.</h2>
+              </div>
+              <p class="s-section-copy">The app runs v1.5 today. The 1.6 preview has no published weights and no downstream benchmarks; its training log is the public evidence. <b>We do not blur those two states.</b></p>
+            </div>
+            <table class="s-matrix">
+              <thead>
+                <tr><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Parameters</th><th scope="col">Runs on</th><th scope="col">Start</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row"><b>Dizel 1.5</b><small>Dense · distillation</small></th>
+                  <td data-label="Status"><span class="s-tag is-ok"><i></i>Published</span></td>
+                  <td class="num" data-label="Parameters">454.78M<small>all active</small></td>
+                  <td data-label="Runs on">Desktop app · TUI · GGUF</td>
+                  <td><a href="index.html">Install v1.5 →</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><b>Dizel 1.6 Flash</b><small>Sparse MoE · preview</small></th>
+                  <td data-label="Status"><span class="s-tag is-warn"><i></i>Training</span></td>
+                  <td class="num" data-label="Parameters">435.3M<small>293.7M active</small></td>
+                  <td data-label="Runs on" class="s-empty">Weights pending</td>
+                  <td><a href="model.html#mc-training">Training log →</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="s-section">
+          <div class="s-shell">
+            <div class="s-index">
+              <div class="s-index-intro">
+                <p class="s-kicker">Documentation</p>
+                <h2>Start here.</h2>
+                <p class="copy">Dizel is a model and two clients. Pick the surface that matches how you work; the docs get you from a checkout to a running app.</p>
+                <a class="s-text-link" href="guide/index.html">Browse all documentation →</a>
+              </div>
+              <ol class="s-links-list">
+                <li><a href="guide/install.html"><span class="s-num">01</span><span><span class="s-link-title">Install Dizel</span><span class="s-link-desc">Python, PyTorch, and the desktop app.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
+                <li><a href="guide/launch.html#tui"><span class="s-num">02</span><span><span class="s-link-title">Use the terminal</span><span class="s-link-desc">Keyboard-first TUI, sessions, and commands.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
+                <li><a href="model.html"><span class="s-num">03</span><span><span class="s-link-title">Read the model card</span><span class="s-link-desc">Architecture, training, evaluation, and limits.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
+                <li><a href="guide/index.html"><span class="s-num">04</span><span><span class="s-link-title">Browse the docs</span><span class="s-link-desc">The guide index and what runs today.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+        <section class="s-section" id="demo">
+          <div class="s-shell">
+            <div class="s-section-head">
+              <div>
+                <p class="s-kicker">Evidence</p>
+                <h2>The model’s home.</h2>
+              </div>
+              <p class="s-section-copy">An Electron shell over a local Python engine. It runs v1.5 today; the preview moves in when its gates clear. Prompts stay on the machine.</p>
+            </div>
+            <div class="s-evidence">
+              <figure class="s-shot">
+                <img src="assets/site/app-desktop.webp" alt="The Dizel desktop app showing a chat with a Python code answer, a recent-chat sidebar, and a v1.5 status bar." width="1475" height="975">
+                <figcaption><span>The desktop app, running v1.5.</span><a href="https://github.com/D4niel-dev/Dizel" target="_blank" rel="noopener">Repository ↗</a></figcaption>
+              </figure>
+              <div class="s-specs">
+                <p class="s-kicker">The sparse bet</p>
+                <h3>Store more capacity. Fire less of it.</h3>
+                <p class="copy">Four experts hold the knowledge. Two fire for every token. The trade is memory for compute — and measuring that trade is what the preview gates are for.</p>
+                <ul class="s-facts">
+                  <li><span class="k">Total parameters</span><span class="v">435.3M</span></li>
+                  <li><span class="k">Active per token</span><span class="v">293.7M</span></li>
+                  <li><span class="k">Experts</span><span class="v">4 · top-2</span></li>
+                  <li><span class="k">Context</span><span class="v">2,048 tokens</span></li>
+                  <li><span class="k">Tokenizer</span><span class="v">151,936 rows</span></li>
+                  <li><span class="k">License</span><span class="v">MIT</span></li>
+                </ul>
+                <a class="s-text-link" href="model.html#mc-architecture">Read the architecture →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="s-section" id="lab">
+          <div class="s-shell">
+            <div class="s-lab-head">
+              <div>
+                <p class="s-kicker">Interactive</p>
+                <h2>Route a token.</h2>
+              </div>
+              <p class="copy">Pick a fragment. The dropless router sends it to two of the four experts and keeps the other two asleep.</p>
+            </div>
+            <div class="s-token-row" role="group" aria-label="Choose a token to route">
+              <button class="s-token" type="button" data-token="def add(" aria-pressed="true">def add(</button>
+              <button class="s-token" type="button" data-token="photosynthesis" aria-pressed="false">photosynthesis</button>
+              <button class="s-token" type="button" data-token="bầu cử" aria-pressed="false">bầu cử</button>
+              <button class="s-token" type="button" data-token="2 + 2 =" aria-pressed="false">2 + 2 =</button>
+              <button class="s-token" type="button" data-token="select *" aria-pressed="false">select *</button>
+              <button class="s-token" type="button" data-token="Paris" aria-pressed="false">Paris</button>
+            </div>
+            <div class="s-route" aria-live="polite">
+              <div class="s-node is-token"><b data-route-token>def add(</b><small>token</small></div>
+              <div class="s-wire" aria-hidden="true"></div>
+              <div class="s-node is-router"><b>router</b><small>top two</small></div>
+              <div class="s-wire" aria-hidden="true"></div>
+              <div class="s-experts" role="group" aria-label="Expert load">
+                <div class="s-expert is-active" data-expert="0"><span>E0</span><i></i></div>
+                <div class="s-expert" data-expert="1"><span>E1</span><i></i></div>
+                <div class="s-expert is-active" data-expert="2"><span>E2</span><i></i></div>
+                <div class="s-expert" data-expert="3"><span>E3</span><i></i></div>
+              </div>
+            </div>
+            <div class="s-lab-foot"><span>Illustrative routes at the 25% even-load target.</span><span class="s-mono" data-route-readout>E0 + E2 · 2 of 4 awake</span></div>
+          </div>
+        </section>
+
+        <section class="s-section">
+          <div class="s-shell">
+            <div class="s-limits">
+              <div>
+                <p class="s-kicker">Limitations</p>
+                <h2>What this is not.</h2>
+                <p class="copy">A preview page should state its boundaries before asking for trust. These are the four that matter most.</p>
+              </div>
+              <ul class="s-limit-list">
+                <li><span class="x" aria-hidden="true">×</span><span><strong>Not a vision model.</strong><span>No image encoder, image tokens, or multimodal projection.</span></span></li>
+                <li><span class="x" aria-hidden="true">×</span><span><strong>Not a 1.6 release.</strong><span>The preview has no published weights; v1.5 is the model you can run.</span></span></li>
+                <li><span class="x" aria-hidden="true">×</span><span><strong>Not publicly benchmarked.</strong><span>Only held-out BPB and validation loss are published; downstream results are not.</span></span></li>
+                <li><span class="x" aria-hidden="true">×</span><span><strong>Not a long-context model.</strong><span>2,048 tokens, and the app does not extend that window.</span></span></li>
+              </ul>
+            </div>
+          </div>
+        </section>

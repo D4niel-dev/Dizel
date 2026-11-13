@@ -15,6 +15,12 @@ def list_sessions() -> List[Dict]:
     """List all available sessions"""
     return SessionService.list_sessions()
 
+@router.post("/clear-all")
+def clear_all_sessions() -> Dict[str, int]:
+    """Delete every saved session."""
+    return {"deleted": SessionService.delete_all()}
+
+
 @router.get("/{session_id}")
 def get_session(session_id: str) -> Dict:
     """Get a specific session by ID"""
@@ -42,3 +48,39 @@ def toggle_pin(session_id: str) -> Dict[str, Any]:
     """Toggle the pin status of a session"""
     pinned = SessionService.toggle_pin(session_id)
     return {"session_id": session_id, "pinned": pinned}
+
+
+@router.post("/{session_id}/archive")
+def toggle_archive(session_id: str) -> Dict[str, Any]:
+    """Toggle the archived flag of a session."""
+    archived = SessionService.toggle_archive(session_id)
+    return {"session_id": session_id, "archived": archived}
+
+
+class SessionTruncateRequest(BaseModel):
+    keep: int
+
+
+@router.post("/{session_id}/truncate")
+def truncate_session(session_id: str, req: SessionTruncateRequest) -> Dict[str, Any]:
+    """Keep only the first `keep` messages — used by edit-and-resend."""
+    if req.keep < 0:
+        raise HTTPException(status_code=400, detail="keep must be >= 0")
+    if not SessionService.truncate(session_id, req.keep):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id, "kept": req.keep}
+
+
+class SessionRenameRequest(BaseModel):
+    title: str
+
+
+@router.post("/{session_id}/rename")
+def rename_session(session_id: str, req: SessionRenameRequest) -> Dict[str, str]:
+    """Rename a saved session."""
+    clean = req.title.strip()[:80]
+    if not clean:
+        raise HTTPException(status_code=400, detail="Title cannot be empty.")
+    if not SessionService.rename_session(session_id, clean):
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id, "title": clean}

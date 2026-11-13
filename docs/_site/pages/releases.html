@@ -1,0 +1,80 @@
+<!--meta
+{
+  "title": "Releases — Dizel",
+  "description": "Dizel releases: v1.5 published, v1.6 Flash Preview training, known limits, and release policy.",
+  "nav": "releases",
+  "layout": "public"
+}
+-->
+
+<div class="s-shell">
+  <header class="s-doc-head">
+    <div class="s-crumb"><a href="index.html">Dizel</a><span>/</span><span>Releases</span></div>
+    <h1>Releases</h1>
+    <div class="s-doc-meta"><span>Record 2026-11</span><span>v1.5 published</span><span>v1.6 preview</span></div>
+  </header>
+</div>
+
+<section class="s-section">
+  <div class="s-shell">
+    <div class="s-section-head">
+      <div>
+        <p class="s-kicker">Availability</p>
+        <h2>Two models.<br>One is ready.</h2>
+      </div>
+      <p class="s-section-copy">The app runs v1.5 today. The 1.6 preview has no published weights and no downstream benchmarks; its training log is the public evidence.</p>
+    </div>
+    <table class="s-matrix">
+      <thead>
+        <tr><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Parameters</th><th scope="col">Runs on</th><th scope="col">Start</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><b>Dizel 1.5</b><small>Dense · distillation</small></th>
+          <td data-label="Status"><span class="s-tag is-ok"><i></i>Published</span></td>
+          <td class="num" data-label="Parameters">454.78M<small>all active</small></td>
+          <td data-label="Runs on">Desktop app · TUI · GGUF</td>
+          <td><a href="guide/install.html">Install v1.5 →</a></td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Dizel 1.6 Flash</b><small>Sparse MoE · preview</small></th>
+          <td data-label="Status"><span class="s-tag is-warn"><i></i>Training</span></td>
+          <td class="num" data-label="Parameters">435.3M<small>293.7M active</small></td>
+          <td data-label="Runs on" class="s-empty">Weights pending</td>
+          <td><a href="model.html#mc-training">Training log →</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="s-section">
+  <div class="s-shell">
+    <div class="s-section-head">
+      <div>
+        <p class="s-kicker">Known limits</p>
+        <h2>What is not ready.</h2>
+      </div>
+      <p class="s-section-copy">These are the boundaries behind the preview label. They are not release notes for a finished version.</p>
+    </div>
+    <ul class="s-limit-list">
+      <li><span class="x" aria-hidden="true">×</span><span><strong>v1.6 weights are pending.</strong><span>The preview checkpoint is for evaluation; v1.5 is the model you can run.</span></span></li>
+      <li><span class="x" aria-hidden="true">×</span><span><strong>Downstream benchmarks are not published.</strong><span>Only held-out BPB and validation loss are available.</span></span></li>
+      <li><span class="x" aria-hidden="true">×</span><span><strong>2,048-token context.</strong><span>The app does not extend the model's window.</span></span></li>
+      <li><span class="x" aria-hidden="true">×</span><span><strong>No vision path.</strong><span>There is no image encoder, image tokens, or multimodal projection.</span></span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="s-section">
+  <div class="s-shell">
+    <div class="s-section-head">
+      <div>
+        <p class="s-kicker">Release policy</p>
+        <h2>Gates, not a date.</h2>
+      </div>
+      <p class="s-section-copy">The stable 1.6 release ships after six measured gates pass, not on a calendar date. The repository release policy is the source of truth.</p>
+    </div>
+    <a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/releases" target="_blank" rel="noopener">GitHub releases ↗</a>
+  </div>
+</section>

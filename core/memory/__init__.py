@@ -32,28 +32,39 @@ class MemorySystem:
     with automatic permission enforcement and context assembly.
     """
 
-    def __init__(self, data_dir: Optional[str] = None):
+    def __init__(self, data_dir: Optional[str] = None, enabled: bool = True):
         import os
-        if data_dir:
-            ep_path = os.path.join(data_dir, "episodic.db")
-            sem_path = os.path.join(data_dir, "semantic.json")
-        else:
-            ep_path = None
-            sem_path = None
+        self.enabled = enabled
 
+        # Non-persistent: always available (in-memory only)
         self.working = WorkingMemory()
-        self.episodic = EpisodicMemory(db_path=ep_path)
-        self.semantic = SemanticMemory(file_path=sem_path)
         self.policy = MemoryPolicy()
+
+        if enabled:
+            # Persistent stores — only created when memory is active
+            if data_dir:
+                ep_path = os.path.join(data_dir, "episodic.db")
+                sem_path = os.path.join(data_dir, "semantic.json")
+            else:
+                ep_path = None
+                sem_path = None
+            self.episodic = EpisodicMemory(db_path=ep_path)
+            self.semantic = SemanticMemory(file_path=sem_path)
+        else:
+            self.episodic = None
+            self.semantic = None
 
         self._stores: Dict[MemoryType, MemoryStore] = {
             MemoryType.WORKING:  self.working,
-            MemoryType.EPISODIC: self.episodic,
-            MemoryType.SEMANTIC: self.semantic,
         }
+        if enabled:
+            self._stores[MemoryType.EPISODIC] = self.episodic
+            self._stores[MemoryType.SEMANTIC] = self.semantic
 
     def store(self, agent: str, item: MemoryItem) -> Optional[str]:
         """Write a memory item if the agent has permission."""
+        if not self.enabled:
+            return None
         if not self.policy.check_write(agent, item):
             return None
         target = self._stores.get(item.type)
@@ -78,6 +89,8 @@ class MemorySystem:
 
     def get_context(self, agent: str, query: Optional[str] = None) -> str:
         """Assemble a context string for prompt injection."""
+        if not self.enabled:
+            return ""
         return self.policy.assemble_context(agent, self._stores, query)
 
     def prune_all(self) -> int:
@@ -93,7 +106,8 @@ class MemorySystem:
 
     def end_session(self, session_id: str, summary: str):
         """Archive the current session into episodic memory."""
-        self.episodic.store_session_summary(session_id, summary)
+        if self.enabled and self.episodic:
+            self.episodic.store_session_summary(session_id, summary)
         self.working.clear()
 
 

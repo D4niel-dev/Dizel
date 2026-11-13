@@ -1,0 +1,36 @@
+{
+  "name": "dizel",
+  "version": "2.0.0",
+  "description": "Dizel — local-first AI model, desktop app, and terminal client",
+  "license": "MIT",
+  "author": "D4niel-dev",
+  "homepage": "https://d4niel-dev.github.io/Dizel/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/D4niel-dev/Dizel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/D4niel-dev/Dizel/issues"
+  },
+  "bin": {
+    "dizel": "bin/dizel.js"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dizel",
+    "local-ai",
+    "llm",
+    "cli",
+    "desktop",
+    "tui"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

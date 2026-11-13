@@ -1,0 +1,50 @@
+<!--meta
+{
+  "title": "Dizel docs — Overview",
+  "description": "Dizel documentation: what runs today, install, launch, and the model card.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "overview"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Overview</span></div>
+<h1>Dizel docs</h1>
+<p class="s-docs-lede">Dizel is a local model and two clients. This guide gets you from a checkout to a running app; the model card holds the research record.</p>
+
+<div class="s-callout"><b>Start with v1.5.</b> It is the published model and the one the app loads by default. The 1.6 preview has no weights yet.</div>
+
+<section class="s-docs-section">
+  <h2 id="what-runs">What runs today</h2>
+  <ul>
+    <li><strong>Dizel 1.5</strong> — the published dense model. The desktop app, TUI, and F16 GGUF checkpoints run today.</li>
+    <li><strong>Dizel 1.6 Flash</strong> — a sparse preview in pretraining. Weights and downstream benchmarks are not published.</li>
+  </ul>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="choose">Choose a path</h2>
+  <ul>
+    <li><a href="install.html">Install Dizel</a> — requirements and the commands to get a checkout running.</li>
+    <li><a href="launch.html">Launch a client</a> — the desktop app, the terminal UI, or headless generation.</li>
+    <li><a href="../model.html">Read the model card</a> — architecture, training, held-out evaluation, and limits.</li>
+    <li><a href="../releases.html">Check releases</a> — what is published, what is training, and the release policy.</li>
+  </ul>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="before">Before you start</h2>
+  <ul>
+    <li><strong>Python 3.10+</strong> for the engine and both clients.</li>
+    <li><strong>PyTorch 2.1+</strong> — CUDA is recommended for local inference.</li>
+    <li><strong>Node.js 18+</strong> for the desktop app.</li>
+    <li><strong>Windows</strong> for the <code>dizel.cmd</code> launcher; the Python modules also run on macOS and Linux.</li>
+  </ul>
+  <p>If you only want to inspect the interface, open the <a href="../demo.html">scripted demo</a>. No model runs in the browser.</p>
+</section>
+
+<div class="s-next">
+  <a href="../index.html"><small>Previous</small>Home</a>
+  <a href="install.html"><small>Next</small>Install Dizel →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>

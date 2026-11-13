@@ -1,0 +1,123 @@
+{
+  "name": "dizel-gui",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dizel — desktop application",
+  "author": "D4niel-dev",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n vite,app -c cyan,magenta \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/run-smoke.cjs",
+    "dist": "npm run build && electron-builder --win --x64 --publish never",
+    "pack:tui": "python ../../scripts/package_tui.py"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "public/**/*"
+  ],
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "highlight.js": "^11.10.0",
+    "lottie-web": "^5.13.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "rehype-highlight": "^7.0.1",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.1.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "dev.dizel.desktop",
+    "productName": "Dizel",
+    "artifactName": "Dizel-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../api",
+        "to": "app/api",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../dizel_core",
+        "to": "app/dizel_core",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../model",
+        "to": "app/model",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../core",
+        "to": "app/core",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../utils",
+        "to": "app/utils",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../inference",
+        "to": "app/inference",
+        "filter": ["__init__.py", "tui/**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../../config.py",
+        "to": "app/config.py"
+      },
+      {
+        "from": "../../capabilities.json",
+        "to": "app/capabilities.json"
+      },
+      {
+        "from": "../../requirements.txt",
+        "to": "app/requirements.txt"
+      },
+      {
+        "from": "../../README.md",
+        "to": "app/README.md"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/Dizel_GUI.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "D4niel-dev",
+      "repo": "Dizel"
+    }
+  }
+}

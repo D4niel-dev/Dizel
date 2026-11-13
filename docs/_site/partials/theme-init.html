@@ -1,0 +1,17 @@
+<script>
+(function () {
+  var root = document.documentElement;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  var light = "#F1F2EC";
+  var dark = "#141519";
+  var stored = null;
+  try { stored = localStorage.getItem("dizel.site.theme"); } catch (_) {}
+  var darkMode = stored
+    ? stored === "dark"
+    : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  root.classList.add("js");
+  root.dataset.theme = darkMode ? "dark" : "light";
+  root.style.colorScheme = darkMode ? "dark" : "light";
+  if (meta) meta.setAttribute("content", darkMode ? dark : light);
+})();
+</script>

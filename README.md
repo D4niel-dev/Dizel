@@ -1,769 +1,948 @@
 <div align="center">
-  <img src="inference/dizel_gui/assets/app/Dizel_banner.png" 
+  <img src="docs/assets/app/Dizel_banner.png"
     width="60%"
     height="60%"/>
 </div>
 <div align="center">
 
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch)
-![PySide6](https://img.shields.io/badge/GUI-PySide6-41CD52?logo=qt)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-EE4C2C?logo=pytorch)
+![Textual](https://img.shields.io/badge/TUI-Textual-5A5AFF)
+![Electron](https://img.shields.io/badge/Desktop-Electron%20%2B%20React-47848F?logo=electron)
+![License: MIT](https://img.shields.io/badge/Code-MIT-yellow.svg)
 
 </div>
 
-**Dizel** *(Distributed Intelligent Zen Execution Layer)* is a complete, educational implementation of a GPT-style causal language
-model *(~205 M parameters)* built with PyTorch. It is designed to run locally on a
-single consumer GPU *(~4 GB VRAM)* over a weekend, with no distributed training required.
-But it has grown into **so much more**—shipping with a state-of-the-art **Native Desktop App** featuring voice transcription, cross-provider API routing (BYOK), and rich markdown UI.
+**Dizel** is a small language model built from scratch, plus the local software that runs it. The repository contains the model architecture, the training pipeline, a Textual terminal client, an Electron desktop app, and the FastAPI sidecar they share.
+
+The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in public; its weights are not published yet. The v1.5 dense model remains the control and the released artifact.
+
+> **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 5,000 of 45,777. Nothing from v1.6 is a release yet.
 
 ---
 
-## Current Status
+## Contents
 
-| Component | Status |
-|------------|---------|
-| Pretraining | 🚧 In Progress |
-| SFT | ⏳ Planned |
-| DPO | ⏳ Planned |
-| CMD UI v2 | ✅ Available |
-| Desktop GUI | ✅ Available |
-| Web Demo | ✅ Available |
-
-Current Model:
-- Dizel v1.2.2
-- ~205M Parameters
-- ~100M Tokens
-- Training on Tesla T4
-
----
-
-## 📑 Table of Contents
-
-- [🌟 What You Will Build](#-what-you-will-build)
-- [📁 Folder Structure](#folder-structure)
-
-<details>
-<summary><b>⚙️ Setup</b></summary>
-
-- [Setup](#setup)
-  - [1. Install dependencies](#1-install-dependencies)
-  - [2. Verify your installation](#2-verify-your-installation)
-
-</details>
-
-<details>
-<summary><b>🚀 Execution Steps</b></summary>
-
-- [Execution Steps](#execution-steps)
-  - [Step 0 — Quick Start](#step-0--quick-start-if-you-already-have-a-checkpoint)
-  - [Step 1 — Review and tune configuration](#step-1--review-and-tune-configuration-optional)
-  - [Step 2 — Add training data](#step-2--add-training-data)
-  - [Step 3 — Train the tokenizer](#step-3--train-the-tokenizer)
-  - [Step 4 — Run sanity checks](#step-4--run-sanity-checks)
-  - [Step 5 — Pre-train Dizel](#step-5--pre-train-dizel)
-  - [Step 6 — Generate SFT training data](#step-6--generate-sft-training-data)
-  - [Step 7 — Supervised Fine-Tuning (SFT)](#step-7--supervised-fine-tuning-sft)
-  - [Step 8 — Dizel CMD UI](#step-8--dizel-cmd-ui-v203)
-  - [Step 9 — Desktop GUI](#step-9--desktop-gui-v102-recommended)
-
-</details>
-
-<details>
-<summary><b>🌐 Web Demo</b></summary>
-
-- [Interactive Web UI Demo](#-interactive-web-ui-demo)
-- [Weekend Timeline](#weekend-timeline)
-
-</details>
-
-<details>
-<summary><b>🏗️ Architecture Deep Dive</b></summary>
-
-- [Architecture Deep-Dive](#architecture-deep-dive)
-  - [Core Attention Mechanism](#core-attention-mechanism-flash-attention--rope)
-  - [Transformer Block](#transformer-block-pre-layernorm--swiglu)
-
-</details>
-
-- [📉 Overfitting on Small Data](#overfitting-on-small-data)
-- [💾 VRAM Usage Guide](#vram-usage-guide)
-
-<details>
-<summary><b>🛠️ Extending Dizel</b></summary>
-
+- [Status](#status)
+- [What's new](#whats-new)
+- [What's coming](#whats-coming)
+- [Quick start](#quick-start)
+- [Using Dizel](#using-dizel)
+- [Repository layout](#repository-layout)
+- [Training](#training)
+- [Architecture](#architecture)
+- [Overfitting on small data](#overfitting-on-small-data)
+- [VRAM guide](#vram-guide)
 - [Extending Dizel](#extending-dizel)
-  - [Build Custom Agents](#1-build-custom-agents)
-  - [Change Model Architecture](#2-change-model-architecture)
-  - [Expand SFT Datasets](#3-expand-sft-datasets)
-  - [Export to ONNX / C++](#4-export-to-onnx--c)
-
-</details>
-
-<details>
-<summary><b>❓ FAQ & References</b></summary>
-
-- [Frequently Asked Questions](#frequently-asked-questions)
-  - [🧠 Training & Model Architecture](#-training--model-architecture)
-  - [🖥️ Hardware & Compatibility](#️-hardware--compatibility)
-  - [🎨 Desktop App (PySide6) & UI](#-desktop-app-pyside6--ui)
-  - [⌨️ Terminal (CMD UI) & Workflows](#️-terminal-cmd-ui--workflows)
-
+- [FAQ](#faq)
 - [References](#references)
-  - [Architecture & Papers](#architecture--papers)
-  - [Libraries & Inspiration](#libraries--inspiration)
-
-</details>
 
 ---
 
+## Status
 
-## 🌟 What You Will Build
+| Track                       | Status                  | What it is                                                                                                                            |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dizel 1.5**               | **Shipped / published** | 454.78M dense decoder. 100K SentencePiece vocabulary, 2,048-token context, F16 GGUF, and the dense control for every v1.6 comparison. |
+| **Dizel 1.6 Flash Preview** | **Training in public**  | 435.3M total / 293.7M active. Four-expert, top-2 dropless MoE. Qwen2.5 tokenizer, ChatML, 2,048-token context. Weights unpublished.   |
+| **Dizel 1.6 Flash**         | **Gated**               | Same Flash architecture, refined checkpoint and post-training. The name is earned only after the six measured gates pass.             |
+| **Dizel 1.6 Pro**           | **Future**              | A separate 1.6B total / 973M active, 8-expert top-4 tier. Configured, not trained. No artifact exists.                                |
 
-| Component | Details |
-|---|---|
-| **Architecture** | Causal Transformer (Pre-LayerNorm, RoPE, SwiGLU MLP, multi-head self-attention) |
-| **Parameters** | ~205 M (configurable 10–250 M) |
-| **Tokenizer** | SentencePiece BPE, 32 000 vocab |
-| **Pre-training** | Next-token prediction, cosine LR, AMP, gradient accumulation, memory-efficient chunked tokenization |
-| **SFT** | Basic chat format, prompt-loss masking |
-| **Inference (CLI)** | CLI chat with streaming, top-k/nucleus sampling, repetition penalty (Available v2.0!) |
-| **Inference (GUI)** | Full Desktop App (PySide6) with **API Router (BYOK)**, **Nova Voice Engine**, Dark mode, history & persistent UI |
+### Current pretrain run
 
----
+| Metric          | Value                                                       |
+| --------------- | ----------------------------------------------------------- |
+| Run             | `dizel-1.6-preview-m1-pretrain`                             |
+| Progress        | 5,000 / 45,777 steps (10.9%)                                |
+| Tokens          | 327.7M / 3B                                                 |
+| Bits per byte   | **1.2057** on the fixed 500-document holdout                |
+| Validation loss | 3.6998                                                      |
+| Train loss      | 2.7982                                                      |
+| Throughput      | ~21 s/step on the current T4 run                            |
+| Checkpoint      | Best snapshot synced to Drive; local copy in `checkpoints/` |
 
-## Folder Structure
-
-```text
-Dizel/
-├── config.py                    ← All hyperparameters in one place
-├── requirements.txt             ← All app requirements and optionals too
-│
-├── data/
-│   └── english.md               ← Training corpus (plain English text or what ever your datasets is)
-│
-├── tokenizer/
-│   ├── train_tokenizer.py       ← Train SentencePiece BPE tokenizer
-│   ├── train_mila_tokenizer.py  ← Train Mila variant tokenizer
-│   ├── corpus.txt               ← (generated) plain texts
-│   ├── dizel.model              ← (generated) tokenizer model
-│   └── dizel.vocab              ← (generated) vocabulary
-│
-├── model/
-│   ├── __init__.py              ← Package loader
-│   ├── architecture.py          ← DizelLM: full Transformer implementation
-│   ├── registry.py              ← Model size presets (Lite, Base, Large)
-│   └── rope.py                  ← Rotary position embedding (RoPE)
-│
-├── core/
-│   ├── agents/                  ← Content Dict and Lily agents config
-│   ├── tools/                   ← Tools and functions of Dict and Lily
-│   ├── __init__.py              ← Package loader
-│   ├── prompt_builder.py        ← Format agent results into clean text context
-│   └── router.py                ← Detect input type and dispatch to the correct agent
-│
-├── training/
-│   ├── __init__.py              ← Package loader
-│   ├── dataset.py               ← PretrainDataset, SFTDataset, Tokenizer wrapper
-│   ├── pretrain.py              ← Pre-training loop (AMP, grad accum, LR schedule)
-│   ├── sft.py                   ← Supervised fine-tuning for chat format
-│   ├── shard_utils.py           ← Memory-efficient corpus sharding (100 MB shards)
-│   ├── tokenizer_utils.py       ← Fast batch tokenization utilities
-│   ├── cache_utils.py           ← Per-shard .pt caching for instant resume
-│   ├── data_mixing.py           ← Multi-dataset mixing utilities
-│   ├── mila_pretrain.py         ← Mila variant pre-training driver
-│   └── mila_sft.py              ← Mila variant SFT driver
-│
-├── scripts/
-│   ├── colab_train.py           ← Google Colab training notebook helper
-│   ├── migrate_datasets.py      ← HuggingFace dataset downloader and converter
-│   ├── prepare_v11.py           ← v1.1 data preparation pipeline
-│   └── prepare_v12.py           ← v1.2 data preparation pipeline
-│
-├── sft_data/
-│   ├── generate_sft_data.py     ← Generate synthetic chat JSONL data
-│   └── chat.jsonl               ← (generated) ~60 conversation examples
-│
-├── inference/
-│   ├── cmd_tui/                  ← Terminal UI v2.0 Application! (NEW)
-│   │   ├── main.py              ← Run this to start the Terminal UI
-│   │   ├── app.py               ← Textual App runtime & bindings
-│   │   ├── bridge/              ← Streaming & threading logic
-│   │   ├── commands/            ← Slash command registry & parser
-│   │   ├── panels/              ← InputBar, Workspace, Context panels
-│   │   ├── rendering/           ← Markdown blocks, ASCII empty state
-│   │   └── cmd_tui.tcss          ← Textual CSS styles & layouts
-│   │
-│   └── dizel_gui/                ← Full Desktop GUI Application! (v1.0.0)
-│       ├── main.py              ← Run this to start the desktop app
-│       ├── theme/               ← Theme manager, colors, fonts, stylesheets
-│       ├── history/             ← Saved chats via JSON    (auto-created)
-│       ├── .dizel/              ← Saved settings via JSON (auto-created)
-│       ├── ui/                  ← PySide6 UI components (sidebar, chat, input, overlays)
-│       ├── utils/               ← Hardware utilities and generic icons
-│       ├── logic/               ← Async managers, context trimmer, TokenBudget
-│       └── assets/              ← Static logos and fonts
-│       
-├── docs/                        ← Demo Website (HTML/CSS/JS)
-│
-├── utils/
-│   ├── __init__.py              ← Package loader
-│   ├── data_cleaner.py          ← Clean the training data
-│   ├── test_model.py            ← Test the model
-│   └── verify.py                ← Sanity checks (no GPU required)
-│
-├── checkpoints/                 ← Saved model checkpoints (auto-created)
-└── logs/                        ← Training loss CSV logs  (auto-created)
-```
+The local `checkpoints/dizel-1.6-preview-m1-best.pt` is a **pretrain snapshot for evaluation**, not an instruct model. It has not been SFT'd, distilled, or released.
 
 ---
 
-## Setup
+## What's new
 
-### 1. Install dependencies
+### 1. The desktop app is Electron now (v2.0.0)
+
+The PySide6 app is gone. `inference/gui/` is an Electron + React + TypeScript shell over the same Python engine. It talks to a FastAPI sidecar (`api/`) on `127.0.0.1` with a fresh per-launch token, so the window never imports torch and the HTTP surface is not reachable from another origin.
+
+What shipped in the rewrite:
+
+- Frameless window, tray icon, and a global `Ctrl+Shift+Space` summon hotkey.
+- Streaming chat over SSE, markdown + GFM tables, syntax-highlighted code, copy/regenerate, stop generation.
+- Thumb-up/down feedback on finished replies, with optional reasons and a free-form note stored locally in `data/feedback/feedback.jsonl` (or the packaged app's user-data equivalent).
+- Session list from disk with rename, pin, archive, delete, search, import, and JSON export.
+- Model loader with named stages and an elapsed counter instead of a fake percentage.
+- Provider grid for hosted APIs, Ollama discovery, and any OpenAI-compatible endpoint.
+- Settings for checkpoint, device, sampling, system prompt, appearance, speech, and shortcuts, plus a separate profile dialog.
+- Voice dictation through Whisper, with automatic model download on first use.
+- Context warning at 80% of the window, edit-and-resend, and handoff to a new chat.
+
+### 2. The TUI is a real client, not a demo
+
+`inference/tui/` is a Textual application with the same engine as the desktop app:
+
+- Single-column chat, `Ctrl+T` session drawer, `Ctrl+R` context rail, `Ctrl+A` artifacts, `Ctrl+K` command palette.
+- Slash commands for `/load`, `/model`, `/provider`, `/tier`, `/mode`, `/session`, `/context`, `/export`, `/settings`, and more.
+- **Flash** / **Pro** tiers for Dizel checkpoints, and **Fast** / **Planning** / **Coding** / **Thinking** / **Deep Think** modes.
+- Local checkpoints and remote providers in the same surface.
+- Headless mode for scripts: `python -m inference.tui.main --prompt "..."`.
+
+### 3. Checkpoint switching is serialized and observable
+
+Both clients share `dizel_core/`:
+
+- A load swaps the backend atomically under a lock; generation and loading cannot overlap.
+- A failed load restores the previous model and header instead of leaving an empty runtime.
+- `unload_model()` releases the backend cleanly.
+- The TUI preloads `dizel_core.model_backend` and `llama_cpp` on the main thread before Textual starts, so the slow native import does not block the event loop.
+- `.pt` checkpoints load memory-mapped on CPU and drop the training optimizer state, so a 5 GB pretrain checkpoint does not need 5 GB of resident RAM before the model is built.
+- A 20-second load watchdog writes a thread dump to `logs/tui_load_stacks.log`; normal load progress goes to `logs/tui_load.log`.
+
+### 4. v1.6 is a different model, not a bigger v1.5
+
+v1.6 moves from a dense FFN to a **4-expert, top-2 dropless MoE**, switches to the **Qwen2.5 tokenizer**, and trains on **ChatML**. It keeps the same 2,048-token context and the same tied-embedding, RMSNorm, RoPE, GQA, SwiGLU backbone.
+
+The checkpoint format and loader understand both generations. New v1.6 checkpoints default to ChatML, the Qwen tokenizer, and system prompts even when an older save lacks the metadata flags. v1.5 checkpoints keep their raw `<|role|>` path and SentencePiece tokenizer.
+
+### 5. v1.5 is published as F16
+
+The released v1.5 artifact is the **F16 GGUF** (`~1.1 GB`), plus the source `.pt` checkpoint, which the native loader can also run:
 
 ```bash
-# Create a virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+ollama run D4niel-dev/Dizel-1.5
+```
 
-# Install PyTorch with CUDA (replace cu121 with your CUDA version)
+Q4_K_M and Q8_0 conversions were evaluated and **rejected** for release. Do not present them as supported artifacts. The published tag is F16.
+
+### 6. The docs are product-led
+
+`docs/index.html` is now a landing page for the model and the app, not a feature dump. It states the Preview status plainly and shows the live pretrain numbers. `docs/demo.html` is a scripted browser replica of the desktop interface; it is not the model.
+
+---
+
+## What's coming
+
+### v1.6 Flash Preview
+
+The remaining path is fixed:
+
+1. Finish Phase A pretraining: 45,777 steps / 3B tokens at 65,536 tokens per step.
+2. Run SFT: 3,000 steps on the ChatML assistant-only mix.
+3. Run token-level KD: 2,000 steps from `Qwen/Qwen2.5-0.5B-Instruct`, KL weight 0.5, temperature 2.0.
+4. Run optional DPO: 1,000 steps, experimental.
+5. Validate every resume and Drive save from a fresh runtime.
+6. Run the fixed BPB, behavioral, safety, speed, and RAM checks.
+
+The instruct build ships only after those stages. Preview publication also requires the plan's engineering checks: router health, safety, checkpoint resume, Drive sync, and a documented BPB/behavioral baseline.
+
+### Stable Dizel 1.6 Flash: six gates
+
+The stable name is allowed only when all six pass:
+
+1. Router utilization is healthy for the final 1,000 steps; no expert below 5%.
+2. BPB on the fixed byte-level holdout is not worse than v1.5.
+3. The fixed behavioral suite is not worse than v1.5 on math, code, concision, and identity.
+4. The safety red-team gate passes.
+5. Tokens/sec and RAM are better than v1.5 on the same hardware.
+6. Checkpoint save/reload and resume work from a fresh Colab runtime.
+
+Preview does **not** have to beat v1.5; it records the baseline. If a stable gate fails, the name stays **Preview**. If a Preview engineering check fails, the build stays an experimental MoE and is not published.
+
+### Pro, later
+
+`Dizel 1.6 Pro` is a future 1.6B total / 973M active, 8-expert top-4 tier. Its architecture, 3B-token Phase A, and post-training defaults live in `configs/v16_pro.py` (`DIZEL_16_PRO_CONFIG`). No Pro run or artifact exists yet.
+
+### Not planned for 1.6: vision
+
+There is no vision encoder. The model is text-only. The desktop app's image and presentation workspaces are UI placeholders, not multimodal model features.
+
+---
+
+## Quick start
+
+### Requirements
+
+- **Python 3.10+**
+- **PyTorch 2.1+** (CUDA strongly recommended for local inference and required for realistic training)
+- **Node.js 18+** for the desktop app
+- **Windows** for the `dizel.cmd` launcher; the Python modules run on macOS and Linux too
+- Optional: an NVIDIA GPU with a current CUDA build of `llama-cpp-python` for GGUF acceleration
+
+### Install
+
+```bash
+git clone https://github.com/D4niel-dev/Dizel.git
+cd Dizel
+
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS / Linux:
+# source .venv/bin/activate
+
+# Install PyTorch for your CUDA version first (example: CUDA 12.1)
 pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-# Install remaining dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Verify your installation
+`requirements.txt` includes the runtime dependencies for both clients and the API sidecar. Training-only packages are listed as optional comments at the bottom.
+
+For GPU-accelerated GGUF inference, reinstall `llama-cpp-python` with CUDA enabled:
+
+```bat
+set CMAKE_ARGS=-DGGML_CUDA=on
+pip install llama-cpp-python --upgrade --force-reinstall --no-cache-dir
+```
+
+### Configure the Hugging Face token (training only)
+
+The v1.6 path downloads the Qwen tokenizer and, for KD, the Qwen teacher. Put the token in `.env` at the repository root:
+
+```dotenv
+HF_TOKEN=hf_your_token_here
+```
+
+`.env` is ignored by git. The training code loads `HF_TOKEN` without printing it. Never paste the token into a notebook cell, a log, or a commit.
+
+### Launch
+
+```bat
+dizel
+```
+
+Choose:
+
+1. **Terminal UI** — keyboard-first, lives in the shell.
+2. **Desktop app** — full window, animations, voice input.
+
+Or start either client directly:
 
 ```bash
-python -c "import torch; print(torch.cuda.is_available(), torch.version.cuda)"
-# Should print: True  12.x
+# Terminal UI
+python -m inference.tui.main --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt --device cuda
+
+# Desktop app (first run installs npm dependencies)
+cd inference/gui
+npm install
+npm run dev
 ```
 
----
-
-## Execution Steps
-
-### Step 0 — Quick Start (If you already have a checkpoint)
-
-If you have downloaded a pre-trained Dizel checkpoint (e.g. `dizel-sft-best.pt`), you can skip the training steps and immediately launch the graphical Desktop Interface to chat with it.
-
-*(Or if there was a `dizel-sft-best.pt` in the `checkpoints` folder in the project directory, you can just use that file.)*
-
-1. Install the dependencies (see Setup above).
-2. Launch the Desktop GUI/TUI:
-   ```bash
-   # GUI
-   python -m inference.dizel_gui.main
-
-   # TUI
-   python -m inference.cmd_tui.main
-   ```
-3. Click the **⚙ Configuration** button in the UI.
-4. Use the **Checkpoint Loader** to select your `.pt` file.
-5. Click **Back**/**Save** — the model will load in the background, and you're ready to chat!
-
-*If you do not have a checkpoint and want to build the model from scratch, continue with Step 1 below.*
-
----
-
-### Step 1 — Review and tune configuration (optional)
-
-Open `config.py`. Key parameters:
-
-```python
-# Model size
-d_model  = 384          # hidden dimension  (256 = smaller/faster, 512 = larger/slower)
-n_layers = 6            # transformer depth
-n_heads  = 6            # attention heads   (d_model must be divisible by n_heads)
-
-# Training
-batch_size  = 8         # micro-batch per step
-grad_accum  = 8         # effective batch = 8 × 8 = 64 sequences
-max_steps   = 4000      # how many steps the pretrain and sft does
-lr          = 3e-4      # how much the model will learn with the training
-context_length = 512    # how much contexts for the model to generate a respond
-```
-
-**Estimated parameters** by `d_model`:
-
-| d_model | n_layers | Parameters |
-|---------|----------|------------|
-| 256     | 6        | ~10 M      |
-| 384     | 6        | ~20 M      |
-| 512     | 6        | ~34 M      |
-| 768     | 12       | ~110.35 M  |
-
----
-
-### Step 2 — Add training data
-
-The file `data/english.md` ships with ~5 000 words of seed text. For better
-results, **add more plain English text** to the same file:
-
-- Wikipedia article extracts (plain text dump)
-- Project Gutenberg books
-- Any well-written English prose
-- HuggingFace dataset samples
-- etc...
-
-The more diverse the data, the better. Even 1–5 MB of text makes a noticeable
-difference.
-
----
-
-### Step 3 — Train the tokenizer
+The desktop app auto-detects a Python interpreter that can import FastAPI. Override it with `DIZEL_PYTHON` if needed:
 
 ```bash
-python tokenizer/train_tokenizer.py
+DIZEL_PYTHON="C:/path/to/python.exe" npm run dev
 ```
 
-This reads `data/english.md`, trains a BPE SentencePiece model with 32 000
-vocabulary entries, and writes `tokenizer/dizel.model` and `tokenizer/dizel.vocab`.
+### Headless generation
 
-**Output:**
+```bash
+python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda \
+  --prompt "Explain what a for loop does in one paragraph."
+```
+
+Tokens go to stdout; loader and error messages go to stderr.
+
+### Checkpoints in this repository
+
+| File                                            | Purpose                                                                                      |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `checkpoints/dizel15/dizel-v15-distill-best.pt` | v1.5 distillation student in PyTorch format; unmerged LoRA adapters are folded at load time. |
+| `checkpoints/Dizel-1.5-Distill.gguf`            | Published F16 GGUF for llama.cpp / Ollama.                                                   |
+| `checkpoints/Dizel-1.5-SFT.gguf`                | F16 SFT GGUF.                                                                                |
+| `checkpoints/dizel-1.6-preview-m1-best.pt`      | v1.6 pretrain snapshot for evaluation; **not** an instruct release.                          |
+
+The loader accepts `.pt`, `.pth`, `.gguf`, `.safetensors`, `.bin`, and `.ckpt`. When a v1.5 `.pt` still contains unmerged LoRA adapters, `dizel_core.model_backend` folds them in memory with `model/lora_merge.py` before building the plain `DizelLM`. Standalone scripts that build the model themselves must do the same fold.
+
+---
+
+## Using Dizel
+
+### Local inference
+
+| Format         | Backend                                                   | Notes                                                                                   |
+| -------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `.pt` / `.pth` | Native PyTorch (`dizel_core.model_backend.NativeBackend`) | Loads v1.1, v1.2, v1.5, and v1.6 checkpoints by inspecting the state dict.              |
+| `.safetensors` | Native PyTorch (`SafeTensorsBackend`)                     | Same model path, memory-mapped weights.                                                 |
+| `.gguf`        | `llama-cpp-python` (`GGUFBackend`)                        | v1.5 GGUFs use the `qwen2` llama.cpp architecture and the Dizel `<\|role\|>` chat path. |
+
+CPU works for all three. CUDA is selected with `--device cuda` in the TUI or the device control in Settings.
+
+### Model switching and loader behavior
+
+- Loading is **atomic**: the new backend is built off to the side and swapped in only when ready.
+- Loading is **exclusive** with generation: the TUI refuses a load while a reply is streaming.
+- A failed load **restores the previous model** and the previous header label.
+- `unload_model()` releases the backend and clears the runtime.
+- The TUI preloads the heavy native modules before Textual starts. A slow first load looks like a slow start, not a frozen interface.
+- If a load emits no progress for 20 seconds, the watchdog dumps all thread stacks to `logs/tui_load_stacks.log`. Send that file with `logs/tui_load.log` when reporting a stall.
+
+### Tiers and modes
+
+The app exposes the v1.6 naming today, even while running v1.5:
+
+- **Tiers:** `Flash` (the small, fast tier; what this build ships) and `Pro` (the larger tier; same prompts until that build exists). Tiers are shown only for Dizel checkpoints; Mila and other local models go straight to modes.
+- **Modes:** `Fast` (answer-first, temp 0.55), `Planning` (plan, risks, then execute, temp 0.45), `Coding` (runnable code first, temp 0.25), `Thinking` (reason in a `think` block, temp 0.40), and `Deep Think` (long-form reasoning and structure, temp 0.50).
+
+Modes change sampling, token budget, and the system prompt. They do not change the weights. Non-Dizel local checkpoints use their own generic/Mila profile family, never the Dizel prompt.
+
+### Providers
+
+The local model is one provider among many:
+
+- **Local (Dizel)** — native `.pt` / `.safetensors` / GGUF.
+- **Ollama** — discovers models from a local Ollama server.
+- **Hosted APIs** — OpenAI, Anthropic, Google Gemini, Groq, Mistral AI, xAI, AI21 Labs, Azure OpenAI, Cohere, and Meta (Llama).
+- **Custom Provider** — any OpenAI-compatible base URL and key.
+
+API keys are encrypted locally before they are written to `.dizel/settings.json`. The desktop sidecar binds loopback only and requires `X-Dizel-Token` on every route except `/api/health`. Shell and Python execution routes are disabled over HTTP unless the sidecar is started with `DIZEL_ALLOW_SHELL=1`.
+
+### Sessions, context, and usage
+
+- Chats are JSON files in `data/history/`.
+- Settings are in `.dizel/settings.json`.
+- `ContextTrimmer` drops the oldest turns when the window fills, protects the system prompt and the most recent turns, and falls back to an extractive summary note.
+- `UsageManager` tracks a 12-hour compute window and allows five compactions per window.
+- The status bar shows generation state, context tokens, and the output budget. The composer footer shows the active model, provider, and tier.
+
+### Voice (desktop only)
+
+The desktop app records 16 kHz WAV, posts it to `/api/nova/transcribe`, and inserts the transcript into the composer. If no Whisper checkpoint is on disk, pressing the mic starts the ~145 MB download, streams to a `.part` file, and renames on completion. The TUI has no voice input.
+
+### Keyboard
+
+| Key                 | Action                             |
+| ------------------- | ---------------------------------- |
+| `Ctrl+C`            | Interrupt generation / quit        |
+| `Esc`               | Interrupt, or close an overlay     |
+| `Ctrl+K` / `Ctrl+F` | Command palette / all commands     |
+| `Ctrl+T`            | Session drawer                     |
+| `Ctrl+R`            | Context rail                       |
+| `Ctrl+Y`            | Multi-line input                   |
+| `Ctrl+A`            | Artifacts                          |
+| `Ctrl+L`            | Clear the workspace                |
+| `Tab`               | Cycle modes (TUI)                  |
+| `Ctrl+Shift+Space`  | Summon the desktop window (global) |
+
+The desktop app also supports `Ctrl+N` (new chat), `Ctrl+B` (sidebar), `Ctrl+,` (settings), and `Ctrl+K` (focus composer) inside the window.
+
+### Web demo
+
+- Landing page: [d4niel-dev.github.io/Dizel](https://d4niel-dev.github.io/Dizel/)
+- Interface demo: [d4niel-dev.github.io/Dizel/demo.html](https://d4niel-dev.github.io/Dizel/demo.html)
+
+The browser demo is a **scripted replica** of the desktop UI. It does not run the model. Local inference requires the Python app.
+
+---
+
+## Repository layout
 
 ```text
-[tokenizer] Wrote plain text to tokenizer/corpus.txt (45,123 chars)
-[tokenizer] Training SentencePiece BPE (vocab=32,000) ...
-[tokenizer] Trained BPE model → tokenizer/dizel.model
-[tokenizer] Round-trip OK ✓
+Dizel/
+├── config.py                    # v1.2 and v1.5 configs, shared training defaults
+├── configs/
+│   ├── v16_flash.py             # v1.6 Flash architecture, tokenizer, SFT/KD/DPO, release identity
+│   └── v16_pro.py               # v1.6 Pro architecture (8 experts, top-4), pretrain/post-training defaults
+│
+├── model/
+│   ├── architecture.py          # DizelLM: RMSNorm + GQA + SwiGLU + RoPE
+│   ├── moe.py                   # dropless top-k MoE block and router
+│   ├── rope.py                  # rotary position embeddings
+│   ├── registry.py              # model family registry
+│   ├── naming.py                # checkpoint filename -> display name
+│   └── lora_merge.py            # fold v1.5 LoRA adapters (used by the loader)
+│
+├── training/
+│   ├── pretrain.py              # v1.5 dense pretraining
+│   ├── sft.py                   # v1.5 SFT
+│   ├── distill.py               # v1.5 LoRA distillation
+│   ├── dpo.py                   # v1.5 experimental DPO
+│   ├── pretrain_v16.py          # v1.6 MoE pretraining (--config flash|pro; BPB, RNG, dataset position, Drive sync)
+│   ├── sft_v16.py               # v1.6 ChatML SFT
+│   ├── distill_v16.py           # v1.6 token-level KD
+│   ├── dpo_v16.py               # v1.6 experimental DPO
+│   ├── posttrain_common_v16.py  # resumable batch stream, optimizer, AMP
+│   ├── posttrain_checkpoint_v16.py
+│   ├── posttrain_data_v16.py    # ChatML formatting and datasets
+│   ├── tokenizer_qwen.py        # Qwen2.5 tokenizer wrapper
+│   ├── dataset.py               # pretrain/SFT datasets
+│   ├── pretokenized.py          # packed uint32 shard loader
+│   ├── shard_utils.py           # corpus sharding
+│   ├── cache_utils.py           # per-shard token cache
+│   └── data_mixing.py           # dataset mixing
+│
+├── pipelines/
+│   ├── download_v15_data.py     # v1.5 source download
+│   ├── clean_v15_data.py        # v1.5 cleaning
+│   ├── format_v15_data.py       # v1.5 pretrain/SFT/distill formatting
+│   ├── generate_math_v15.py     # synthetic math
+│   ├── generate_safety_v15.py   # safety examples
+│   ├── prepare_v16_data.py      # 3B-token Phase A corpus: holdout, tokenize, mix, verify, upload
+│   └── prepare_v16_posttrain.py # SFT/KD/DPO mixes by token budget
+│
+├── dizel_core/                  # shared engine for both clients
+│   ├── chat_manager.py          # atomic load/swap, generation guard, unload
+│   ├── model_backend.py         # native, safetensors, GGUF backends
+│   ├── config_manager.py        # settings + encrypted API keys
+│   ├── history_manager.py       # JSON chat sessions
+│   ├── context_trimmer.py       # window trimming + extractive summary
+│   ├── token_budget.py          # adaptive output budget
+│   ├── usage_manager.py         # 12-hour compute window
+│   ├── core_integration.py
+│   └── tutorial_manager.py
+│
+├── api/
+│   ├── main.py                  # FastAPI sidecar, version 2.0.0
+│   ├── security.py              # loopback token auth, origin allowlist
+│   ├── routes/                  # chat, config, health, memory, models, nova, profile, providers, session
+│   └── services/                # chat, config, memory, session wrappers
+│
+├── inference/
+│   ├── tui/                     # Textual terminal client
+│   │   ├── main.py              # python -m inference.tui.main
+│   │   ├── app.py               # runtime, bindings, loader lifecycle
+│   │   ├── constants.py         # Flash/Pro, modes, provider fallbacks
+│   │   ├── runtime_actions.py
+│   │   ├── state.py / theme.py
+│   │   ├── bridge/              # streaming, sessions, tools
+│   │   ├── commands/            # slash command registry + builtins
+│   │   ├── panels/              # top bar, composer, session/context/artifact panels
+│   │   ├── rendering/           # message, tool, status, empty state
+│   │   └── cmd_ui.tcss
+│   │
+│   └── gui/                     # Electron + React + TypeScript desktop app
+│       ├── electron/            # main process, preload, sidecar supervisor
+│       ├── src/                 # React renderer, components, store, services
+│       ├── public/              # icons and static assets
+│       └── package.json         # v2.0.0; npm run dev / build / dist
+│
+├── tokenizer/
+│   ├── dizel_v15.model          # 100K SentencePiece BPE, byte fallback
+│   ├── dizel_v15.vocab
+│   ├── qwen2.5/                 # local Qwen2.5 tokenizer files
+│   ├── train_tokenizer.py       # legacy 32K tokenizer trainer
+│   └── train_mila_tokenizer.py
+│
+├── scripts/
+│   ├── convert_to_gguf.py       # .pt -> GGUF (v1.5 layout)
+│   ├── convert_to_safetensors.py
+│   ├── eval_holdout_bpb.py      # fixed byte-level holdout BPB
+│   ├── smoke_test_v16.py        # architecture/router/checkpoint smoke tests
+│   ├── test_model_lifecycle.py  # load/swap/failure/unload regression tests
+│   ├── test_inference_backend.py
+│   ├── push_to_hub.py           # Hugging Face release helper
+│   ├── publish_ollama_readme.py
+│   └── snap_tui.py              # headless TUI screenshots
+│
+├── data/
+│   ├── english.md               # small seed corpus
+│   └── v16/                     # packed corpus: train/, val/, holdout/, posttrain/
+│
+├── checkpoints/                 # local weights (gitignored)
+├── docs/                        # landing page + browser demo
+├── evaluation/                  # benchmark runner, scorer, reports
+├── utils/                       # verify.py, data_cleaner.py, test_model.py
+├── core/                        # optional tools, memory, generation modes
+├── sft_data/                    # legacy v1.2 SFT sample
+├── dizel.cmd                    # Windows launcher (TUI or desktop)
+├── requirements.txt
+└── README.md
+```
+
+`sft_data/` is a legacy v1.2 sample. `core/` still provides the optional tool, memory, and generation-mode modules that `dizel_core/` imports lazily; it is not the model engine.
+
+---
+
+## Training
+
+There are two paths. They share the data tooling, display helpers, and checkpoint discipline, but they are not interchangeable.
+
+### v1.5 dense control
+
+v1.5 is the released model and the comparison baseline. Its config lives in `V15_CONFIG` in `config.py`.
+
+| Setting       | Value                                    |
+| ------------- | ---------------------------------------- |
+| Parameters    | 454,779,904 unique (~454.78M)            |
+| Layers        | 28                                       |
+| Hidden size   | 1,024                                    |
+| Attention     | 16 heads, 8 KV heads (GQA), head dim 64  |
+| Feed-forward  | SwiGLU, 3,072                            |
+| Normalization | RMSNorm, eps 1e-6                        |
+| Position      | RoPE, theta 10,000                       |
+| Context       | 2,048                                    |
+| Vocabulary    | 100,000 SentencePiece BPE, byte fallback |
+| Embeddings    | Tied input/output                        |
+| Dropout       | 0.0                                      |
+
+The published `.pt` is the distillation student. Distillation saves LoRA unmerged, so the app's loader folds those adapters in memory before building the plain `DizelLM`. Any script that builds `DizelLM` directly must call `model/lora_merge.py` first.
+
+Typical v1.5 commands:
+
+```bash
+# Data
+python pipelines/download_v15_data.py --source pretrain
+python pipelines/clean_v15_data.py --input data/raw --output data/cleaned --all
+python pipelines/format_v15_data.py --mode pretrain
+
+# Pretrain
+python training/pretrain.py \
+  --data_path data/formatted/v15_pretrain.txt \
+  --max_steps 15000 \
+  --lr 2e-4 --min_lr 2e-5 --warmup_steps 500 \
+  --batch_size 2 --grad_accum 16 \
+  --gradient_checkpointing
+
+# SFT
+python training/sft.py \
+  --base_checkpoint checkpoints/dizel-v15-pretrain-best.pt \
+  --sft_data data/formatted/v15_sft.jsonl \
+  --max_steps 10000 \
+  --lr 1e-4 --min_lr 1e-5 \
+  --batch_size 2 --grad_accum 16 \
+  --gradient_checkpointing
+
+# Distillation (needs HF_TOKEN for the Qwen teacher)
+python training/distill.py \
+  --base_checkpoint checkpoints/dizel-v15-sft-best.pt \
+  --data_path data/formatted/v15_distill.jsonl \
+  --max_steps 5000 \
+  --kl_weight 0.5 --temperature 2.0
+```
+
+v1.5 runs save `{run_name}-best.pt`, `{run_name}-final.pt`, and periodic `{run_name}-step{N}.pt`. v1.6 saves `-best`, `-last`, and `-final`, with one rotated `-milestone-step{N}.pt` during pretraining. Resume with `--resume <path>`.
+
+### v1.6 Flash Preview training
+
+v1.6 is the MoE path. The single source of truth is `configs/v16_flash.py` (`DIZEL_16_FLASH_CONFIG`).
+
+| Setting                   | Value                                                    |
+| ------------------------- | -------------------------------------------------------- |
+| Total parameters          | 435,284,736 (~435.3M)                                    |
+| Active parameters / token | 293,726,976 (~293.7M)                                    |
+| Layers                    | 20                                                       |
+| Hidden size               | 768                                                      |
+| Attention                 | 12 heads, 6 KV heads (GQA), head dim 64                  |
+| Experts                   | 4 per layer, top-2, dropless                             |
+| Expert hidden             | 1,536                                                    |
+| Router                    | float32 logits, aux 0.01, z-loss 0.001                   |
+| Normalization             | RMSNorm, eps 1e-6                                        |
+| Position                  | RoPE, theta 10,000                                       |
+| Context                   | 2,048                                                    |
+| Vocabulary                | Qwen2.5, 151,936 embedding rows; tokenizer emits 151,665 |
+| Chat format               | ChatML                                                   |
+| Embeddings                | Tied input/output                                        |
+| Dropout                   | 0.0                                                      |
+
+#### 1. Build the Phase A corpus
+
+```bash
+python pipelines/prepare_v16_data.py --stage all --target-tokens 3B
+```
+
+This builds the fixed 500-document holdout, tokenizes the sources with the Qwen tokenizer, mixes them to the target token count, verifies the packed shards, and can upload them to Drive with `--drive-dir` or `--rclone-remote`. The output is `data/v16/` with `train/`, `val/`, `holdout/`, `manifest.json`, and checksums.
+
+#### 2. Pretrain
+
+```bash
+python training/pretrain_v16.py \
+  --tokenized_data_dir data/v16 \
+  --batch_size 2 --grad_accum 16
+```
+
+That is 65,536 tokens per optimizer step: `2 × 16 × 2,048`. The run is 45,777 steps, 3B tokens, bf16, with gradient checkpointing.
+
+Resume:
+
+```bash
+python training/pretrain_v16.py \
+  --tokenized_data_dir data/v16 \
+  --resume checkpoints/dizel-1.6-preview-m1-best.pt \
+  --batch_size 1 --grad_accum 32
+```
+
+The explicit path must exist. If it does not, the trainer raises `FileNotFoundError` instead of silently starting a fresh run. Resume restores the model, optimizer, scaler, RNG state, dataset position, and scheduler phase. `batch_size=1` with `grad_accum=32` keeps the same 65,536-token step when VRAM is tight.
+
+#### 3. Build the post-training mixes
+
+```bash
+python pipelines/prepare_v16_posttrain.py --stage all
+```
+
+The SFT mix is selected by assistant/loss tokens, not sample count:
+
+| Family           | Share |
+| ---------------- | -----:|
+| Detailed answers | 25%   |
+| Concise answers  | 20%   |
+| Conversation     | 15%   |
+| Code             | 15%   |
+| Math             | 10%   |
+| Reasoning        | 5%    |
+| Safety           | 7%    |
+| Identity         | 3%    |
+
+Current artifacts:
+
+| File                               | Size                              |
+| ---------------------------------- | --------------------------------- |
+| `data/v16/posttrain/sft.jsonl`     | 84,701 records / 9,880,701 tokens |
+| `data/v16/posttrain/distill.jsonl` | 42,873 records / 5,000,041 tokens |
+| `data/v16/posttrain/dpo.jsonl`     | 9,975 pairs                       |
+
+#### 4. SFT
+
+```bash
+python training/sft_v16.py \
+  --base_checkpoint checkpoints/dizel-1.6-preview-m1-best.pt \
+  --data data/v16/posttrain/sft.jsonl \
+  --max_steps 3000
+```
+
+ChatML, assistant-only loss, max length 1,024, batch 2, lr 2e-5, cosine decay to 2e-6.
+
+#### 5. Token-level KD
+
+```bash
+python training/distill_v16.py \
+  --base_checkpoint checkpoints/dizel-1.6-preview-m1-sft/dizel-1.6-preview-m1-sft-final.pt \
+  --data data/v16/posttrain/distill.jsonl \
+  --max_steps 2000
+```
+
+The teacher is `Qwen/Qwen2.5-0.5B-Instruct`, KL weight 0.5, temperature 2.0, batch 1, lr 1e-5. Unlike v1.5, v1.6 shares Qwen's vocabulary, so the teacher and student logits align directly and the student stays a plain, checkpoint-compatible model. No LoRA is used.
+
+#### 6. Optional DPO
+
+```bash
+python training/dpo_v16.py \
+  --base_checkpoint checkpoints/dizel-1.6-preview-m1-distill/dizel-1.6-preview-m1-distill-final.pt \
+  --data data/v16/posttrain/dpo.jsonl \
+  --max_steps 1000
+```
+
+DPO is experimental. Beta 0.5, label smoothing 0.05, max length 1,536, max prompt 768, lr 5e-6. The reference checkpoint defaults to the base checkpoint, so this run freezes the KD result.
+
+### Resume rules
+
+All three v1.6 post-training scripts and the pretrainer follow the same contract:
+
+- `--resume <path>` restores model weights, optimizer state, AMP scaler, RNG state, and the resumable batch position.
+- A missing explicit `--resume` path raises `FileNotFoundError`. The trainer never treats a typo as "start over".
+- A fresh run requires `--base_checkpoint` (or, for pretraining, a data source).
+- Checkpoints carry architecture, tokenizer, and config hashes. A mismatch is rejected instead of loaded with `strict=False` and silently corrupted.
+
+### Colab and Drive rules
+
+- Run training from `/content`, **not** from the mounted Drive folder. Drive I/O is too slow and too flaky for tokenized shard reads.
+- Upload only the packed corpus and training-only code to the runtime.
+- Keep exactly **one active training runtime** writing to a shared checkpoint folder. Two writers will overwrite each other's `last`/`best` state.
+- Save locally first, then sync to Drive. Verify the Drive copy before deleting the runtime.
+- Use `.env` `HF_TOKEN`; never print it, log it, or commit it.
+
+### Release policy
+
+- v1.6 lives on the main tree behind `configs/v16_flash.py` and `training/*_v16.py`. There is no separate `v1.6/` fork.
+- Preview ships first. The stable Flash name is a separate, gated decision.
+- Publish only smoke-tested artifacts. A checkpoint that has not passed save/reload/resume on a fresh runtime is not a release.
+- The v1.5 F16 `latest` stays published. Q4_K_M and Q8_0 remain rejected.
+
+### Evaluation
+
+```bash
+# v1.6 on the fixed holdout
+python scripts/eval_holdout_bpb.py \
+  --checkpoint checkpoints/dizel-1.6-preview-m1-best.pt \
+  --holdout data/v16/holdout/wikipedia.jsonl.gz \
+  --tokenizer tokenizer/qwen2.5/tokenizer.json \
+  --json-out runs/v16_holdout_bpb.json
+
+# v1.5 control on the same holdout
+python scripts/eval_holdout_bpb.py \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --holdout data/v16/holdout/wikipedia.jsonl.gz \
+  --json-out runs/v15_holdout_bpb.json
+```
+
+BPB is computed on raw UTF-8 bytes, so it is comparable across the 100K SentencePiece and 151,936-row Qwen vocabularies. Raw token cross-entropy is **not** comparable across tokenizers.
+
+Run the architecture and router smoke tests before a long run:
+
+```bash
+python scripts/smoke_test_v16.py
+python scripts/test_model_lifecycle.py
+python scripts/test_inference_backend.py
 ```
 
 ---
 
-### Step 4 — Run sanity checks
+## Architecture
 
-```bash
-python utils/verify.py
-```
+Dizel is a decoder-only causal Transformer. Both generations use pre-RMSNorm, RoPE, GQA, SwiGLU, tied embeddings, and PyTorch 2.x scaled dot-product attention. v1.6 replaces the dense FFN with a sparse MoE block.
 
-Verifies model architecture, forward pass, loss at initialisation, generation
-shape, and tokenizer round-trip. **No GPU required.** Should complete in < 5 s.
-
----
-
-### Step 5 — Pre-train Dizel
-
-```bash
-python training/pretrain.py
-```
-
-With optional overrides:
-```bash
-python training/pretrain.py --max_steps 6000 --lr 5e-4 --d_model 256
-```
-
-**What to expect:**
-
-| Step | Train Loss | Notes |
-|------|------------|-------|
-| 0    | ~10.4      | Random initialisation (~ln(32000)) |
-| 200  | ~5.0–6.0   | Starting to learn common words |
-| 1000 | ~3.5–4.5   | Coherent word sequences |
-| 4000 | ~2.5–3.5   | Reasonable sentences on training data |
-
-A good val loss for this corpus size is **≤ 3.0**. The model will overfit on
-tiny data — the dropout, weight decay, and window reshuffling all help mitigate
-this.
-
-Checkpoints are saved to `checkpoints/`:
-- `dizel-pretrain-best.pt`     — best val loss
-- `dizel-pretrain-step{N}.pt`  — periodic saves
-- `dizel-pretrain-final.pt`    — end of training
-
-Resume training from a checkpoint:
-```bash
-# 1st Option
-python training/pretrain.py --resume checkpoints/dizel-pretrain-step{N}.pt
-
-# 2nd Option (Recommended)
-python training/pretrain.py --resume checkpoints/dizel-pretrain-best.pt
-```
-
-**Approximate training time (RTX 3060, 12 GB VRAM):**
-- 4 000 steps, d_model=384, ctx=512: ~1.5–2 hours
-- 4 000 steps, d_model=256, ctx=512: ~45–60 minutes
-
-**Google Colab:** Use `scripts/colab_train.py` for a streamlined notebook experience. The tokenization pipeline uses memory-efficient numpy arrays to stay within Colab's ~12.7 GB RAM limit.
-
----
-
-### Step 6 — Generate SFT training data
-
-```bash
-python sft_data/generate_sft_data.py
-```
-
-Creates `sft_data/chat.jsonl` with ~60 synthetic Q&A pairs in the chat format:
-```json
-{
-  "messages": [
-    {"role": "system",    "content": "You are Dizel..."},
-    {"role": "user",      "content": "What is photosynthesis?"},
-    {"role": "assistant", "content": "Photosynthesis is the process..."}
-  ]
-}
-```
-
-*You can add your own examples to this file in the same format.*
-
----
-
-### Step 7 — Supervised fine-tuning (SFT)
-
-```bash
-python training/sft.py --base_checkpoint checkpoints/dizel-pretrain-best.pt
-```
-
-SFT runs for 500 steps (default) at a lower learning rate (1e-4). It:
-- Loads the pretrained weights
-- Teaches the model the user / assistant conversation format
-- Computes loss **only on assistant tokens** (prompt masking)
-
-Output checkpoint:
-- `checkpoints/dizel-sft-step{N}.pt`
-- `checkpoints/dizel-sft-best.pt`
-
-Resume SFT from a checkpoint:
-```bash
-# 1st Option
-python training/sft.py --resume checkpoints/dizel-sft-step{N}.pt
-
-# 2nd Option (Recommended)
-python training/sft.py --resume checkpoints/dizel-sft-best.pt
-```
-
----
-
-### Step 8 — Dizel CMD UI (v2.0.3)
-
-The Terminal UI for Dizel has been completely reimagined from the ground up to provide a premium, developer-first experience inspired by modern keyboard-centric CLI tools. It is built using the robust Textual framework + Rich for better rendering.
-
-Launch it via:
-```bash
-# Option 1 (Recommended)
-python -m inference.cmd_tui.main
-
-# Option 2 (Optional)
-python -m inference.cmd_tui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
-```
-
-**Features of the Reworked CMD UI:**
-- 🎨 **Terminal-Native Aesthetics:** A seamless, deep dark gray layout featuring floating components, a centered gradient ASCII logo, and an overall distraction-free environment for power users.
-- ⌨️ **Keyboard-First Workflow:** Navigate the entire app without a mouse:
-  - `Tab`: Cycle between AI Agent modes (Fast, Planning, Coding, Review).
-  - `Ctrl+K`: Open the floating Command Palette for quick actions.
-  - `Ctrl+T`: Toggle the Session History Panel (with fuzzy search and pinning).
-  - `Ctrl+A`: Toggle the Code Artifacts Panel for syntax-highlighted snippets.
-  - `Ctrl+R`: Toggle the Context Panel for telemetry and budgets.
-- 💬 **Floating Input Bar & Tracker:** A clean, bottom-docked prompt area paired with a dedicated Session Tracker, keeping you informed of your active context without clutter.
-- 📊 **Context Panel & Live Monitor:** A dynamic right sidebar that tracks live token usage, generation speed (t/s), and real-time hardware telemetry (CPU & RAM) during streaming.
-- 💻 **Code Artifacts Viewer:** Instantly extracts and syntax-highlights markdown code blocks from LLM responses into a dedicated side panel for easy reading and analysis.
-- 🤖 **Persistent Macro System:** Define complex pipe-chained commands (e.g., `/macro define audit /clear | /mode Review`) that survive application restarts.
-- 🚀 **Advanced Slash Commands:** Fully integrated commands for instant workflow adjustments:
-  - `/model [name]` - Swap models on the fly.
-  - `/provider [name]` - Switch between local inference and API routing.
-  - `/mode [name]` - Change your AI persona/agent mode.
-  - `/session` - Manage your chat sessions natively.
-  - `/settings` - Manage runtime configuration and persist API keys securely.
-  - `/macro` - Create, run, and manage custom shortcut macros.
-- 🛠 **Real-Time Generation:** Supports asynchronous text streaming, tool execution reporting, and robust error handling without blocking the main UI thread.
----
-
-### Step 9 — Desktop GUI (v1.0.2) *(Recommended)*
-
-Dizel includes a fully localized, premium Desktop Interface built entirely from scratch with **PySide6**. It pushes the boundaries of native Python UI development with highly fluid animations, rich data management, and an uncompromising aesthetic heavily inspired by state-of-the-art developer tools.
-
-Launch it via:
-```bash
-# Launch the app (Default)
-python -m inference.dizel_gui.main
-
-# Pass a checkpoint right from the command line (Optional)
-python -m inference.dizel_gui.main --checkpoint checkpoints/dizel-sft-best.pt --device cuda
-```
-
-**Core Capabilities & Architecture:**
-- 🎙️ **Nova Voice Engine:** Native Whisper-powered speech transcription featuring real-time waveform UI visualization (`WaveformWidget`), multi-language support, and customizable silence thresholds to auto-submit your prompts when you stop speaking.
-- 🔌 **API Router (BYOK):** Bring Your Own Keys. Robust out-of-the-box routing for *Anthropic, Gemini, OpenAI,* and *xAI*. Also includes a highly configurable **Custom Provider** module to plug directly into *OpenRouter, DeepSeek, Together AI,* or any local OpenAI-compatible endpoint (like Ollama or vLLM). All external keys are **AES-encrypted** locally before saving.
-- 💬 **Secondary Operations Sidebar:** A dynamic, multi-view animated right sidebar offering:
-  - **Chats & Import:** Search history and import `.json`/`.md` chats.
-  - **Image Gallery:** A visual archive of all images you've generated or attached across all sessions.
-  - **Riset (Global Search):** Deep semantic search filtering across all projects, archived files, and starred content simultaneously.
-  - **Prompt Library:** Save, favorite, and reuse custom personas, instructions, and prompt templates.
-  - **File Archive & Presentations:** Central hub for all documents and slide imports.
-- 📊 **Intelligent Compute Tracking:** An advanced `UsageManager` and `TokenBudget` system dynamically tracks your 12-hour compute window, allocating context ceilings based on active mode complexity (e.g., scoring *Fast* mode vs *Planning* mode differently).
-- 🧠 **Dynamic Context Trimming:** The `ContextTrimmer` automatically truncates or summarizes conversational data to prevent memory overflow (OOM) while rigidly protecting system instructions and recent context.
-- 🎨 **Rich UI & Micro-Animations:** Custom-built PySide6 components including `MessageBubble` (for live-rendered markdown with one-click copy and syntax highlighting), `ActionMenu` (smooth popup tooling), `AnimatedButton`, and a realistic `TypingIndicator` for a truly premium feel.
-- 🎒 **First-Run Onboarding:** An interactive tutorial overlay (`TutorialManager`) that sequentially spotlights critical UI regions with helpful tooltips for first-time users.
-- ⚡ **Performance Telemetry & System Monitor:** Live hardware integration displaying tokens/sec, context lengths, budget consumption, and a persistent CPU/RAM system monitor straight in the sidebar.
-- ⌨️ **Command Palette:** Press `Ctrl+K` to summon a fuzzy-searchable global command list, allowing entirely mouse-free navigation (Toggle Theme, Export Chat, Reload Model, Settings).
-- 💊 **Zero-State Carousels:** Clickable, paginated action pills (Brainstorm, Write Code, Create Image) that instantly queue up complex system instructions.
-- 💾 **Persistent Settings:** Your temperature, top-p, external API keys (AES ENCRYPTED), checkpoints, and UI preferences are saved safely across sessions.
-- 💬 **Chat History:** Seamlessly manage multiple conversations from the left sidebar via localized JSON instances.
-- 📎 **Attachment Previews:** Visually queue up reference items for your prompts directly in the floating composer.
-- 🎭 **Model Switcher:** Switch between Dizel and Mila model versions on the fly, complete with dynamic avatars.
-- 📏 **Verbosity Control:** Instantly toggle response lengths (Short, Normal, Detailed) from the status bar, modifying token budgets dynamically without entering settings.
-- 🧠 **Context Chips:** The model `Web Search`, `Deep Think` and `Parse Files` mode toggles right in the chatbox.
-- ⚡ **Hardware & Limits Info:** Live UI tracking of generation tokens/sec, context limits, and hardware overhead.
-
----
-
-## 🌐 Interactive Web UI Demo
-
-Want to experience the look and feel of the Dizel GUI without installing Python, PyTorch, or downloading any models? **You can now preview the interface directly in your browser!**
-
-> Try the live demo here: **[Dizel Web Interface](https://d4niel-dev.github.io/Dizel/)**
-
-### What is the Web Demo?
-The web demo is a meticulously crafted 1:1 visual replica of the PySide6 Desktop GUI, engineered entirely in **Vanilla HTML/CSS/JS** (located in the `docs/` folder). It is designed to give you a hands-on feel of the application's premium aesthetics, fluid animations, and layout before you commit to cloning the repository.
-
-### What You Can Experience:
-- 🎨 **Pixel-Perfect Aesthetics:** Explore the deep dark theme, glassmorphism overlays, and smooth micro-animations.
-- 🎒 **Interactive Onboarding:** Walk through the mock first-run tutorial that highlights key UI elements.
-- 🖱️ **Navigation & Layout:** Click through the Action Pill Carousels, toggle the Secondary Operations Sidebar, and open the Command Palette (`Ctrl+K`).
-- 📱 **Responsive Design:** Unlike the desktop app, the web demo allows you to see how the UI reflows on smaller viewports and mobile devices.
-
-### Important Limitations:
-> **Note:** This is an interaction and design playground, *not* the full Python application.
-- **No Local Model Execution:** You cannot run the `.pt` PyTorch models in the browser.
-- **Limited Backend Logic:** The demo focuses on UI interactions. Chat functionality only works if you connect it to **Ollama** or external **API-based providers** (like OpenAI or Anthropic) via the settings.
-- **Experimental Features:** The web UI acts as our testing ground. You may see early previews of upcoming features here before they are merged into the main PySide6 desktop app!
-- **Subject to Change:** Features in the web demo may be altered, improved, or removed frequently.
-
----
-
-## Weekend Timeline
-
-| Time Block | Task |
-|------------|------|
-| **Fri evening** | Install PyTorch + CUDA, run `verify.py`, read `architecture.py` |
-| **Sat morning** | Train tokenizer, start pre-training (let it run) |
-| **Sat afternoon** | Read training logs, generate SFT data, run SFT |
-| **Sat evening** | Chat with the model, tune sampling parameters |
-| **Sun morning** | Add more training data, retrain with better hyperparameters |
-| **Sun afternoon** | Experiment: change d_model, n_layers, context_length |
-| **Sun evening** | Write your own SFT examples, fine-tune again, celebrate |
-
----
-
-## Architecture Deep-Dive
-
-Dizel implements a modern, highly-optimized variant of the original GPT-style Transformer.
-
-### Core Attention Mechanism (Flash Attention & RoPE)
+### Attention (GQA + RoPE)
 
 ```text
-input x (B, T, d_model)
+x (B, T, d_model)
    │
-   ├─ QKV = Linear(d_model → 3 × d_model)
-   │       split into Q, K, V
+   ├─ RMSNorm
    │
-   ├─ reshape to (B, n_heads, T, head_dim)
+   ├─ Q = Linear(d_model → n_heads × head_dim)
+   ├─ K = Linear(d_model → n_kv_heads × head_dim)
+   ├─ V = Linear(d_model → n_kv_heads × head_dim)
    │
-   ├─ RoPE: Apply Rotary Position Embeddings to Q and K
-   │        (Enables relative positional understanding and better length extrapolation)
+   ├─ RoPE(Q, K)
    │
-   ├─ attn = softmax(Q @ K.T / √head_dim + causal_mask)
-   │        ⚡ Hardware Accelerated via PyTorch 2.x SDPA (Flash Attention)
+   ├─ SDPA(causal, GQA)
    │
-   └─ output = attn @ V  →  reshape  →  Linear(d_model → d_model)
+   └─ Linear(d_model → d_model) → + residual
 ```
 
-### Transformer Block (Pre-LayerNorm & SwiGLU)
+v1.5 uses 16 query heads and 8 KV heads at `d_model=1024`. v1.6 uses 12 query heads and 6 KV heads at `d_model=768`. GQA cuts the KV cache while keeping the query capacity.
+
+### Dense block (v1.5)
 
 ```text
-x → LayerNorm → Attention → + → LayerNorm → SwiGLU MLP → +
-│                            ↑                            ↑
-└────────────────────────────┘────────────────────────────┘
-         residual connections (essential for deep gradient flow)
+x → RMSNorm → GQA attention → + → RMSNorm → SwiGLU(1024 → 3072 → 1024) → +
 ```
 
-**Why SwiGLU?**
-Instead of a standard ReLU or GELU MLP, Dizel utilizes the SwiGLU activation function (as seen in Llama 3). This gating mechanism requires slightly more parameters per block but yields significantly better reasoning performance.
+### MoE block (v1.6)
 
-**Why Pre-LayerNorm?**
-Post-LN (LayerNorm after residuals) is the original Transformer design but requires careful learning rate warm-up to train stably. Pre-LN (before each sub-layer) is more stable with standard AdamW and prevents gradient vanishing early in training.
+```text
+x → RMSNorm → router logits (d_model × 4, float32)
+                    │
+                    ├─ top-2 experts
+                    │     expert_i: SwiGLU(768 → 1536 → 768)
+                    │
+                    └─ weighted sum → + residual
+```
 
-**Weight Tying & KV Caching**
-- **Weight Tying:** The token embedding matrix and the final LM head share the same weights. This reduces total parameters by ~3M and forces the embedding space to properly align with output probabilities.
-- **KV Caching:** During inference, past Key and Value vectors are aggressively cached. Instead of re-computing the entire context window for every new word, Dizel only processes the *last* token, dropping O(N²) attention complexity down to O(N).
+The router is **dropless**: every token is processed by its top two experts; no token is dropped for capacity. The auxiliary loss (0.01) and router z-loss (0.001) encourage balanced expert use. The router logits stay in float32 for stability.
+
+All four experts are stored in memory even though only two fire per token. That is the trade: **435.3M total parameters of capacity, 293.7M active parameters of compute per token.**
+
+### Why these choices
+
+**SwiGLU.** The gated MLP from Llama-family models gives better quality per parameter than a plain ReLU/GELU FFN. v1.6 applies it per expert.
+
+**Pre-RMSNorm.** RMSNorm before each sub-layer is stable with AdamW and avoids the warm-up sensitivity of post-LayerNorm. It also removes the mean-centering cost of LayerNorm.
+
+**RoPE.** Rotary position embeddings encode relative position and keep the parameter count flat. Both models use theta 10,000 and a 2,048-token window.
+
+**GQA.** Grouped-query attention shares K/V heads across query groups. It reduces KV-cache size and memory bandwidth without collapsing to single-head MQA.
+
+**Tied embeddings.** The input embedding and LM head share weights. For v1.5 that removes ~102M duplicate parameters; for v1.6 it removes ~117M. The GGUF writer may serialize the tied tensor twice, which is why some tools display a larger parameter count than the unique total.
+
+**MoE.** A dense 435M model would cost 435M parameters of compute per token. The top-2 router spends 294M and keeps the rest as stored capacity. At this scale the expected win is modest; measuring it is what the v1.6 gates are for.
+
+**No vision.** There is no image encoder, no image tokens, and no multimodal projection. Adding one would be a new model, not a v1.6 checkpoint.
+
+### Parameter accounting
+
+| Model                   | Total   | Active / token | Embedding             | Layers | d_model | Q / KV heads | FFN                      |
+| ----------------------- | -------:| --------------:| ---------------------:| ------:| -------:| ------------:| ------------------------ |
+| Dizel 1.5               | 454.78M | 454.78M        | 100,000 × 1,024, tied | 28     | 1,024   | 16 / 8       | SwiGLU 3,072             |
+| Dizel 1.6 Flash Preview | 435.3M  | 293.7M         | 151,936 × 768, tied   | 20     | 768     | 12 / 6       | 4 experts × 1,536, top-2 |
+
+The v1.6 count includes every expert. The active count includes the embeddings, attention, norms, router, and the two selected experts per layer.
 
 ---
 
-## Overfitting on Small Data
+## Overfitting on small data
 
-Small corpora are the primary challenge when training LLMs from scratch. Dizel uses an aggressive suite of mitigations to prevent memorization:
+Small corpora are the main failure mode when training a language model from scratch. The v1.5 and v1.6 training runs use dropout 0.0 because the data volume is large enough; the regularizers below do the work instead.
 
-| Technique | Where | Effect |
-|---|---|---|
-| **Dropout (0.15)** | Attention + MLP | Prevents strict memorisation of paths |
-| **Weight decay (0.1)** | AdamW Optimiser | L2 regularisation keeps weights small |
-| **Window reshuffling** | DataLoader | Breaks repetitive mini-batch patterns |
-| **Overlapping windows (stride = ctx/2)** | PretrainDataset | Maximizes examples squeezed from raw text |
-| **Gradient clipping (1.0)** | Optimiser | Prevents explosive instability spikes |
-| **Cosine LR + Warmup** | Scheduler | Allows smooth convergence |
-| **Gradient Accumulation** | Training Loop | Simulates massive batch sizes (e.g., 64+) to average out noise |
+| Technique                           | Where                             | Effect                                                               |
+| ----------------------------------- | --------------------------------- | -------------------------------------------------------------------- |
+| **Weight decay 0.1**                | AdamW                             | Keeps weights small; applied to matrices, not norms or biases.       |
+| **Window reshuffling**              | DataLoader, every 500 steps       | Breaks repeated mini-batch order.                                    |
+| **Overlapping windows**             | `PretrainDataset`, stride = ctx/2 | Gets more training signal from the same text.                        |
+| **Gradient clipping 1.0**           | Optimizer                         | Prevents loss spikes from destabilizing the run.                     |
+| **Cosine LR + warmup**              | Scheduler                         | Smooth decay; 500–1,000 warmup steps for the long runs.              |
+| **Gradient accumulation**           | Training loop                     | Effective batch of 65,536 tokens per step on one T4.                 |
+| **Fixed holdout + best checkpoint** | Evaluation                        | Model selection on a stable 500-document set, not the training loss. |
+| **Router aux + z-loss**             | v1.6 MoE                          | Prevents expert collapse and router overconfidence.                  |
 
-> **Pro Tip:** If your validation loss plateaus early, try:
-> 1. Adding more raw data (this is the only true fix).
-> 2. Increasing dropout to 0.2–0.3.
-> 3. Scaling down the model (use `d_model=256`).
+For tiny experimental configs, raising dropout to 0.1–0.2 is reasonable. Do not change it in a published-run config and compare the result as if only one variable moved.
+
+If validation loss plateaus early:
+
+1. Add more clean data. This is the only real fix.
+2. Check the tokenizer and the holdout before changing the model.
+3. Scale the model down before scaling the batch up.
 
 ---
 
-## VRAM Usage Guide
+## VRAM guide
 
-Using `bfloat16` mixed precision, memory requirements are highly dependent on whether you are *Training* (which must store optimizer states, gradients, and activations) or running *Inference*.
+The numbers below are practical starting points, not guarantees. Activation memory dominates training; KV cache and context length dominate inference.
 
-| Config | d_model | Params | Training VRAM (Batch 8) | Inference VRAM (w/ KV Cache) |
-|--------|---------|--------|-------------------------|------------------------------|
-| **Tiny**   | 256     | ~10 M  | ~1.5 GB                 | ~400 MB                      |
-| **Small**  | 384     | ~20 M  | ~2.5 GB                 | ~650 MB                      |
-| **Medium** | 512     | ~34 M  | ~4.0 GB                 | ~1.1 GB                      |
-| **Large**  | 768     | ~110 M | ~8.0 GB                 | ~3.5 GB                      |
+| Model                   | Params                       | Published artifact                       | Inference                  | Training                                                 |
+| ----------------------- | ----------------------------:| ---------------------------------------- | -------------------------- | -------------------------------------------------------- |
+| Dizel v1.2              | ~205M                        | `.pt`                                    | ~1 GB                      | ~4–6 GB                                                  |
+| Dizel 1.5               | 454.78M                      | F16 GGUF ~1.1 GB; `.pt` ~2.0 GB          | ~1.5–2.5 GB incl. KV cache | 16 GB T4 with batch 2 × 2,048 + gradient checkpointing   |
+| Dizel 1.6 Flash Preview | 435.3M total / 293.7M active | `.pt` ~5.2 GB (includes optimizer state) | ~1.5–2.5 GB incl. KV cache | 16 GB T4 with batch 1–2 × 2,048 + gradient checkpointing |
 
-If you get OOM (Out of Memory) errors during training: reduce `batch_size`, reduce `context_length`, or enable gradient checkpointing.
+The 5.2 GB v1.6 checkpoint is a **training snapshot** with optimizer state. It is not the inference footprint.
+
+If you hit CUDA OOM:
+
+1. Reduce `batch_size` first.
+2. Reduce `context_length` or `max_length`.
+3. Enable gradient checkpointing.
+4. For inference, use the GGUF F16 build and lower the context.
+5. Close other GPU consumers before changing the model.
 
 ---
 
 ## Extending Dizel
 
-The framework is built to be hacked on.
+### Change the architecture
 
-### 1. Build Custom Agents
-Dizel ships with an Agent Router (`core/router.py`) and predefined agents (`core/agents/`). You can define your own JSON configurations to inject specific tools, system prompts, and personalities into the Desktop App.
+Edit `config.py` for v1.2/v1.5 or `configs/v16_flash.py` for v1.6. `d_model` must be divisible by `n_heads`; `n_heads` must be divisible by `n_kv_heads`.
 
-### 2. Change Model Architecture
-Edit `d_model`, `n_layers`, `n_heads` in `config.py`.  
-*Rule of thumb:* `d_model` must be evenly divisible by `n_heads`.
+### Add training data
 
-### 3. Expand SFT Datasets
-Add more conversation JSON examples to `sft_data/chat.jsonl` or modify `generate_sft_data.py` to synthesize larger dialogue datasets automatically.
+- v1.5: add cleaned text to `data/formatted/v15_pretrain.txt`, or add JSONL records for SFT/distill.
+- v1.6: add sources to `pipelines/prepare_v16_data.py` and rebuild the packed corpus. Do not hand-edit `data/v16/train/` shards.
+- Post-training: add records to the source datasets and rerun `pipelines/prepare_v16_posttrain.py`.
 
-### 4. Export to ONNX / C++
-```python
-import torch
-from model.architecture import DizelLM
-model = DizelLM(cfg)
-dummy = torch.zeros(1, 64, dtype=torch.long)
-torch.onnx.export(model, dummy, "dizel.onnx", opset_version=17)
+### Add a provider
+
+Add the provider to `api/routes/providers.py` and `dizel_core`'s provider registry, then wire the key form in `inference/gui/src/components/SettingsDialog.tsx`. The sidecar validates the key and model list; the renderer never talks to the provider directly.
+
+### Export
+
+```bash
+# GGUF for llama.cpp / Ollama
+python scripts/convert_to_gguf.py \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --tokenizer tokenizer/dizel_v15.model
+
+# safetensors + Hugging Face config
+python scripts/convert_to_safetensors.py \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --tokenizer tokenizer/dizel_v15.model
 ```
+
+The v1.5 GGUF uses the `qwen2` architecture identifier for llama.cpp compatibility. It is **not** a Qwen model or a Qwen fine-tune; Qwen2.5-0.5B-Instruct was only the distillation teacher.
+
+### Do not add a vision path to 1.6
+
+The 1.6 plan is text-only. A vision encoder would change the architecture, tokenizer, data, and evaluation contract. Treat it as a future model, not a feature flag.
 
 ---
 
-## Frequently Asked Questions
+## FAQ
 
-### 🧠 Training & Model Architecture
+**Can I run Dizel 1.6 today?**  
+No. The app runs v1.5. The v1.6 weights are unpublished. A local pretrain snapshot exists for evaluation, but it is not an instruct model.
 
-**Q: Why does the model repeat itself?**  
-**A:** Dizel uses an aggressive default `repetition_penalty` of 1.35 over a 128-token window to prevent looping. If you still see repetition, try reducing `temperature` to 0.7 or increasing the penalty slightly (up to 1.5).
+**Is Dizel 1.6 a Qwen fine-tune?**  
+No. v1.6 uses the Qwen2.5 tokenizer and Qwen2.5-0.5B-Instruct as a distillation teacher. The architecture, weights, training run, and identity are Dizel's.
 
-**Q: Why is the output nonsensical?**  
-**A:** The model may not have trained long enough. Check that val loss is ≤ 3.5. Add more plain-text data! A model is only as smart as the data it has read.
+**Why does Ollama show ~557M parameters for a 454.78M model?**  
+The tied input/output embedding is serialized twice in the GGUF. The unique parameter count is **454,779,904** (~454.78M). The Ollama model card documents the difference.
 
-**Q: How much text data do I need for a good model?**  
-**A:** For basic coherent English, 10–50 MB of clean text (Wikipedia, Gutenberg books) is enough to learn grammar. For deep knowledge, you need gigabytes.
+**Why is v1.6 smaller than v1.5 but called more capable?**  
+It is not necessarily more capable yet. v1.6 trades dense parameters for sparse capacity: 435.3M stored, 293.7M active per token. Whether that wins is what the gates measure.
 
-**Q: Can I change the context window length?**  
-**A:** Yes, change `context_length` in `config.py`. However, remember that attention complexity is $O(N^2)$. Doubling the context length will quadruple the memory required for the attention matrix!
+**Where are my settings and chats?**  
+Settings: `.dizel/settings.json`. Chats: `data/history/*.json`. API keys are encrypted before storage.
 
-**Q: How do I make the model produce better structured JSON?**  
-**A:** Add more JSON-formatted responses to `sft_data/chat.jsonl` and re-run Supervised Fine-Tuning (SFT). Lower temperature to 0.2–0.4 during inference.
+**How do I switch checkpoints?**  
+TUI: `/load` or `/model`. Desktop: Settings → Chat → checkpoint picker. Loading is atomic; a failed load restores the previous model. A load is refused while a reply is streaming.
 
-**Q: Can I use multiple GPUs for training?**  
-**A:** Dizel is specifically designed for single consumer GPUs to keep the educational barrier low. If you want multi-GPU, you will need to wrap the model in PyTorch's `DistributedDataParallel` **(DDP).
+**Why does the first load take so long?**  
+The native backend imports torch and, for GGUF, `llama-cpp-python`. The TUI preloads those modules before Textual starts so the interface does not freeze. If a load emits no progress for 20 seconds, the watchdog writes `logs/tui_load_stacks.log`.
 
-**Q: What happens if I stop training halfway?**  
-**A:** Dizel automatically saves periodic checkpoints (e.g., `dizel-pretrain-step1000.pt`).
+**Does Dizel phone home?**  
+No. Local checkpoints run in-process. The desktop sidecar binds `127.0.0.1` and requires a per-launch token. Network calls happen only when you configure a hosted provider or download a model/tokenizer.
 
-You can safely resume training by running:
-```python
-python training/pretrain.py --resume checkpoints/dizel-pretrain-step1000.pt
-```
+**Can I run it on CPU or Apple Silicon?**  
+CPU inference works for all formats; it is slow but usable for short prompts. The TUI and Settings expose only CPU and CUDA, so Apple Silicon runs the CPU path rather than MPS. Training is CUDA-oriented; a T4 is the reference target.
 
-### 🖥️ Hardware & Compatibility
+**Can I use my own API keys?**  
+Yes. The desktop app supports hosted providers and a custom OpenAI-compatible endpoint. Keys are encrypted locally. The sidecar never exposes them to the renderer.
 
-**Q: Can I run/train this on a CPU?**  
-**A:** Yes — set `device = "cpu"`. However, training will be ~50× slower. CPU inference is acceptable for the Tiny/Small models.
+**Why only F16 for v1.5?**  
+F16 is the published artifact. Q4_K_M and Q8_0 conversions were evaluated and rejected for release. Use F16 for quality comparisons; quantized builds are not official.
 
-**Q: Can I train this on my MacBook (M1/M2/M3)?**  
-**A:** Yes! PyTorch supports Apple Silicon via the `mps` backend. Change your device from `cuda` to `mps`. It is highly efficient, though slightly slower than a dedicated NVIDIA RTX GPU.
+**Can I train on Colab?**  
+Yes. Run from `/content`, keep the packed corpus on the runtime, sync checkpoints to Drive, and use one runtime per checkpoint folder. The current 3B-token run is ~21 s/step on a T4.
 
-**Q: I'm getting a**
-```python
-RuntimeError: CUDA out of memory
-```
-**during the model training.**
+**What happens if I stop training halfway?**  
+Resume with `--resume <checkpoint>`. The checkpoint restores the model, optimizer, scaler, RNG state, and dataset position. A missing explicit path raises `FileNotFoundError`; it will not start a fresh run.
 
-**A:** Here's how to fix it: 
-1. Reduce `batch_size` in `config.py`.
-2. Reduce `context_length`.
-3. Ensure no other apps (like games or heavy browsers) are eating your VRAM.
+**Why no vision?**  
+v1.6 has no image encoder. The desktop app's image and presentation views are interface placeholders. A multimodal model would be a separate architecture and training contract.
 
-### 🎨 Desktop App (PySide6) & UI
+**What is licensed under what?**  
+The repository code is MIT. The published v1.5 model weights are Apache-2.0. Training datasets and the Qwen teacher retain their original licenses. See `LICENSE` and the model card for details.
 
-**Q: Why does the Desktop GUI use PySide6 instead of Electron or Webview?**  
-**A:** PySide6 (Qt) offers native OS performance, direct Python integration, and hardware-accelerated rendering *without* the massive RAM overhead of shipping a bundled Chromium browser.
+---
 
-**Q: How do I use the API Router (BYOK) in the Desktop App?**  
-**A:** Open the Desktop App → click **Configuration** → go to the **Chat** tab. You'll see the **API Router** section. Click any provider card (Anthropic, Gemini, OpenAI, etc.), then hit **Configure** to enter your API key. For unlisted providers (like Ollama), click **+ Other Provider**.
+## Updates
 
-**Q: Are my external API keys stored securely?**  
-**A:** Yes. All API keys are encrypted using AES encryption before being saved locally to `.dizel/settings.json`.
+Both surfaces read stable builds from [GitHub Releases](https://github.com/D4niel-dev/Dizel/releases). A release is not installed unless its SHA-256 digest matches the release manifest.
 
-**Q: Where are my chat histories saved?**  
-**A:** They are saved natively on your machine as JSON files inside the `inference/dizel_gui/history/` directory. You can easily back them up or delete them.
+- **Desktop** checks in the background every six hours. Settings → About shows the state, downloads the NSIS installer, and offers **Restart & install**. The packaged app uses `electron-updater`; development builds open the release page instead.
+- **Terminal** checks in the background, verifies and extracts the TUI archive under `.dizel/updates/`, and applies it from `dizel.cmd` before the next launch. `/update` shows status and can check or download on demand. Run `/update auto off` to disable background checks.
+- **No user data is replaced.** Chats, settings, model files, and checkpoints are never part of the TUI archive or its apply step. The packaged desktop app stores settings and history under Electron's user-data folder, outside the install directory, so an installer update leaves them intact.
 
-**Q: How does the Context Trimmer work?**  
-**A:** When your conversation approaches the token limit of the model, the `ContextTrimmer` automatically drops the oldest messages to prevent an Out-Of-Memory error. It rigorously protects your System Prompt and the most recent messages.
+### Publishing a release
 
-**Q: How does the "12-hour Compute Budget" work?**  
-**A:** The UI includes a `UsageManager` that tracks the complexity of your requests. Using heavy agent modes (like *Planning*) consumes more of your virtual compute budget than *Fast* mode. The budget resets automatically every 12 hours.
+The `Release` workflow (`.github/workflows/release.yml`) runs on a `v*` tag or manually from Actions. It builds:
 
-**Q: How do I use voice input (Nova)?**  
-**A:** Click the microphone icon (🎙️) next to the send button in the GUI chat input. The Nova overlay will appear. Speak, and it will be transcribed using Whisper.
+- `Dizel-Setup-<version>.exe` plus `latest.yml` and the blockmap for the desktop updater.
+- `Dizel-TUI-<version>.zip` containing the terminal client and its `.cmd` launcher.
+- `dizel-gui-<version>.tgz` from `npm pack`.
+- `dizel-update.json`, the checksummed manifest the TUI updater reads.
 
-### ⌨️ Terminal (CMD UI) & Workflows
+The installer carries the Python application code, but local inference still uses the machine's Python environment. Run `pip install -r requirements.txt` once as documented above.
 
-**Q: How do I navigate the new CMD UI without a mouse?**
-
-**A:** Here's are some keybinds:
-- **Tab:** Switch AI Modes (Fast, Planning, Coding).
-- **Ctrl+K:** Open Command Palette.
-- **Ctrl+T:** Toggle Chat History sidebar.
-- **Ctrl+R:** Toggle the Context Panel (token tracking).
-
-**Q: I'm getting an** 
-```python
-ImportError
-``` 
-**when trying to run the UI!**
- 
-**A:** Make sure you have activated your virtual environment (`source .venv/bin/activate`) and run `pip install -r requirements.txt`. The UI relies heavily on `PySide6` (Desktop) and `Textual` (CMD).
-
-**Q: Is the model free-to-use?**  
-**A:** Yes, it is! As of right now, this repository uses the `MIT license`.
+Release tags are the unified app version and must increase monotonically. The historical `GUI v1.0.x` and `TUI v2.0.x` labels are component milestones, not updater tags. The first updater-capable release should therefore be `v2.0.1` or higher; tagging `v1.0.3` would look older than the installed `2.0.0` and would not be offered.
 
 ---
 
 ## References
 
-### Architecture & Papers
+### Architecture and papers
+
 - **Attention Is All You Need** — [Vaswani et al., 2017](https://arxiv.org/abs/1706.03762)
 - **GPT-2: Language Models are Unsupervised Multitask Learners** — [Radford et al., 2019](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
 - **RoFormer: Enhanced Transformer with Rotary Position Embedding (RoPE)** — [Su et al., 2021](https://arxiv.org/abs/2104.09864)
-- **GLU Variants Improve Transformer (SwiGLU)** — [Noam Shazeer, 2020](https://arxiv.org/abs/2002.05202)
-- **LLaMA: Open and Efficient Foundation Language Models** — [Touvron et al., 2023](https://arxiv.org/abs/2302.13971) (Inspiration for the modern Llama-like architecture)
-- **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness** — [Tri Dao et al., 2022](https://arxiv.org/abs/2205.14135)
-- **Robust Speech Recognition via Large-Scale Weak Supervision (Whisper)** — [Radford et al., 2022](https://arxiv.org/abs/2212.04356) (Used in Nova Voice Engine)
+- **GLU Variants Improve Transformer (SwiGLU)** — [Shazeer, 2020](https://arxiv.org/abs/2002.05202)
+- **Root Mean Square Layer Normalization (RMSNorm)** — [Zhang & Sennrich, 2019](https://arxiv.org/abs/1910.07467)
+- **GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints** — [Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)
+- **LLaMA: Open and Efficient Foundation Language Models** — [Touvron et al., 2023](https://arxiv.org/abs/2302.13971)
+- **Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity** — [Fedus et al., 2021](https://arxiv.org/abs/2101.03961)
+- **GShard: Scaling Giant Models with Conditional Computation and Automatic Sharding** — [Lepikhin et al., 2020](https://arxiv.org/abs/2006.16668)
+- **Mixtral of Experts** — [Jiang et al., 2024](https://arxiv.org/abs/2401.04088)
+- **Qwen2.5 Technical Report** — [Yang et al., 2024](https://arxiv.org/abs/2412.15115)
+- **FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness** — [Dao et al., 2022](https://arxiv.org/abs/2205.14135)
+- **Direct Preference Optimization: Your Language Model is Secretly a Reward Model** — [Rafailov et al., 2023](https://arxiv.org/abs/2305.18290)
+- **Distilling the Knowledge in a Neural Network** — [Hinton et al., 2015](https://arxiv.org/abs/1503.02531)
+- **Robust Speech Recognition via Large-Scale Weak Supervision (Whisper)** — [Radford et al., 2022](https://arxiv.org/abs/2212.04356)
 
-### Libraries & Inspiration
-- **nanoGPT** — [Andrej Karpathy](https://github.com/karpathy/nanoGPT) (Invaluable architectural inspiration and educational groundwork)
+### Libraries and inspiration
+
+- **nanoGPT** — [Andrej Karpathy](https://github.com/karpathy/nanoGPT) — architectural and educational groundwork.
 - **SentencePiece** — [Kudo & Richardson, 2018](https://github.com/google/sentencepiece)
-- **PyTorch Documentation** — [pytorch.org](https://pytorch.org/docs/stable/index.html)
-- **PySide6 (Qt for Python)** — [Qt Group](https://doc.qt.io/qtforpython-6/) (Powering the Desktop GUI)
-- **Textual & Rich** — [Textualize](https://github.com/Textualize/textual) (Powering the CMD UI v2.0)
-- **Hugging Face Datasets** — [huggingface.co](https://huggingface.co/docs/datasets/)
+- **PyTorch** — [pytorch.org](https://pytorch.org/docs/stable/index.html)
+- **Textual & Rich** — [Textualize](https://github.com/Textualize/textual) — the terminal client.
+- **Electron** — [electronjs.org](https://www.electronjs.org/) — the desktop shell.
+- **FastAPI** — [fastapi.tiangolo.com](https://fastapi.tiangolo.com/) — the local sidecar.
+- **llama.cpp / llama-cpp-python** — [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) — GGUF inference.
+- **Ollama** — [ollama.com](https://ollama.com/) — local model packaging.
+- **Hugging Face** — [huggingface.co](https://huggingface.co/docs) — datasets, tokenizers, and model hosting.
+
+

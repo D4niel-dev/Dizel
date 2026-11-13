@@ -13,3 +13,8 @@ def get_config() -> Dict[str, Any]:
 def update_config(updates: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
     """Update the application configuration"""
     return ConfigService.update_config(updates)
+
+@router.post("/reset_preferences")
+def reset_preferences() -> Dict[str, Any]:
+    """Restore appearance, sampling, budget and dictation defaults."""
+    return ConfigService.reset_preferences()

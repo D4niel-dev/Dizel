@@ -1,0 +1,880 @@
+/* ==========================================================================
+   Dizel terminal — design tokens and shell.
+   The same ladder as the desktop dark theme (desktop/src/styles/tokens.css):
+   chat #212121, chrome #171717, panels #1c1c1c, chips #2f2f2f, one blue
+   accent #0ea5e9. Signal colours only where state changes: blue = live/ok,
+   amber = working, muted red = failure.
+   Keep these values in sync with inference/tui/theme.py.
+   ========================================================================== */
+
+$bg: #201d1d;          /* --bg-chat      screen and transcript */
+$bg-deep: #191616;     /* --bg-sidebar   header, sidebar, status line */
+$surface: #302c2c;     /* --bg-panel     composer, cards */
+$surface-hi: #3b3636;  /* --bg-bubble    chips, selection, tool blocks */
+$border: #332e2e;
+$border-hi: #4a4444;
+$text: #fdfcfc;
+$text-2: #b9b5b5;
+$text-3: #9a9898;
+$accent: #007aff;
+$accent-hi: #4d9bff;
+$warn: #ff9f0a;
+$danger: #ff3b30;
+$code-bg: #262222;
+$violet: #a78bfa;   /* provider / section labels */
+$select-bg: #143048; /* keyboard selection tint */
+
+* {
+    scrollbar-color-hover: $accent;
+    scrollbar-color-active: $accent-hi;
+    scrollbar-background-hover: $surface-hi;
+    scrollbar-background-active: $surface;
+}
+
+Screen {
+    layout: vertical;
+    layers: base overlay;
+    background: $bg;
+}
+
+/* ── Session tabs ───────────────────────────────────────────────────────── */
+/* The active tab is a raised surface with an accent underline; the strip
+   itself stays chrome-coloured and owns the top edge of the window. */
+SessionTabs {
+    height: 2;
+    background: $bg-deep;
+}
+
+#session-tabs {
+    width: 1fr;
+    height: 2;
+    margin-left: 1;
+    background: $bg-deep;
+}
+
+#session-tabs Tab {
+    height: 1;
+    padding: 0 2;
+    color: $text-3;
+    background: $bg-deep;
+}
+
+#session-tabs Tab:hover {
+    color: $text;
+    background: $surface;
+}
+
+#session-tabs Tab.-active,
+#session-tabs:focus Tab.-active {
+    color: $text;
+    background: $surface;
+    text-style: bold;
+}
+
+#session-tabs .underline--bar {
+    color: $accent;
+    background: $border;
+}
+
+#session-tabs:focus .underline--bar {
+    background: $border;
+}
+
+.tab-action {
+    width: 3;
+    height: 2;
+    content-align: center middle;
+    color: $text-3;
+    background: $bg-deep;
+    text-style: bold;
+}
+
+.tab-action:hover {
+    color: $text;
+    background: $surface;
+}
+
+#tab-close:hover { color: $danger; }
+
+#tab-new {
+    color: $accent;
+    text-style: bold;
+}
+
+#tab-new:hover { color: $accent-hi; }
+
+#main-layout {
+    layout: horizontal;
+    height: 1fr;
+    background: $bg;
+}
+
+#workspace-container {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+}
+
+/* ── Sessions ───────────────────────────────────────────────────────────── */
+SessionPanel {
+    width: 32;
+    height: 100%;
+    background: $bg-deep;
+    border-right: solid $border;
+}
+
+SessionPanel.-hidden { display: none; }
+
+#session-inner {
+    height: 100%;
+    padding: 1 1;
+    background: $bg-deep;
+}
+
+#session-head { height: 1; margin-bottom: 1; }
+
+#session-header {
+    width: 1fr;
+    height: 1;
+    color: $text-2;
+    text-style: bold;
+}
+
+#session-count { width: auto; height: 1; color: $text-3; }
+
+#session-new {
+    height: 1;
+    padding: 0 1;
+    margin: 1 0 0 0;
+    background: $surface-hi;
+    color: $text;
+    text-style: bold;
+}
+
+#session-new:hover { background: $border-hi; }
+
+#session-search {
+    border: none;
+    background: $surface;
+    height: 1;
+    margin: 1 0;
+    padding: 0 1;
+}
+
+#session-search:focus { background: $surface-hi; }
+
+#session-list {
+    background: $bg-deep;
+    border: none;
+    height: 1fr;
+    padding: 0;
+}
+
+#session-list > .option-list--option {
+    height: 1;
+    height: 2;
+    margin-bottom: 1;
+}
+
+/* The list scrolls now, so the bar needs to recede. An accent-blue bar beside
+   the transcript competes with the rail that means "you are here". */
+#session-list {
+    scrollbar-color: $border-hi;
+    scrollbar-color-hover: $text-3;
+    scrollbar-color-active: $text-2;
+    scrollbar-background: $bg-deep;
+}
+
+/* Selection stays in the same family as the open-session rail: a quiet fill
+   and the accent rail, not a second orange accent. */
+#session-list > .option-list--option-highlighted {
+    background: $select-bg;
+    color: $text;
+    text-style: bold;
+}
+
+#session-list > .option-list--option-disabled { color: $text-3; }
+
+#session-footer {
+    height: 1;
+    color: $text-3;
+    padding: 0;
+    background: $bg-deep;
+}
+
+/* ── Transcript ─────────────────────────────────────────────────────────── */
+WorkspacePanel {
+    width: 1fr;
+    height: 1fr;
+    background: $bg;
+    padding: 1 0 0 0;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $bg;
+}
+
+WorkspacePanel Static { height: auto; }
+
+EmptyStateBlock {
+    width: 1fr;
+    height: 1fr;
+}
+
+/* Content flows from the top-left under the title block, the way OpenCode's
+   does. Centring a small block in a large window is what made this read as an
+   empty void rather than a screen. */
+#empty-content {
+    width: 1fr;
+    height: 1fr;
+    align: center middle;
+    padding: 1 4;
+}
+
+.empty-kicker {
+    width: auto;
+    height: 1;
+    text-align: left;
+    margin-bottom: 1;
+}
+
+.empty-logo {
+    width: auto;
+    text-align: left;
+    margin-bottom: 1;
+}
+
+#empty-column {
+    width: 68;
+    max-width: 100%;
+    height: auto;
+}
+
+.empty-greeting { width: auto; text-align: left; margin-top: 2; }
+.empty-meta { width: auto; text-align: left; margin-top: 0; }
+.empty-prompt { width: auto; text-align: left; margin-top: 1; }
+
+/* A starter is a shelf row, not a line of loose text: the fill runs the full
+   measure and the enter key sits on the right edge. */
+.empty-suggestion {
+    width: 100%;
+    height: 1;
+    padding: 0 1;
+    margin-top: 1;
+    background: transparent;
+}
+
+#empty-column > .empty-suggestion:first-of-type { margin-top: 2; }
+
+.empty-suggestion:hover { background: $surface-hi; }
+
+.suggestion-glyph { width: 2; height: 1; color: $accent; text-style: bold; }
+.suggestion-label {
+    width: 1fr;
+    height: 1;
+    color: $text-2;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+}
+.suggestion-arrow { width: 1; height: 1; color: $text-3; text-align: right; }
+.empty-suggestion:hover .suggestion-label { color: $text; text-style: bold; }
+.empty-suggestion:hover .suggestion-arrow { color: $accent-hi; }
+.empty-suggestion:hover .suggestion-glyph { color: $accent-hi; }
+
+.empty-hint { width: 100%; height: auto; text-align: left; margin-top: 3; }
+
+/* The welcome is the only screen with room to compose; on short terminals the
+   wordmark and supporting copy yield to the greeting and the three starters. */
+EmptyStateBlock.-compact #empty-content { padding: 1 2; }
+EmptyStateBlock.-compact .empty-logo { display: none; }
+EmptyStateBlock.-compact .empty-greeting { margin-top: 0; }
+EmptyStateBlock.-compact .empty-kicker { margin-bottom: 0; }
+EmptyStateBlock.-compact .empty-hint { margin-top: 2; }
+
+EmptyStateBlock.-tiny #empty-content { padding: 0 2; }
+EmptyStateBlock.-tiny .empty-greeting { margin-top: 0; }
+EmptyStateBlock.-tiny #empty-column > .empty-suggestion:first-of-type { margin-top: 1; }
+
+/* Opening the sidebar on an 80-column terminal leaves a 48-cell workspace:
+   the supporting copy and keycaps step aside so the greeting and starters fit. */
+EmptyStateBlock.-narrow #empty-content { padding: 0 1; }
+EmptyStateBlock.-narrow .empty-prompt,
+EmptyStateBlock.-narrow .empty-hint { display: none; }
+EmptyStateBlock.-narrow .empty-kicker { margin-bottom: 0; }
+
+.assistant-msg { height: auto; }
+
+Collapsible {
+    background: $surface;
+    border: solid $border;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
+CollapsibleTitle { color: $text-3; background: $surface; }
+
+/* OpenCode reports reasoning as a left-railed note, not a card. The body is
+   open while the model thinks and folds to the title once the reply lands. */
+.asm-collapsible {
+    background: transparent;
+    border: none;
+    border-left: solid $border-hi;
+    margin-left: 2;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
+.asm-collapsible CollapsibleTitle {
+    background: transparent;
+    color: $warn;
+}
+.asm-collapsible CollapsibleTitle:hover { color: $text; }
+
+/* ── Notice line ────────────────────────────────────────────────────────── */
+/* ── Composer ───────────────────────────────────────────────────────────── */
+/* OpenCode's composer is a filled block with a single accent rail down the
+   left edge — not a bordered rectangle. The rail is always there; focus lifts
+   the fill instead of recolouring a border. */
+/* The desktop centres the composer in a max-width column rather than running it
+   edge to edge. Same idea here: a fixed measure, centred by the parent. */
+#transcript-row {
+    width: 100%;
+    height: 1fr;
+    align: center top;
+}
+
+#transcript-row > WorkspacePanel {
+    width: 96;
+    max-width: 100%;
+    height: 100%;
+}
+
+/* Chat → Transcript → Message width. Comfortable is the measured default; Wide
+   and Full let the transcript breathe on big terminals while the composer
+   keeps its own measure. */
+#workspace-container.-width-wide #transcript-row > WorkspacePanel { width: 120; }
+#workspace-container.-width-full #transcript-row > WorkspacePanel { width: 100%; }
+
+/* The desktop composer sits mid-screen with the welcome on an empty chat, then
+   docks to the bottom once a conversation starts. Same placement here: while
+   the transcript is empty the welcome and the composer centre as one column;
+   the first message drops the composer back to the bottom edge. */
+#workspace-container.-empty {
+    align: center middle;
+}
+
+#workspace-container.-empty #transcript-row {
+    height: auto;
+    max-height: 1fr;
+}
+
+#workspace-container.-empty WorkspacePanel {
+    height: auto;
+    padding: 0;
+}
+
+#workspace-container.-empty EmptyStateBlock,
+#workspace-container.-empty #empty-content {
+    height: auto;
+}
+
+#drawer-row {
+    height: auto;
+    align: center bottom;
+}
+
+#composer-row {
+    height: 6;
+    align: center middle;
+}
+
+/* Our own composer: a rounded frame with a prompt glyph and a footer that
+   carries the state and the send hint. Rounded rather than square because a
+   terminal has no shadows — the corner shape is the only softness available. */
+/* No fill: a rectangular background behind a rounded border leaves square
+   corners sticking out past the curve. The frame alone is the shape. */
+InputBar {
+    height: 5;
+    width: 96;
+    max-width: 100%;
+    background: transparent;
+    border: round $border;
+    padding: 0 1;
+}
+
+InputBar:focus-within {
+    background: transparent;
+    border: round $accent;
+}
+
+#input-row { height: 1; layout: horizontal; }
+
+#input-foot {
+    height: 1;
+    margin-top: 1;
+    layout: horizontal;
+    padding: 0 1;
+}
+
+#input-foot > Static { height: 1; width: auto; }
+#input-foot > #input-model { width: 1fr; }
+#input-stats { width: auto; margin-left: 3; }
+#input-hint { width: auto; margin-left: 3; }
+#input-model { margin-left: 3; }
+
+#prompt-icon {
+    width: 2;
+    height: 1;
+    color: $accent;
+    text-style: bold;
+}
+
+InputBar:focus-within #prompt-icon { color: $accent-hi; }
+
+InputBar Input {
+    border: none;
+    background: transparent;
+    height: 1;
+    padding: 0;
+    width: 1fr;
+    color: $text;
+}
+
+InputBar Input:focus { background: transparent; }
+
+/* Transient notices read as a toast: a filled bar with an accent edge, not a
+   stray line of grey text floating over the transcript. */
+/* Only takes a row when there is a message — otherwise it left an empty
+   coloured bar sitting above the composer. */
+NoticeLine {
+    display: none;
+    height: 1;
+    margin: 0 3;
+    background: $surface;
+    border-left: solid $accent;
+    padding: 0 1;
+    color: $text-2;
+}
+
+NoticeLine.-shown { display: block; }
+
+NoticeLine.-error { border-left: solid $danger; }
+NoticeLine.-ok { border-left: solid $accent; }
+
+/* ── Status line ────────────────────────────────────────────────────────── */
+StatusBar {
+    layout: horizontal;
+    height: 1;
+    background: $bg-deep;
+    color: $text-3;
+    padding: 0 2;
+}
+
+#status-left { width: 1fr; height: 1; }
+#status-right { width: auto; height: 1; text-align: right; }
+
+/* ── Context rail ───────────────────────────────────────────────────────── */
+ContextPanel {
+    width: 26;
+    height: 100%;
+    background: $bg-deep;
+    border-left: solid $border;
+    padding: 1 2;
+    display: none;
+}
+
+ContextPanel.-visible { display: block; }
+
+.panel-header {
+    height: 1;
+    color: $violet;
+    text-style: bold;
+    margin-top: 1;
+}
+.ctx-item { height: 1; color: $text-2; }
+#ctx-tools { height: auto; }
+
+/* ── Artifacts ──────────────────────────────────────────────────────────── */
+ArtifactPanel {
+    width: 40;
+    height: 100%;
+    background: $bg-deep;
+    border-left: solid $border;
+    display: none;
+}
+
+ArtifactPanel.-visible { display: block; }
+
+#artifact-container {
+    height: 1fr;
+    overflow-y: scroll;
+    padding: 1 2;
+    scrollbar-size-vertical: 1;
+}
+
+#artifact-empty { color: $text-3; }
+
+.artifact-block {
+    height: auto;
+    background: $code-bg;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+/* ── Modals ─────────────────────────────────────────────────────────────── */
+ModalScreen {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.66);
+}
+
+.modal-card {
+    width: 72;
+    max-width: 94%;
+    height: 80%;
+    max-height: 90%;
+    background: $surface;
+    border: solid $border-hi;
+    padding: 1 2;
+}
+
+.modal-card.-wide { width: 94; max-width: 96%; }
+.modal-card.-dense .modal-sub { display: none; }
+.modal-card.-compact { width: 58; }
+
+.modal-head { height: 1; layout: horizontal; }
+.modal-title { width: 1fr; height: 1; color: $text; text-style: bold; }
+.modal-kbd { width: auto; height: 1; color: $text-3; }
+.modal-sub { height: auto; color: $text-3; margin-top: 1; }
+.modal-body { height: auto; color: $text-2; margin-top: 1; }
+.modal-footer { height: 1; color: $text-3; margin-top: 1; text-align: right; }
+.modal-error { height: auto; color: $danger; margin-top: 1; text-style: bold; }
+
+/* Same shape as the composer, one size down: an outline, no fill. A
+   rectangular background behind a rounded border leaves square corners poking
+   past the curve — the same fault the composer had. */
+.modal-input {
+    height: 3;
+    border: round $border;
+    background: transparent;
+    padding: 0 2;
+    margin-top: 1;
+}
+.modal-input:focus {
+    border: round $accent;
+    background: transparent;
+}
+
+.modal-input > .input--cursor { background: $accent; }
+
+.modal-list {
+    height: 1fr;
+    background: $surface;
+    border: none;
+    margin-top: 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $surface;
+}
+.modal-list > .option-list--option { padding: 0 1; }
+.modal-list > .option-list--option-highlighted {
+    background: $select-bg;
+    color: $text;
+    text-style: bold;
+}
+.modal-list > .option-list--option-disabled { color: $text-3; }
+
+.modal-actions { height: 3; layout: horizontal; align-horizontal: right; margin-top: 1; }
+.modal-actions Button {
+    height: 3;
+    min-width: 12;
+    border: none;
+    margin-left: 1;
+    padding: 0 2;
+    background: $surface-hi;
+    color: $text;
+}
+.modal-actions Button:hover { background: $border-hi; }
+.modal-actions Button:focus { background: $border-hi; text-style: bold; }
+.modal-actions Button.-primary { background: $accent; color: $bg; text-style: bold; }
+.modal-actions Button.-primary:hover,
+.modal-actions Button.-primary:focus { background: $accent-hi; color: $bg; }
+.modal-actions Button.-error { background: $danger; color: $bg; text-style: bold; }
+
+.field-label { height: 1; color: $text-2; margin-top: 2; }
+.field-help { height: auto; color: $text-3; margin-top: 1; }
+
+/* ── Command palette / picker cards ─────────────────────────────────────── */
+.picker-card { width: 72; }
+.picker-card.-wide { width: 94; }
+
+/* ── Multi-line composer ────────────────────────────────────────────────── */
+.multiline-card { width: 82; max-width: 96%; height: 76%; }
+.multiline-card TextArea {
+    height: 1fr;
+    margin-top: 1;
+    background: $bg;
+    border: solid $border;
+}
+.multiline-card TextArea:focus { border: solid $border-hi; }
+
+/* ── Help browser ───────────────────────────────────────────────────────── */
+.help-card { width: 94; max-width: 96%; height: 82%; }
+.help-body { height: 1fr; layout: horizontal; margin-top: 1; }
+.help-list {
+    width: 38;
+    height: 1fr;
+    max-height: 100%;
+    margin-top: 0;
+}
+.help-list > .option-list--option { height: 1; }
+.help-detail-wrap {
+    width: 1fr;
+    height: 1fr;
+    background: $bg;
+    border-left: solid $border;
+    padding: 0 2;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $bg;
+}
+#help-detail { height: auto; color: $text-2; padding-top: 1; }
+.help-keys {
+    height: auto;
+    color: $text-3;
+    margin-top: 2;
+    padding-top: 1;
+    border-top: solid $border;
+}
+
+/* ── Settings ───────────────────────────────────────────────────────────── */
+.settings-card { width: 112; max-width: 96%; height: 86%; }
+.settings-card.-short { height: 92%; }
+.settings-card.-short .modal-sub,
+.settings-card.-short .settings-summary,
+.settings-card.-short .settings-section-desc,
+.settings-card.-short .settings-nav-title { display: none; }
+.settings-card.-short .settings-actions { height: 1; margin-top: 0; }
+.settings-card.-short .settings-actions Button { height: 1; min-width: 10; }
+.settings-card.-short .settings-status { height: 1; }
+
+.settings-body { height: 1fr; layout: horizontal; margin-top: 1; }
+.settings-nav {
+    width: 24;
+    height: 1fr;
+    border-right: solid $border;
+    padding-right: 2;
+}
+/* The nav used to open with a "SECTIONS" label that named the list sitting
+   directly under it. */
+.settings-nav-title { height: 0; display: none; }
+.settings-nav-list {
+    height: 1fr;
+    max-height: 100%;
+    background: $surface;
+    border: none;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $surface;
+}
+.settings-nav-list > .option-list--option { height: 1; padding: 0 1; }
+.settings-nav-list > .option-list--option-highlighted {
+    background: $select-bg;
+    color: $text;
+    text-style: bold;
+}
+.settings-summary {
+    height: auto;
+    color: $text-3;
+    border-top: solid $border;
+    padding-top: 1;
+}
+.settings-content { width: 1fr; height: 1fr; padding-left: 2; }
+/* The description carries the hairline: an empty Static draws nothing, so the
+   rule has to come from a border on something that already has height. */
+.settings-section-desc {
+    height: auto;
+    color: $text-3;
+    border-bottom: solid $border;
+    padding-bottom: 1;
+    margin-bottom: 1;
+}
+.settings-scroll {
+    height: 1fr;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $surface;
+}
+/* No outer border here: single-line inputs already carry a left accent bar and
+   the multiline one draws its own box, so a card around them reads as nesting. */
+.settings-pane { display: none; height: auto; }
+.settings-pane.-active { display: block; }
+
+/* A cluster kicker inside a pane ("Replies", "Transcript", …). The diamond
+   marks the group the way the welcome marks its kickers. */
+.form-group {
+    height: 1;
+    color: $text-3;
+    text-style: bold;
+    margin-top: 1;
+}
+.settings-pane > .form-group:first-of-type { margin-top: 0; }
+
+/* Toggles and pickers sit on their own line: label and hint on the left, the
+   control on the right. Stacking them full-width pushed the eye down the pane
+   for settings that are one word and one switch. */
+.form-row {
+    height: auto;
+    layout: horizontal;
+    align-vertical: middle;
+    margin-bottom: 1;
+}
+.form-row-text { width: 1fr; height: auto; padding-right: 2; }
+.form-row-label { height: auto; color: $text; }
+.form-row .form-hint { height: auto; color: $text-3; }
+.form-row .form-check { width: 10; height: 1; }
+.form-row .form-select { width: 22; }
+/* Textual draws the same X in both states; only its tint changes. Fill the
+   chip with the accent when on so the switch reads at a glance. */
+.form-check > .toggle--button { color: $text-3; background: $surface-hi; }
+.form-check.-on > .toggle--button { color: $bg; background: $accent; }
+.form-check .toggle--label { color: $text-3; }
+.form-check.-on .toggle--label { color: $text; }
+.settings-card.-narrow .form-row { layout: vertical; }
+.settings-card.-narrow .form-row-text { width: 100%; padding-right: 0; }
+.settings-card.-narrow .form-row .form-check { width: auto; }
+.settings-card.-narrow .form-row .form-select { width: 100%; }
+
+.form-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-gutter: 1 2;
+    height: auto;
+}
+.settings-card.-narrow .form-grid { grid-size: 1; }
+.settings-card.-narrow .settings-nav { width: 18; padding-right: 1; }
+.settings-card.-narrow .settings-content { padding-left: 1; }
+
+.form-item { height: auto; margin-bottom: 1; }
+.form-item.-wide { width: 100%; margin-bottom: 1; }
+.form-label { height: 1; color: $text; text-style: bold; }
+.form-input {
+    height: 1;
+    border: none;
+    border-left: solid $surface-hi;
+    background: $surface-hi;
+    padding: 0 1;
+}
+.form-input:focus { border-left: solid $accent; background: $surface-hi; }
+.form-select { height: 1; }
+.form-select > SelectCurrent {
+    height: 1;
+    border: none;
+    border-left: solid $surface-hi;
+    background: $surface-hi;
+    padding: 0 1;
+}
+.form-select:focus > SelectCurrent { border-left: solid $accent; background: $surface-hi; }
+.form-check { height: 1; }
+.form-hint { height: auto; color: $text-3; }
+.form-hint.-error { color: $danger; text-style: bold; }
+.form-textarea {
+    height: 6;
+    background: $bg;
+    border: solid $border;
+    color: $text;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $bg;
+}
+.settings-card.-short .form-textarea { height: 4; }
+.form-textarea:focus { border: solid $border-hi; }
+.form-path { height: 1; layout: horizontal; }
+.form-path .form-input { width: 1fr; }
+.form-browse {
+    height: 1;
+    min-width: 9;
+    margin-left: 1;
+    border: none;
+    padding: 0 1;
+    background: $surface-hi;
+    color: $text;
+}
+.form-browse:hover { background: $border-hi; }
+.form-browse:focus { background: $border-hi; text-style: bold; }
+
+.settings-actions { height: 3; layout: horizontal; margin-top: 1; }
+.settings-status { width: 1fr; height: 3; content-align: left middle; color: $text-3; }
+.settings-status.-dirty { color: $warn; text-style: bold; }
+.settings-actions Button {
+    height: 3;
+    min-width: 12;
+    border: none;
+    margin-left: 1;
+    padding: 0 2;
+    background: $surface-hi;
+    color: $text;
+}
+.settings-actions Button:hover { background: $border-hi; }
+.settings-actions Button:focus { background: $border-hi; text-style: bold; }
+.settings-actions Button.-primary { background: $accent; color: $bg; text-style: bold; }
+.settings-actions Button.-primary:hover,
+.settings-actions Button.-primary:focus { background: $accent-hi; color: $bg; }
+
+/* ── Checkpoint file browser ────────────────────────────────────────────── */
+.file-card { width: 96; max-width: 96%; height: auto; max-height: 86%; }
+.file-card.-short { height: auto; max-height: 94%; }
+.file-card.-short .modal-sub { display: none; }
+.file-path-row { height: 2; layout: horizontal; margin-top: 1; }
+.file-path-row .modal-input { width: 1fr; margin-top: 0; }
+.file-path-row Button {
+    height: 2;
+    min-width: 6;
+    margin-left: 1;
+    border: none;
+    padding: 0 1;
+    background: $surface-hi;
+    color: $text;
+}
+.file-list { height: auto; max-height: 18; margin-top: 1; }
+.file-card.-short .file-list { max-height: 9; }
+.file-options { height: 1; layout: horizontal; margin-top: 1; }
+.file-options Checkbox { width: auto; height: 1; }
+#file-status { width: 1fr; height: 1; text-align: right; color: $text-3; }
+#file-status.-error { color: $danger; text-style: bold; }
+
+SelectOverlay {
+    background: $surface;
+    border: solid $border-hi;
+    color: $text;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $surface;
+}
+SelectOverlay > .option-list--option { padding: 0 1; }
+SelectOverlay > .option-list--option-highlighted { background: $select-bg; color: $text; }
+
+/* ── Panel overlays (ctrl+r / ctrl+a) ──────────────────────────────────── */
+/* Panels float over the transcript rather than narrowing it: a terminal has no
+   room for a permanently parked column. */
+PanelOverlay {
+    background: rgba(0, 0, 0, 0.55);
+    align: right top;
+}
+
+#overlay-dock {
+    width: 46;
+    height: 100%;
+    background: $bg-deep;
+    border-left: solid $border;
+    padding: 1 2;
+}
+
+/* The layout copies of these panels are display:none until -visible, and that
+   rule applies to every instance — including the one inside the overlay. */
+#overlay-dock ContextPanel,
+#overlay-dock ArtifactPanel {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+}

@@ -35,6 +35,7 @@ from torch.utils.data import Dataset, DataLoader
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from config import CONFIG, ModelConfig, TokenizerConfig
+from training.display_utils import info, ok, warning, dim
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +50,17 @@ class Tokenizer:
         except ImportError:
             raise ImportError("pip install sentencepiece")
 
-        path = model_path or CONFIG.tokenizer.model_path
+        # Resolve model path: explicit > CONFIG > V15_CONFIG fallback
+        if model_path:
+            path = model_path
+        else:
+            path = CONFIG.tokenizer.model_path
+            if not os.path.exists(path):
+                from config import V15_CONFIG
+                v15_path = V15_CONFIG.tokenizer.model_path
+                if os.path.exists(v15_path):
+                    path = v15_path
+
         if not os.path.exists(path):
             raise FileNotFoundError(
                 f"Tokenizer model not found at '{path}'. "
@@ -120,6 +131,7 @@ class PretrainDataset(Dataset):
 
         # Build index of window start positions
         self._make_index()
+        self._current_pos = 0  # track position within _starts (for resume)
 
     def _make_index(self) -> None:
         """Rebuild the list of start indices (called each epoch for reshuffling)."""
@@ -129,6 +141,31 @@ class PretrainDataset(Dataset):
             rng = random.Random(self.seed)
             rng.shuffle(starts)
         self._starts = starts
+
+    @property
+    def current_index(self) -> int:
+        """Current window position within the shuffled list."""
+        return self._current_pos
+
+    def get_state(self) -> dict:
+        """Return dataset state for checkpoint save.
+
+        Returns a dict with:
+          - starts: np.ndarray of current window start indices
+          - seed:   int, the active shuffle seed
+        """
+        return {
+            "starts": np.array(self._starts, dtype=np.int64),
+            "seed":   self.seed,
+        }
+
+    def load_state(self, state: dict) -> None:
+        """Restore dataset state from checkpoint."""
+        if isinstance(state["starts"], np.ndarray):
+            self._starts = state["starts"].tolist()
+        else:
+            self._starts = list(state["starts"])
+        self.seed = state.get("seed", self.seed)
 
     def reshuffle(self, new_seed: int = None) -> None:
         """Call at the end of each epoch to re-randomise window order."""
@@ -140,6 +177,7 @@ class PretrainDataset(Dataset):
         return len(self._starts)
 
     def __getitem__(self, idx: int):
+        self._current_pos = idx  # track position for resume
         start = self._starts[idx]
         # Only convert the small window to tensor (not the whole array)
         x = torch.from_numpy(self.data[start     : start + self.ctx].astype(np.int64).copy())
@@ -189,7 +227,7 @@ def build_pretrain_loaders(
     # ── Compute shard boundaries ────────────────────────────────────────
     boundaries = shard_corpus(data_path, shard_size_mb=shard_size_mb)
     num_shards = len(boundaries)
-    print(f"[dataset] Corpus: {file_mb:.1f} MB → {num_shards} shards ({shard_size_mb} MB each)")
+    info(f"Corpus: {file_mb:.1f} MB  →  {num_shards} shards ({shard_size_mb} MB each)")
 
     # ── Check if tokens.bin is already complete ─────────────────────────
     total_tokens = None
@@ -197,7 +235,7 @@ def build_pretrain_loaders(
         total_tokens = is_bin_complete(c_dir, num_shards)
 
     if total_tokens is not None:
-        print(f"[dataset] ✓ tokens.bin complete: {total_tokens:,} tokens (memory-mapped)")
+        ok(f"Token cache complete: {total_tokens:,} tokens")
         all_ids = build_memmap(c_dir, total_tokens)
     else:
         # ── Stream tokenize → tokens.bin (one shard at a time) ──────────
@@ -214,7 +252,7 @@ def build_pretrain_loaders(
 
             if resume_enabled and is_shard_cached(c_dir, idx, manifest):
                 ids = load_shard_tokens(c_dir, idx)
-                print(f"  shard {idx+1}/{num_shards} ({shard_mb:.0f} MB) → cached ({len(ids):,} tokens)")
+                dim(f"shard {idx+1}/{num_shards} ({shard_mb:.0f} MB)  →  cached ({len(ids):,} tokens)")
             else:
                 text = read_shard(data_path, start, end)
                 ids = tokenize_shard_batched(
@@ -228,7 +266,7 @@ def build_pretrain_loaders(
                     save_shard_tokens(c_dir, idx, ids)
                     manifest.setdefault("completed_shards", []).append(idx)
                     save_manifest(c_dir, manifest)
-                print(f"  shard {idx+1}/{num_shards} ({shard_mb:.0f} MB) → tokenized ({len(ids):,} tokens)")
+                dim(f"shard {idx+1}/{num_shards} ({shard_mb:.0f} MB)  →  tokenized ({len(ids):,} tokens)")
 
             # Stream to binary file immediately, then free RAM
             append_tokens_to_bin(c_dir, ids)
@@ -238,20 +276,20 @@ def build_pretrain_loaders(
         # Update manifest with total
         manifest["total_tokens"] = total_tokens
         save_manifest(c_dir, manifest)
-        print(f"[dataset] ✓ tokens.bin built: {total_tokens:,} tokens")
+        ok(f"Token cache built: {total_tokens:,} tokens")
 
         # Open as memmap (zero RAM)
         all_ids = build_memmap(c_dir, total_tokens)
 
-    print(f"[dataset] Total tokens: {len(all_ids):,}")
+    info(f"Total tokens  : {len(all_ids):,}")
 
     # ── Train / val split ───────────────────────────────────────────────
     split_at  = int(len(all_ids) * train_split)
     train_ids = all_ids[:split_at]
     val_ids   = all_ids[split_at:]
 
-    print(f"[dataset] Train tokens : {len(train_ids):,}")
-    print(f"[dataset] Val   tokens : {len(val_ids):,}")
+    info(f"Train tokens  : {len(train_ids):,}")
+    info(f"Val tokens    : {len(val_ids):,}")
 
     if len(val_ids) < context_length + 1:
         fallback_split = int(len(train_ids) * 0.90)
@@ -373,9 +411,19 @@ class SFTDataset(Dataset):
                 except json.JSONDecodeError as e:
                     skipped += 1
                     if skipped <= 5:
-                        print(f"  [warn] Skipping bad JSON on line {line_num}: {e}")
+                        warning(f"Skipping bad JSON on line {line_num}: {e}")
                     continue
                 msgs = obj.get("messages", [])
+                if not msgs:
+                    inst = obj.get("instruction", "")
+                    inp = obj.get("input", "")
+                    out = obj.get("output", "")
+                    if inst and out:
+                        content = f"{inst}\n{inp}".strip() if inp else inst
+                        msgs = [
+                            {"role": "user", "content": content},
+                            {"role": "assistant", "content": out}
+                        ]
                 if not msgs:
                     continue
                 x, y, mask = format_conversation(msgs, tokenizer)
@@ -385,11 +433,15 @@ class SFTDataset(Dataset):
                 mask = mask[:context_length]
                 if len(x) < 2:
                     continue
-                self.samples.append((x, y, mask))
+                # Store as compact numpy arrays to avoid OOM on large datasets
+                x_np = np.array(x, dtype=np.int32)
+                y_np = np.array(y, dtype=np.int32)
+                mask_np = np.array(mask, dtype=np.bool_)
+                self.samples.append((x_np, y_np, mask_np))
         if skipped:
-            print(f"  [warn] Skipped {skipped} bad JSON lines total")
+            warning(f"Skipped {skipped} bad JSON lines")
 
-        print(f"[dataset] SFT samples loaded: {len(self.samples)}")
+        ok(f"SFT samples loaded: {len(self.samples)}")
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -397,9 +449,9 @@ class SFTDataset(Dataset):
     def __getitem__(self, idx: int):
         x, y, mask = self.samples[idx]
         return (
-            torch.tensor(x,    dtype=torch.long),
-            torch.tensor(y,    dtype=torch.long),
-            torch.tensor(mask, dtype=torch.float),
+            torch.tensor(x.astype(np.int64), dtype=torch.long),
+            torch.tensor(y.astype(np.int64), dtype=torch.long),
+            torch.tensor(mask.astype(np.float32), dtype=torch.float),
         )
 
 
@@ -468,6 +520,7 @@ class MixedSFTDataset(Dataset):
         tokenizer: Tokenizer,
         context_length: int,
         mask_prompt_loss: bool = True,
+        cache_path: str = None,
     ) -> None:
         self.tokenizer        = tokenizer
         self.ctx              = context_length
@@ -475,50 +528,88 @@ class MixedSFTDataset(Dataset):
         self.samples          = []
         self.sample_weights   = []
 
+        if cache_path and os.path.exists(cache_path):
+            info(f"Loading cached SFT mix from {os.path.basename(cache_path)} ...")
+            data = torch.load(cache_path, weights_only=False)
+            self.samples = data["samples"]
+            self.sample_weights = data["weights"]
+            ok(f"Loaded {len(self.samples)} cached samples")
+            return
+
         for entry in mix_config.datasets:
-            if not os.path.exists(entry.path):
-                print(f"  [mix] ⚠ Skipping missing dataset: {entry.name} ({entry.path})")
+            try:
+                if not os.path.exists(entry.path):
+                    warning(f"Skipping missing dataset: {entry.name} ({entry.path})")
+                    continue
+
+                ds_samples = []
+                skipped = 0
+                with open(entry.path, "r", encoding="utf-8") as f:
+                    for line_num, line in enumerate(f, 1):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                        except json.JSONDecodeError:
+                            skipped += 1
+                            continue
+                        try:
+                            msgs = obj.get("messages", [])
+                            if not msgs:
+                                inst = obj.get("instruction", "")
+                                inp = obj.get("input", "")
+                                out = obj.get("output", "")
+                                if inst and out:
+                                    content = f"{inst}\n{inp}".strip() if inp else inst
+                                    msgs = [
+                                        {"role": "user", "content": content},
+                                        {"role": "assistant", "content": out}
+                                    ]
+                            if not msgs:
+                                continue
+                            x, y, mask = format_conversation(msgs, tokenizer)
+                            x    = x[:context_length]
+                            y    = y[:context_length]
+                            mask = mask[:context_length]
+                            if len(x) < 2:
+                                continue
+                            # Store as compact numpy arrays to avoid OOM on large datasets
+                            x_np = np.array(x, dtype=np.int32)
+                            y_np = np.array(y, dtype=np.int32)
+                            mask_np = np.array(mask, dtype=np.bool_)
+                            ds_samples.append((x_np, y_np, mask_np))
+
+                            if entry.max_samples > 0 and len(ds_samples) >= entry.max_samples:
+                                break
+                        except Exception:
+                            skipped += 1
+                            continue
+
+                if skipped:
+                    warning(f"{entry.name}: skipped {skipped} bad JSON lines")
+
+                info(f"{entry.name}: {len(ds_samples)} samples (weight={entry.weight})")
+                self.samples.extend(ds_samples)
+                self.sample_weights.extend([entry.weight] * len(ds_samples))
+            except Exception as e:
+                warning(f"{entry.name}: skipped source ({e})")
                 continue
-
-            ds_samples = []
-            skipped = 0
-            with open(entry.path, "r", encoding="utf-8") as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except json.JSONDecodeError:
-                        skipped += 1
-                        continue
-                    msgs = obj.get("messages", [])
-                    if not msgs:
-                        continue
-                    x, y, mask = format_conversation(msgs, tokenizer)
-                    x    = x[:context_length]
-                    y    = y[:context_length]
-                    mask = mask[:context_length]
-                    if len(x) < 2:
-                        continue
-                    ds_samples.append((x, y, mask))
-
-                    if entry.max_samples > 0 and len(ds_samples) >= entry.max_samples:
-                        break
-
-            if skipped:
-                print(f"  [mix] {entry.name}: skipped {skipped} bad JSON lines")
-
-            print(f"  [mix] {entry.name}: {len(ds_samples)} samples (weight={entry.weight})")
-            self.samples.extend(ds_samples)
-            self.sample_weights.extend([entry.weight] * len(ds_samples))
 
         # Normalize weights
         if self.sample_weights:
             total = sum(self.sample_weights)
             self.sample_weights = [w / total for w in self.sample_weights]
 
-        print(f"[dataset] Mixed SFT total: {len(self.samples)} samples from {len(mix_config.datasets)} sources")
+        ok(f"Mixed SFT total: {len(self.samples)} samples from {len(mix_config.datasets)} sources")
+
+        if cache_path:
+            dim(f"Saving mixed SFT cache to {os.path.basename(cache_path)} ...")
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            torch.save({
+                "samples": self.samples,
+                "weights": self.sample_weights,
+            }, cache_path)
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -526,9 +617,9 @@ class MixedSFTDataset(Dataset):
     def __getitem__(self, idx: int):
         x, y, mask = self.samples[idx]
         return (
-            torch.tensor(x,    dtype=torch.long),
-            torch.tensor(y,    dtype=torch.long),
-            torch.tensor(mask, dtype=torch.float),
+            torch.tensor(x.astype(np.int64), dtype=torch.long),
+            torch.tensor(y.astype(np.int64), dtype=torch.long),
+            torch.tensor(mask.astype(np.float32), dtype=torch.float),
         )
 
 
@@ -540,11 +631,12 @@ def build_mixed_sft_loaders(
     val_frac: float = 0.10,
     seed: int = 42,
     num_workers: int = 0,
+    cache_path: str = None,
 ):
     """Build train/val DataLoaders from a mixed dataset config with weighted sampling."""
     from torch.utils.data import WeightedRandomSampler
 
-    full = MixedSFTDataset(mix_config, tokenizer, context_length)
+    full = MixedSFTDataset(mix_config, tokenizer, context_length, cache_path=cache_path)
 
     n_val   = max(1, int(len(full) * val_frac))
     n_train = len(full) - n_val

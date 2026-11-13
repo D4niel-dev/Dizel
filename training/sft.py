@@ -33,14 +33,21 @@ import torch.optim as optim
 from torch.amp import GradScaler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from config import CONFIG, DizelConfig
+from config import V15_CONFIG, ModelConfigV15, ModelConfig, DizelConfig
 from model.architecture import DizelLM
 from training.dataset import Tokenizer, build_sft_loaders, build_mixed_sft_loaders
 from training.data_mixing import DEFAULT_MIX, DatasetMixConfig, DatasetMixEntry
 from training.pretrain import (
     cosine_lr_with_warmup, set_lr, evaluate, save_checkpoint, load_checkpoint,
-    save_tokenizer,
+    save_tokenizer, make_schedule_tag, _enable_gradient_checkpointing,
 )
+
+from training.display_utils import (
+    rule, section, info, ok, warning, error, dim,
+    config_table, StepMeter, validation,
+)
+
+torch.serialization.add_safe_globals([ModelConfig, ModelConfigV15])
 
 # ---------------------------------------------------------------------------
 # SFT evaluate (uses loss_mask)
@@ -69,8 +76,12 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
     sc = cfg.sft
     mc = cfg.model
 
+    rule("Supervised Fine-Tuning")
+
+    section("Hardware")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[sft] Device : {device}")
+    info(f"Device : {device}")
 
     use_amp  = sc.use_amp and device.type == "cuda"
     amp_dtype = torch.bfloat16 if sc.amp_dtype == "bfloat16" else torch.float16
@@ -85,25 +96,27 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
     mc.vocab_size = len(tokenizer)
 
     # ── Data ─────────────────────────────────────────────────────────────
+    section("Data")
     use_mix = getattr(cfg, '_use_mix', True)
     if use_mix:
         mix_config = getattr(cfg, '_mix_config', DEFAULT_MIX)
-        print(f"[sft] Using mixed dataset ({len(mix_config.datasets)} sources)")
+        ok(f"Mixed dataset ({len(mix_config.datasets)} sources)")
         try:
             train_loader, val_loader = build_mixed_sft_loaders(
                 mix_config     = mix_config,
                 tokenizer      = tokenizer,
                 context_length = mc.context_length,
                 batch_size     = sc.batch_size,
+                cache_path     = getattr(cfg.sft, "cache_path", ".cache/sft_mixed_cache.pt"),
             )
         except Exception as e:
-            print(f"[sft] ⚠ Mixed dataset failed ({e}), falling back to single file")
+            warning(f"Mixed dataset failed ({e}), falling back to single file")
             use_mix = False
 
     if not use_mix:
         if not os.path.exists(sc.sft_data_path):
-            print(f"[sft] ⚠ SFT data not found at '{sc.sft_data_path}'")
-            print(f"[sft]   Run: python sft_data/generate_sft_data.py")
+            error(f"SFT data not found at '{sc.sft_data_path}'")
+            error("Run: python sft_data/generate_sft_data.py")
             sys.exit(1)
         train_loader, val_loader = build_sft_loaders(
             jsonl_path     = sc.sft_data_path,
@@ -113,11 +126,34 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
         )
 
     # ── Model (load from pretrain checkpoint) ────────────────────────────
+    section("Model")
     model = DizelLM(mc).to(device)
+
+    # Gradient checkpointing (saves ~40% VRAM)
+    if getattr(sc, "gradient_checkpointing", False):
+        _enable_gradient_checkpointing(model)
+        ok("Gradient checkpointing enabled")
 
     # Delay loading checkpoint until optimizer is created so we can load its state if resuming
 
-    print(f"[sft] Model : {model}")
+    ok(f"Model: DizelLM({mc.d_model}, {mc.n_layers} layers)")
+
+    config_table({
+        "dimension":    mc.d_model,
+        "layers":       mc.n_layers,
+        "vocab size":   mc.vocab_size,
+        "context":      mc.context_length,
+    })
+    target_steps = sc.max_steps
+
+    config_table({
+        "phase steps":   sc.max_steps,
+        "batch size":    sc.batch_size,
+        "grad accum":    sc.grad_accum,
+        "learning rate": f"{sc.lr:.2e} → {sc.min_lr:.2e}",
+        "warmup steps":  sc.warmup_steps,
+        "mask prompts":  sc.mask_prompt_loss,
+    })
 
     # ── Optimiser (lower LR than pretrain) ───────────────────────────────
     param_groups = [
@@ -132,27 +168,55 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
     os.makedirs(sc.output_dir, exist_ok=True)
     best_val   = float("inf")
     step       = 0
-    
+    ckpt_phase0    = None
+    ckpt_phase_tag = None
+
     if base_ckpt and os.path.exists(base_ckpt):
         # We assume if the filename has 'sft', we are resuming an SFT run, not starting from pretrain
         is_resume = "sft" in base_ckpt.lower()
-        loaded_step = load_checkpoint(base_ckpt, model, optimizer=optimizer if is_resume else None, device=str(device))
+        loaded_step, _meta = load_checkpoint(
+            base_ckpt, model,
+            optimizer=optimizer if is_resume else None,
+            device=str(device),
+        )
+        ckpt_phase0    = _meta.get("phase0")
+        ckpt_phase_tag = _meta.get("phase_tag")
         if is_resume:
             step = loaded_step
     else:
-        print(f"[sft] ⚠ No base checkpoint provided — SFT from scratch")
+        warning("No base checkpoint provided — training from scratch")
+    _resume_step = step
+
+    # -- LR schedule anchor ----------------------------------------------
+    # phase0 = global step where this phase first began; persisted in
+    # checkpoints so a mid-phase resume CONTINUES decaying instead of
+    # re-entering warmup. Legacy or cross-phase checkpoints start a fresh
+    # schedule anchored at the current step.
+    phase_tag = make_schedule_tag(sc.max_steps, sc.lr, sc.min_lr, sc.warmup_steps)
+    if ckpt_phase0 is not None and ckpt_phase_tag == phase_tag:
+        phase0 = ckpt_phase0
+    else:
+        phase0 = step
+    # `--max_steps` is a PER-PHASE budget counted from the phase's FIRST step
+    # (phase0), so the absolute stopping step stays fixed across mid-phase
+    # resumes: resuming at step N simply gets closer to the same fixed end.
+    target_steps = phase0 + sc.max_steps
+    _resume_note = f" (resume {_resume_step:,} → end {target_steps:,})" if _resume_step else ""
+    info(f"Steps: {sc.max_steps:,} this phase{_resume_note}")
     data_iter  = iter(train_loader)
     micro_step = 0
     accum_loss = 0.0
-    t0         = time.time()
 
     model.train()
     optimizer.zero_grad()
 
-    print(f"\n[sft] Starting SFT  (steps={sc.max_steps})")
-    print(f"      mask_prompt_loss : {sc.mask_prompt_loss}\n")
+    meter = StepMeter(
+        target_steps,
+        tokens_per_step=sc.batch_size * sc.grad_accum * mc.context_length,
+        start_step=step,
+    )
 
-    while step < sc.max_steps:
+    while step < target_steps:
         try:
             batch = next(data_iter)
         except StopIteration:
@@ -175,8 +239,11 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
         micro_step += 1
 
         if micro_step % sc.grad_accum == 0:
+            # LR schedule — anchored to phase start so a mid-phase resume
+            # continues decaying instead of re-entering warmup.
+            local = step - phase0
             lr = cosine_lr_with_warmup(
-                step, sc.warmup_steps, sc.max_steps, sc.lr, sc.min_lr
+                local, sc.warmup_steps, sc.max_steps, sc.lr, sc.min_lr
             )
             set_lr(optimizer, lr)
 
@@ -196,41 +263,46 @@ def sft_train(cfg: DizelConfig, base_ckpt: str) -> None:
             accum_loss = 0.0
             step      += 1
 
-            if step % 25 == 0 or step == 1:
-                elapsed = time.time() - t0
-                t0      = time.time()
-                print(
-                    f"  step {step:4d}/{sc.max_steps} | "
-                    f"loss {train_loss:.4f} | "
-                    f"lr {lr:.2e} | {elapsed:.1f}s"
-                )
+            if step % 25 == 0 or step == _resume_step + 1:
+                meter.update(step=step, loss=train_loss, lr=lr)
 
             if step % sc.eval_interval == 0:
                 val_loss = sft_evaluate(
                     model, val_loader, sc.eval_iters, device, amp_ctx
                 )
-                print(f"  *** step {step} | val_loss {val_loss:.4f} ***")
+                validation(step, val_loss)
+                torch.cuda.empty_cache()
                 if val_loss < best_val:
                     best_val = val_loss
                     save_checkpoint(
-                        model, optimizer, step, val_loss, CONFIG,
+                        model, optimizer, step, val_loss, V15_CONFIG,
                         os.path.join(sc.output_dir, f"{sc.run_name}-best.pt"),
                         tokenizer=tokenizer,
+                        phase0=phase0,
+                        phase_tag=phase_tag,
                     )
 
-            if step % sc.save_interval == 0:
+            if not getattr(cfg, '_best_only', False) and step % sc.save_interval == 0:
                 save_checkpoint(
-                    model, optimizer, step, float("inf"), CONFIG,
+                    model, optimizer, step, float("inf"), V15_CONFIG,
                     os.path.join(sc.output_dir, f"{sc.run_name}-step{step}.pt"),
                     tokenizer=tokenizer,
+                    phase0=phase0,
+                    phase_tag=phase_tag,
                 )
 
     save_checkpoint(
-        model, optimizer, step, best_val, CONFIG,
+        model, optimizer, step, best_val, V15_CONFIG,
         os.path.join(sc.output_dir, f"{sc.run_name}-final.pt"),
         tokenizer=tokenizer,
+        phase0=phase0,
+        phase_tag=phase_tag,
     )
-    print(f"\n[sft] Done.  Best val loss: {best_val:.4f}")
+    meter.finalise()
+    config_table({
+        "Best val loss": f"{best_val:.4f}",
+        "Total steps":   f"{step:,}",
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -243,9 +315,13 @@ def parse_args():
     p.add_argument("--resume", type=str, default="",
                    help="Path to an SFT checkpoint (.pt) to resume from.")
     p.add_argument("--lr",        type=float, default=None)
+    p.add_argument("--min_lr",    type=float, default=None)
     p.add_argument("--max_steps", type=int,   default=None)
+    p.add_argument("--warmup_steps", type=int, default=None)
     p.add_argument("--batch_size", type=int,  default=None)
     p.add_argument("--grad_accum", type=int,  default=None)
+    p.add_argument("--gradient_checkpointing", action="store_true",
+                   help="Enable gradient checkpointing")
     p.add_argument("--no_amp",    action="store_true",
                    help="Disable AMP even on CUDA")
     p.add_argument("--use_amp",   action="store_true",
@@ -258,26 +334,33 @@ def parse_args():
                    help="Disable mixed dataset loading, use single sft_data_path")
     p.add_argument("--mix_config", type=str, default="",
                    help="Path to dataset mix JSON config. Uses DEFAULT_MIX if empty.")
+    p.add_argument("--best_only", action="store_true",
+                   help="Save only the best checkpoint (skip periodic step checkpoints)")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    cfg  = CONFIG
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    cfg  = V15_CONFIG
     
     if not args.base_checkpoint and not args.resume:
         print("Error: Must provide either --base_checkpoint or --resume")
         sys.exit(1)
         
     if args.lr        is not None: cfg.sft.lr        = args.lr
+    if args.min_lr    is not None: cfg.sft.min_lr    = args.min_lr
     if args.max_steps is not None: cfg.sft.max_steps = args.max_steps
+    if args.warmup_steps is not None: cfg.sft.warmup_steps = args.warmup_steps
     if args.batch_size is not None: cfg.sft.batch_size = args.batch_size
     if args.grad_accum is not None: cfg.sft.grad_accum = args.grad_accum
+    if args.gradient_checkpointing: cfg.sft.gradient_checkpointing = True
     if args.no_amp:                cfg.sft.use_amp   = False
     if args.use_amp:               cfg.sft.use_amp   = True
     if args.amp_dtype is not None: cfg.sft.amp_dtype = args.amp_dtype
     if args.sft_data is not None:  cfg.sft.sft_data_path = args.sft_data
     if args.base_checkpoint:       cfg.sft.base_checkpoint = args.base_checkpoint
+    cfg._best_only = args.best_only
 
     # Mixed dataset control
     cfg._use_mix = not args.no_mix

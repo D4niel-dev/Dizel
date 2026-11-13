@@ -1,0 +1,57 @@
+<!--meta
+{
+  "title": "Launch Dizel — Docs",
+  "description": "Launch the Dizel desktop app or terminal UI with a local checkpoint.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "launch"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Getting started</span><span>/</span><span>Launch</span></div>
+<h1>Launch Dizel</h1>
+<p class="s-docs-lede">Choose the desktop app or the terminal client. Both use the local engine and the checkpoint you pass them.</p>
+
+<div class="s-callout"><b>Use v1.5 today.</b> The published checkpoint is <code>checkpoints/dizel15/dizel-v15-distill-best.pt</code>. The 1.6 preview has no weights.</div>
+
+<section class="s-docs-section">
+  <h2 id="desktop">Desktop app</h2>
+  <p>The desktop app is an Electron shell over the local Python engine. The first run installs its own npm dependencies.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>cd inference/gui
+npm install
+npm run dev</code></pre>
+  </div>
+  <p>The app auto-detects a Python interpreter that can import FastAPI. Set <code>DIZEL_PYTHON</code> to override it.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="tui">Terminal UI</h2>
+  <p>The TUI is keyboard-first and lives in the shell. It uses the same checkpoint and sidecar as the desktop app.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda</code></pre>
+  </div>
+  <p>Type <code>/help</code> for commands, <code>/skills</code> for prompt templates, and <code>/mcp</code> for plugin servers.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="headless">Headless generation</h2>
+  <p>Send one prompt without opening a client. Tokens go to stdout; loader and error messages go to stderr.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda \
+  --prompt "Explain what a for loop does in one paragraph."</code></pre>
+  </div>
+</section>
+
+<div class="s-next">
+  <a href="install.html"><small>Previous</small>Install Dizel</a>
+  <a href="../model.html"><small>Next</small>Read the model card →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>

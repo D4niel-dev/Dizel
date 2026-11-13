@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch Dizel — Docs</title>
+<meta name="description" content="Launch the Dizel desktop app or terminal UI with a local checkpoint.">
+
+<link rel="canonical" href="https://d4niel-dev.github.io/Dizel/guide/launch.html">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://d4niel-dev.github.io/Dizel/guide/launch.html">
+<meta property="og:title" content="Launch Dizel — Docs">
+<meta property="og:description" content="Launch the Dizel desktop app or terminal UI with a local checkpoint.">
+<meta property="og:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
+<meta property="og:image:width" content="1475">
+<meta property="og:image:height" content="975">
+<meta property="og:image:alt" content="The Dizel desktop app with a chat sidebar, a session chip and a composer.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Launch Dizel — Docs">
+<meta name="twitter:description" content="Launch the Dizel desktop app or terminal UI with a local checkpoint.">
+<meta name="twitter:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
+<meta name="theme-color" content="#F1F2EC">
+<link rel="icon" type="image/x-icon" href="../assets/app/Dizel.ico">
+<link rel="icon" type="image/png" href="../assets/app/Dizel.png">
+<link rel="preload" href="../assets/fonts/Newsreader-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+(function () {
+  var root = document.documentElement;
+  var meta = document.querySelector('meta[name="theme-color"]');
+  var light = "#F1F2EC";
+  var dark = "#141519";
+  var stored = null;
+  try { stored = localStorage.getItem("dizel.site.theme"); } catch (_) {}
+  var darkMode = stored
+    ? stored === "dark"
+    : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  root.classList.add("js");
+  root.dataset.theme = darkMode ? "dark" : "light";
+  root.style.colorScheme = darkMode ? "dark" : "light";
+  if (meta) meta.setAttribute("content", darkMode ? dark : light);
+})();
+</script>
+
+<link rel="stylesheet" href="../styles/site.css">
+</head>
+<body class="site">
+<a class="s-site-skip" href="#main">Skip to content</a>
+<header class="s-nav">
+  <a class="s-brand" href="../index.html" aria-label="Dizel home">
+    <img class="s-mark" src="../assets/app/Dizel.png" width="40" height="40" alt="">
+    <span class="s-word">Dizel</span>
+    <span class="s-edition">1.6 Preview</span>
+  </a>
+  <nav class="s-nav-links" aria-label="Primary">
+    <a href="../model.html" data-nav="model">Model</a>
+    <a href="../guide/index.html" data-nav="docs" aria-current="page">Docs</a>
+    <a href="../releases.html" data-nav="releases">Releases</a>
+    <a href="../demo.html" data-nav="demo">Demo</a>
+  </nav>
+  <div class="s-nav-right">
+    <span class="s-avail"><i></i>v1.5 available</span>
+    <button class="s-icon-btn theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 14.4A8.4 8.4 0 0 1 9.6 3.8a8.6 8.6 0 1 0 10.6 10.6Z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+    </button>
+    <a class="s-icon-btn" href="https://github.com/D4niel-dev/Dizel" target="_blank" rel="noopener" aria-label="Dizel on GitHub">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.97 3.22 9.18 7.69 10.67.56.1.77-.24.77-.54 0-.27-.01-1.16-.02-2.1-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.68.08-.68 1.13.08 1.72 1.16 1.72 1.16 1 1.72 2.63 1.22 3.27.94.1-.73.39-1.22.71-1.5-2.5-.29-5.13-1.25-5.13-5.58 0-1.23.44-2.24 1.16-3.03-.12-.29-.5-1.44.11-3 0 0 .95-.3 3.1 1.16a10.7 10.7 0 0 1 5.64 0c2.15-1.46 3.1-1.16 3.1-1.16.61 1.56.23 2.71.11 3 .72.79 1.16 1.8 1.16 3.03 0 4.34-2.64 5.29-5.15 5.57.4.35.76 1.03.76 2.08 0 1.5-.01 2.71-.01 3.08 0 .3.2.65.78.54a11.26 11.26 0 0 0 7.68-10.67C23.25 5.48 18.27.5 12 .5Z"/></svg>
+    </a>
+    <button class="s-icon-btn s-menu" type="button" id="s-menu" aria-expanded="false" aria-controls="s-mobile-menu" aria-label="Open menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </div>
+</header>
+<div class="s-mobile-menu" id="s-mobile-menu" hidden>
+  <a href="../model.html">Model</a>
+  <a href="../guide/index.html">Docs</a>
+  <a href="../releases.html">Releases</a>
+  <a href="../demo.html">Demo</a>
+  <a href="../index.html">Home</a>
+</div>
+
+<main id="main" tabindex="-1"><div class="s-shell">
+  <div class="s-docs-bar">
+    <a class="s-docs-title" href="../index.html">Dizel Docs <span class="s-docs-label">v1.5</span></a>
+    <span class="s-docs-version">Record 2026-11</span>
+  </div>
+  <div class="s-docs-layout">
+    <nav class="s-docs-side" aria-label="Documentation">
+  <div class="s-side-group">
+    <div class="s-side-title">Getting started</div>
+    <a href="index.html" data-docs="overview">Overview</a>
+    <a href="install.html" data-docs="install">Install</a>
+    <a href="launch.html" data-docs="launch" class="is-active" aria-current="page">Launch</a>
+  </div>
+  <div class="s-side-group">
+    <div class="s-side-title">Clients</div>
+    <a href="launch.html#desktop" data-docs="desktop">Desktop app</a>
+    <a href="launch.html#tui" data-docs="tui">Terminal UI</a>
+  </div>
+</nav>
+
+    <article class="s-docs-main" id="docs-main">
+      <details class="s-docs-mobile">
+        <summary>Documentation menu</summary>
+        <a href="index.html">Overview</a>
+        <a href="install.html">Install</a>
+        <a href="launch.html">Launch</a>
+        <a href="launch.html#desktop">Desktop app</a>
+        <a href="launch.html#tui">Terminal UI</a>
+      </details>
+      <div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Getting started</span><span>/</span><span>Launch</span></div>
+<h1>Launch Dizel</h1>
+<p class="s-docs-lede">Choose the desktop app or the terminal client. Both use the local engine and the checkpoint you pass them.</p>
+
+<div class="s-callout"><b>Use v1.5 today.</b> The published checkpoint is <code>checkpoints/dizel15/dizel-v15-distill-best.pt</code>. The 1.6 preview has no weights.</div>
+
+<section class="s-docs-section">
+  <h2 id="desktop">Desktop app</h2>
+  <p>The desktop app is an Electron shell over the local Python engine. The first run installs its own npm dependencies.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>cd inference/gui
+npm install
+npm run dev</code></pre>
+  </div>
+  <p>The app auto-detects a Python interpreter that can import FastAPI. Set <code>DIZEL_PYTHON</code> to override it.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="tui">Terminal UI</h2>
+  <p>The TUI is keyboard-first and lives in the shell. It uses the same checkpoint and sidecar as the desktop app.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda</code></pre>
+  </div>
+  <p>Type <code>/help</code> for commands, <code>/skills</code> for prompt templates, and <code>/mcp</code> for plugin servers.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="headless">Headless generation</h2>
+  <p>Send one prompt without opening a client. Tokens go to stdout; loader and error messages go to stderr.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda \
+  --prompt "Explain what a for loop does in one paragraph."</code></pre>
+  </div>
+</section>
+
+<div class="s-next">
+  <a href="install.html"><small>Previous</small>Install Dizel</a>
+  <a href="../model.html"><small>Next</small>Read the model card →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>
+    </article>
+    <aside class="s-docs-toc">
+  <div class="s-side-title">On this page</div>
+  <a href="#desktop">Desktop app</a>
+<a href="#tui">Terminal UI</a>
+<a href="#headless">Headless generation</a>
+  <div class="s-toc-foot">
+    Version: v1.5 · <a href="https://github.com/D4niel-dev/Dizel/blob/main/docs/_site/pages/guide-launch.html" target="_blank" rel="noopener">Edit this page ↗</a>
+  </div>
+</aside>
+
+  </div>
+</div>
+</main>
+<footer class="s-foot">
+  <div class="s-shell">
+    <div class="s-foot-grid">
+      <div>
+        <a class="s-foot-brand" href="../index.html">
+          <img class="s-mark" src="../assets/app/Dizel.png" width="40" height="40" alt="">
+          <span class="s-word">Dizel</span>
+        </a>
+        <p class="s-foot-note">A local-first model and app. Trained in public on one T4. The preview is a record, not a promise.</p>
+      </div>
+      <div class="s-foot-col">
+        <h3>Product</h3>
+        <a href="../guide/launch.html">Desktop app</a>
+        <a href="../guide/launch.html#tui">Terminal UI</a>
+        <a href="../demo.html">Interface demo</a>
+      </div>
+      <div class="s-foot-col">
+        <h3>Research</h3>
+        <a href="../model.html">Model card</a>
+        <a href="../model.html#mc-architecture">Architecture</a>
+        <a href="../model.html#mc-evaluation">Evaluation</a>
+      </div>
+      <div class="s-foot-col">
+        <h3>Project</h3>
+        <a href="../releases.html">Releases</a>
+        <a href="../model.html#mc-training">Training log</a>
+        <a href="https://github.com/D4niel-dev/Dizel" target="_blank" rel="noopener">Repository ↗</a>
+      </div>
+    </div>
+    <div class="s-foot-bottom">
+      <span>Dizel 1.6 Flash Preview · Record 2026-11</span>
+      <span>MIT licensed · Built in public on one T4</span>
+      <a href="../model.html#mc-citation">Citation</a>
+      <a href="#main">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/site.js" defer></script>
+</body>
+</html>

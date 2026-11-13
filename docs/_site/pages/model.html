@@ -1,0 +1,146 @@
+<!--meta
+{
+  "title": "Dizel 1.6 Flash Preview — Model card",
+  "description": "Dizel 1.6 Flash Preview model card: architecture, training, held-out evaluation, limitations, and citation.",
+  "nav": "model",
+  "layout": "public"
+}
+-->
+<div class="s-shell">
+          <header class="s-doc-head">
+            <div class="s-crumb"><a href="index.html">Dizel</a><span>/</span><a href="model.html">Model</a><span>/</span><span>1.6 Flash Preview</span></div>
+            <h1>Dizel 1.6 Flash Preview</h1>
+            <div class="s-doc-meta"><span>Model card</span><span>2026-11</span><span>Preview</span><span>MIT</span></div>
+          </header>
+
+          <div class="s-paper">
+            <nav class="s-paper-side" aria-label="Model card sections">
+              <div class="s-side-title">On this page</div>
+              <a href="#mc-overview" class="is-active">Overview</a>
+              <a href="#mc-architecture">Architecture</a>
+              <a href="#mc-training">Training</a>
+              <a href="#mc-evaluation">Evaluation</a>
+              <a href="#mc-limitations">Limitations</a>
+              <a href="#mc-citation">Citation</a>
+            </nav>
+
+            <article class="s-paper-main">
+              <section id="mc-overview">
+                <h2>Overview</h2>
+                <p class="s-abstract">Dizel 1.6 Flash is a decoder-only sparse mixture-of-experts model: 435.3M total parameters, 293.7M active per token, and a 2,048-token context. It is a preview. The weights and downstream benchmarks are not published.</p>
+                <div class="s-status-note"><i aria-hidden="true"></i><span><b>Evaluation checkpoint.</b> This is a pretrain snapshot, not an instruct release. Use v1.5 for the published model that runs in the app.</span></div>
+                <h3>What is verified</h3>
+                <p>At step 10,500, the held-out BPB is <code>1.1236</code> and validation loss is <code>3.4479</code>. These are training-loop measurements, not downstream benchmark scores. The fixed 500-document holdout is not yet published.</p>
+                <h3>What is not</h3>
+                <p>There is no public benchmark table, no instruct weights, and no multimodal encoder. The preview exists to test the sparse architecture and the training recipe before a stable release.</p>
+              </section>
+
+              <section id="mc-architecture">
+                <h2>Architecture</h2>
+                <p>A decoder-only causal Transformer with pre-RMSNorm, RoPE, grouped-query attention, SwiGLU, and tied embeddings. v1.6 replaces the dense feed-forward block with a dropless top-2 mixture of experts.</p>
+                <div class="s-arch" aria-label="Architecture block order">
+                  <span>token</span><em>→</em><span>RMSNorm</span><em>→</em><span>GQA</span><em>→</em><span>+ residual</span><em>→</em><span>RMSNorm</span><em>→</em><span class="hot">router · top-2</span><em>→</em><span class="hot">2 experts</span><em>→</em><span>+ residual</span>
+                </div>
+                <p class="s-arch-note">Illustrative block order; residual paths are abbreviated for width.</p>
+                <div class="s-table-scroll">
+                  <table class="s-paper-table">
+                    <thead><tr><th>Model</th><th>Total</th><th>Active / token</th><th>Layers</th><th>d_model</th><th>Q / KV</th><th>FFN</th></tr></thead>
+                    <tbody>
+                      <tr><td>1.5 Dense</td><td class="num">454.78M</td><td class="num">454.78M</td><td class="num">28</td><td class="num">1,024</td><td class="num">16 / 8</td><td>SwiGLU 3,072</td></tr>
+                      <tr><td>1.6 Flash</td><td class="num">435.3M</td><td class="num">293.7M</td><td class="num">20</td><td class="num">768</td><td class="num">12 / 6</td><td>4 × 1,536, top-2</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <h3>Why top-2</h3>
+                <p>Every token is processed by its top two experts; no token is dropped for capacity. All four experts stay in memory even though only two fire per token. That is the trade: 435.3M parameters of capacity, 293.7M parameters of compute.</p>
+                <h3>Why grouped-query attention</h3>
+                <p>GQA shares K/V heads across query groups. It cuts the KV cache and memory bandwidth without collapsing to single-head MQA. v1.6 uses 12 query heads and 6 KV heads at <code>d_model=768</code>.</p>
+                <h3>Router stability</h3>
+                <p>The router is dropless. An auxiliary loss of <code>0.01</code> and a router z-loss of <code>0.001</code> encourage balanced expert use; router logits stay in float32.</p>
+              </section>
+
+              <section id="mc-training">
+                <h2>Training</h2>
+                <p>Pretraining runs on one T4 with an effective batch of 65,536 tokens. Every 500 steps the run validates on a fixed 500-document holdout and syncs the best checkpoint. The last verified point is step 10,500.</p>
+                <table class="s-paper-table">
+                  <thead><tr><th>Stage</th><th>Data</th><th>Objective</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr><td>Pretrain</td><td>3B-token corpus</td><td>Next token</td><td><span class="s-tag is-warn"><i></i>Training · 22.9%</span></td></tr>
+                    <tr><td>SFT</td><td>Post-training mix</td><td>Supervised</td><td><span class="s-tag is-muted"><i></i>Not started</span></td></tr>
+                    <tr><td>Token-level KD</td><td>Qwen teacher</td><td>Distillation</td><td><span class="s-tag is-muted"><i></i>Not started</span></td></tr>
+                    <tr><td>DPO</td><td>Preference pairs</td><td>Preference</td><td><span class="s-tag is-muted"><i></i>Optional</span></td></tr>
+                  </tbody>
+                </table>
+                <div class="s-callout"><b>Read the number in context.</b> BPB is computed on raw UTF-8 bytes, so it is comparable across the 100K SentencePiece and 151,936-row Qwen vocabularies. Raw token cross-entropy is not comparable across tokenizers.</div>
+                <h3>Progress</h3>
+                <p><code>688.1M</code> of <code>3B</code> training tokens · step <code>10,500</code> of <code>45,777</code> · last verified BPB <code>1.1236</code>. Values are copied from the last validation run; this page does not poll the training process.</p>
+              </section>
+
+              <section id="mc-evaluation">
+                <h2>Evaluation</h2>
+                <p>The published evidence is deliberately narrow: one held-out BPB, one validation loss, and the exact checkpoint and holdout used to produce them. Downstream benchmarks are not published yet.</p>
+                <table class="s-paper-table">
+                  <thead><tr><th>Metric</th><th>Value</th><th>Scope</th></tr></thead>
+                  <tbody>
+                    <tr><td>Held-out BPB</td><td class="num">1.1236</td><td>Fixed 500-document holdout; training-loop proxy</td></tr>
+                    <tr><td>Validation loss</td><td class="num">3.4479</td><td>Same holdout, step 10,500</td></tr>
+                    <tr><td>Downstream benchmarks</td><td class="num">—</td><td><span class="s-tag is-muted"><i></i>Not published</span></td></tr>
+                  </tbody>
+                </table>
+                <p>When a downstream table exists, it will name the prompts, scoring method, model version, and date. Until then, the honest row is the empty one.</p>
+                <a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/blob/main/scripts/eval_holdout_bpb.py" target="_blank" rel="noopener">Evaluation script ↗</a>
+              </section>
+
+              <section id="mc-limitations">
+                <h2>Limitations</h2>
+                <ul>
+                  <li><strong>No vision.</strong> There is no image encoder, image tokens, or multimodal projection.</li>
+                  <li><strong>2,048-token context.</strong> The app does not extend the model’s window.</li>
+                  <li><strong>No instruct release.</strong> The preview checkpoint is for evaluation; v1.5 is the model to run.</li>
+                  <li><strong>No public downstream benchmarks.</strong> BPB and validation loss are training-loop measurements, not task scores.</li>
+                  <li><strong>No published holdout.</strong> The fixed 500-document set is named but not released, so the BPB cannot yet be independently reproduced.</li>
+                </ul>
+              </section>
+
+              <section id="mc-citation">
+                <h2>Citation</h2>
+                <p>This is a working citation for the preview. The stable release will get a permanent record.</p>
+                <div class="s-code">
+                  <button class="copy" type="button" data-copy>Copy</button>
+                  <pre><code><span class="c">@misc{dizel2026flash,</span>
+  title  = {Dizel 1.6 Flash Preview},
+  author = {Dizel},
+  year   = {2026},
+  note   = {Preview checkpoint, weights unpublished},
+  url    = {https://github.com/D4niel-dev/Dizel}
+}</code></pre>
+                </div>
+              </section>
+
+              <div class="s-paper-foot">
+                <a href="index.html"><small>Previous</small>Home</a>
+                <a href="index.html"><small>Next</small>Install Dizel →</a>
+              </div>
+            </article>
+
+            <aside class="s-paper-rail">
+              <div class="s-rail-title">At a glance</div>
+              <ul class="s-rail-list">
+                <li><span class="k">Status</span><span class="v">Preview</span></li>
+                <li><span class="k">Total params</span><span class="v">435.3M</span></li>
+                <li><span class="k">Active / token</span><span class="v">293.7M</span></li>
+                <li><span class="k">Experts</span><span class="v">4 · top-2</span></li>
+                <li><span class="k">Context</span><span class="v">2,048</span></li>
+                <li><span class="k">Vocab</span><span class="v">151,936</span></li>
+                <li><span class="k">License</span><span class="v">MIT</span></li>
+                <li><span class="k">Weights</span><span class="v">Pending</span></li>
+              </ul>
+              <div class="s-callout is-warn"><b>Preview only.</b> Not an instruct release. Use v1.5 for the published model.</div>
+              <div class="s-rail-title">Sources</div>
+              <a class="s-source" href="#mc-training">Training log →</a>
+              <a class="s-source" href="#mc-evaluation">Held-out evaluation →</a>
+              <a class="s-source" href="https://github.com/D4niel-dev/Dizel/blob/main/README.md" target="_blank" rel="noopener">Repository README ↗</a>
+              <a class="s-source" href="https://github.com/D4niel-dev/Dizel/blob/main/LICENSE" target="_blank" rel="noopener">MIT license ↗</a>
+            </aside>
+          </div>
+        </div>

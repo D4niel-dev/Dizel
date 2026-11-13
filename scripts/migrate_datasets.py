@@ -387,6 +387,11 @@ def convert_oasst2_dataset(df: "pd.DataFrame",
     Convert OASST2 tree-structured conversations into linear threads.
     Flattens parent->child chains and maps prompter->user, assistant->assistant.
     """
+    # Modern format — each row has a 'messages' column (list of role/content dicts)
+    if "messages" in df.columns:
+        print(f"  Detected modern 'messages' column format — using ultrachat converter")
+        return convert_ultrachat_dataset(df, system)
+
     # Filter to English
     if "lang" in df.columns:
         df = df[df["lang"] == "en"].copy()
@@ -526,12 +531,24 @@ def convert_ultrachat_dataset(df: "pd.DataFrame",
 
 def convert_codefeedback_dataset(df: "pd.DataFrame",
                                   system: str = DEFAULT_SYSTEM) -> List[Dict]:
-    """Convert CodeFeedback â€” auto-detects column names."""
+    """Convert CodeFeedback – now supports the modern 'messages' column."""
     cols = set(df.columns)
+
+    if "messages" in df.columns:
+        # Each row IS a chat (list of {role, content} dicts)
+        return convert_ultrachat_dataset(df, system)
+
+    # Modern chat format — each row has a 'messages' column with role/content dicts
+    if "messages" in cols:
+        return convert_ultrachat_dataset(df, system)
+
+    # Instruction/completion pairs
     if "instruction" in cols and "answer" in cols:
         inst_col, out_col = "instruction", "answer"
     elif "instruction" in cols and "output" in cols:
         inst_col, out_col = "instruction", "output"
+    elif "prompt" in cols and "completion" in cols:
+        inst_col, out_col = "prompt", "completion"
     elif "query" in cols and "answer" in cols:
         inst_col, out_col = "query", "answer"
     elif "question" in cols and "answer" in cols:
@@ -939,14 +956,23 @@ def _streaming_dedup_and_export(processed_dir, base_dir, expected_count):
     return written
 
 
-def run_full_pipeline(base_dir: str):
+def run_full_pipeline(base_dir: str, raw_dir: str = None):
     """Run the complete migration pipeline. Flushes each dataset to disk immediately."""
-    raw_dir = os.path.join(base_dir, "data", "raw")
+    if raw_dir is None:
+        raw_dir = os.path.join(base_dir, "data", "raw")
     sft_dir = os.path.join(base_dir, "sft_data")
     processed_dir = os.path.join(base_dir, "data", "processed")
     os.makedirs(processed_dir, exist_ok=True)
 
     total_count = 0
+
+    def _skip_if_done(name: str) -> bool:
+        """Check if processed file for this dataset already exists with content."""
+        out_path = os.path.join(processed_dir, f"{name}.jsonl")
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            print(f"  [{name}] Already processed ({os.path.getsize(out_path) / 1024:.0f} KB) — skipping")
+            return True
+        return False
 
     #  Phase 1: Existing SFT files  â”€â”€â”€â”€â”€
     print("\n[Phase 1] Merging existing SFT data...")
@@ -968,10 +994,18 @@ def run_full_pipeline(base_dir: str):
         ("coedit", convert_coedit_dataset, "instruction"),
         ("dolly", convert_dolly_dataset, "instruction"),
     ]:
+        if _skip_if_done(ds_name):
+            continue
         ds_dir = os.path.join(raw_dir, ds_name)
         if os.path.isdir(ds_dir):
-            print(f"\n  -> {ds_name}")
-            df = load_dataset_dir(ds_dir)
+            print(f"\n  -> {ds_name}  (searching {ds_dir})")
+            try:
+                df = load_dataset_dir(ds_dir)
+            except FileNotFoundError as e:
+                print(f"  [!] {e}")
+                print(f"  [!] Check that your {ds_name} parquet/jsonl files are inside {ds_dir}")
+                print(f"  [!] Tip: use --raw_dir to point to a different location")
+                continue
             if df is not None:
                 inspect_schema(df, ds_name)
                 converted = converter(df)
@@ -982,90 +1016,94 @@ def run_full_pipeline(base_dir: str):
     print("\n[Phase 3] Processing conversational datasets...")
 
     # oasst2
-    ds_dir = os.path.join(raw_dir, "oasst2")
-    if os.path.isdir(ds_dir):
-        print("\n  -> oasst2")
-        df = load_parquet_dir(ds_dir)
-        if df is not None:
-            inspect_schema(df, "oasst2")
-            converted = convert_oasst2_dataset(df)
-            del df; import gc; gc.collect()
-            total_count += _flush_to_disk(converted, "oasst2", "chat", processed_dir)
+    if not _skip_if_done("oasst2"):
+        ds_dir = os.path.join(raw_dir, "oasst2")
+        if os.path.isdir(ds_dir):
+            print("\n  -> oasst2")
+            df = load_parquet_dir(ds_dir)
+            if df is not None:
+                inspect_schema(df, "oasst2")
+                converted = convert_oasst2_dataset(df)
+                del df; import gc; gc.collect()
+                total_count += _flush_to_disk(converted, "oasst2", "chat", processed_dir)
 
     # ultrachat (stream to disk file-by-file)
-    ds_dir = os.path.join(raw_dir, "ultrachat")
-    if os.path.isdir(ds_dir):
-        print("\n  -> ultrachat")
-        import glob as _glob; import gc as _gc
-        uc_files = sorted(_glob.glob(os.path.join(ds_dir, "**", "*.parquet"), recursive=True))
-        uc_files = [f for f in uc_files if ".cache" not in f]
-        uc_out = os.path.join(processed_dir, "ultrachat.jsonl")
-        uc_total = 0
-        with open(uc_out, "w", encoding="utf-8") as uf:
-            for uc_f in uc_files:
-                fn = os.path.basename(uc_f)
-                print(f"    Processing {fn}...")
-                import pandas as _pd
-                cdf = _pd.read_parquet(uc_f)
-                converted = convert_ultrachat_dataset(cdf)
-                del cdf
-                for s in converted:
-                    uf.write(json.dumps({"messages": s["messages"], "source": "ultrachat",
-                                         "category": "chat"}, ensure_ascii=False) + "\n")
-                uc_total += len(converted)
-                del converted; _gc.collect()
-                print(f"     {fn}: total so far {uc_total:,}")
-        total_count += uc_total
-        print(f"   ultrachat total: {uc_total:,}")
+    if not _skip_if_done("ultrachat"):
+        ds_dir = os.path.join(raw_dir, "ultrachat")
+        if os.path.isdir(ds_dir):
+            print("\n  -> ultrachat")
+            import glob as _glob; import gc as _gc
+            uc_files = sorted(_glob.glob(os.path.join(ds_dir, "**", "*.parquet"), recursive=True))
+            uc_files = [f for f in uc_files if ".cache" not in f]
+            uc_out = os.path.join(processed_dir, "ultrachat.jsonl")
+            uc_total = 0
+            with open(uc_out, "w", encoding="utf-8") as uf:
+                for uc_f in uc_files:
+                    fn = os.path.basename(uc_f)
+                    print(f"    Processing {fn}...")
+                    import pandas as _pd
+                    cdf = _pd.read_parquet(uc_f)
+                    converted = convert_ultrachat_dataset(cdf)
+                    del cdf
+                    for s in converted:
+                        uf.write(json.dumps({"messages": s["messages"], "source": "ultrachat",
+                                             "category": "chat"}, ensure_ascii=False) + "\n")
+                    uc_total += len(converted)
+                    del converted; _gc.collect()
+                    print(f"     {fn}: total so far {uc_total:,}")
+            total_count += uc_total
+            print(f"   ultrachat total: {uc_total:,}")
 
     #  Phase 4: Complex datasets   
     print("\n[Phase 4] Processing complex datasets...")
 
     # openorca (iter_batches for controlled chunking, stream to disk)
-    ds_dir = os.path.join(raw_dir, "openorca")
-    if os.path.isdir(ds_dir):
-        print("\n  -> openorca")
-        import glob; import pyarrow.parquet as pq; import gc
-        ofiles = sorted(glob.glob(os.path.join(ds_dir, "**", "*.parquet"), recursive=True))
-        ofiles = [f for f in ofiles if ".cache" not in f]
-        o_out = os.path.join(processed_dir, "openorca.jsonl")
-        o_total = 0; sp = False
-        BATCH = 50_000  # rows per batch — safe for T4 RAM
-        with open(o_out, "w", encoding="utf-8") as of:
-            for ofile in ofiles:
-                fn = os.path.basename(ofile)
-                pf = pq.ParquetFile(ofile)
-                total_rows = pf.metadata.num_rows
-                print(f"    {fn}: {total_rows:,} rows")
-                fk = 0; batch_n = 0
-                for batch in pf.iter_batches(batch_size=BATCH):
-                    cdf = batch.to_pandas()
-                    batch_n += 1
-                    if not sp:
-                        inspect_schema(cdf, f"openorca/{fn}")
-                        sp = True
-                    converted = convert_openorca_dataset(cdf)
-                    del cdf
-                    for s in converted:
-                        of.write(json.dumps({"messages": s["messages"], "source": "openorca",
-                                              "category": "reasoning"}, ensure_ascii=False) + "\n")
-                    fk += len(converted)
-                    del converted; gc.collect()
-                    print(f"      batch {batch_n} ({min(batch_n*BATCH, total_rows):,}/{total_rows:,}): kept {fk:,}")
-                o_total += fk
-                print(f"    done {fn}: {fk:,}")
-        total_count += o_total
-        print(f"   “ openorca total: {o_total:,}")
+    if not _skip_if_done("openorca"):
+        ds_dir = os.path.join(raw_dir, "openorca")
+        if os.path.isdir(ds_dir):
+            print("\n  -> openorca")
+            import glob; import pyarrow.parquet as pq; import gc
+            ofiles = sorted(glob.glob(os.path.join(ds_dir, "**", "*.parquet"), recursive=True))
+            ofiles = [f for f in ofiles if ".cache" not in f]
+            o_out = os.path.join(processed_dir, "openorca.jsonl")
+            o_total = 0; sp = False
+            BATCH = 50_000  # rows per batch — safe for T4 RAM
+            with open(o_out, "w", encoding="utf-8") as of:
+                for ofile in ofiles:
+                    fn = os.path.basename(ofile)
+                    pf = pq.ParquetFile(ofile)
+                    total_rows = pf.metadata.num_rows
+                    print(f"    {fn}: {total_rows:,} rows")
+                    fk = 0; batch_n = 0
+                    for batch in pf.iter_batches(batch_size=BATCH):
+                        cdf = batch.to_pandas()
+                        batch_n += 1
+                        if not sp:
+                            inspect_schema(cdf, f"openorca/{fn}")
+                            sp = True
+                        converted = convert_openorca_dataset(cdf)
+                        del cdf
+                        for s in converted:
+                            of.write(json.dumps({"messages": s["messages"], "source": "openorca",
+                                                  "category": "reasoning"}, ensure_ascii=False) + "\n")
+                        fk += len(converted)
+                        del converted; gc.collect()
+                        print(f"      batch {batch_n} ({min(batch_n*BATCH, total_rows):,}/{total_rows:,}): kept {fk:,}")
+                    o_total += fk
+                    print(f"    done {fn}: {fk:,}")
+            total_count += o_total
+            print(f"   openorca total: {o_total:,}")
 
     # codefeedback
-    ds_dir = os.path.join(raw_dir, "codefeedback")
-    if os.path.isdir(ds_dir):
-        print("\n   ’ codefeedback")
-        df = load_dataset_dir(ds_dir)
-        inspect_schema(df, "codefeedback")
-        converted = convert_codefeedback_dataset(df)
-        del df; import gc; gc.collect()
-        total_count += _flush_to_disk(converted, "codefeedback", "coding", processed_dir)
+    if not _skip_if_done("codefeedback"):
+        ds_dir = os.path.join(raw_dir, "codefeedback")
+        if os.path.isdir(ds_dir):
+            print("\n   ' codefeedback")
+            df = load_dataset_dir(ds_dir)
+            inspect_schema(df, "codefeedback")
+            converted = convert_codefeedback_dataset(df)
+            del df; import gc; gc.collect()
+            total_count += _flush_to_disk(converted, "codefeedback", "coding", processed_dir)
 
     #  Phase 5: Streaming Dedup + Export (memory-safe)
     print(f"\n[Phase 5] Streaming dedup + export ({total_count:,} expected)...")
@@ -1085,5 +1123,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Dizel Dataset Migration Pipeline")
     p.add_argument("--base_dir", type=str, required=True,
                    help="Base Dizel project directory")
+    p.add_argument("--raw_dir", type=str, default=None,
+                   help="Directory with downloaded raw datasets (default: {base_dir}/data/raw)")
     args = p.parse_args()
-    run_full_pipeline(args.base_dir)
+    run_full_pipeline(args.base_dir, raw_dir=args.raw_dir)

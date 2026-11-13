@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://d4niel-dev.github.io/Dizel/sitemap.xml

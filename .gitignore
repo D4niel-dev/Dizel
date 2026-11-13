@@ -6,6 +6,13 @@ __pycache__/
 *.pyo
 *.pyd
 *.pyc.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
 # -----------------------
 # Virtual environments
@@ -20,6 +27,7 @@ venv/
 # Training outputs
 # -----------------------
 #checkpoints/
+pipelines/
 outputs/
 runs/
 logs/
@@ -29,6 +37,8 @@ logs/
 *.pth
 *.bin
 *.safetensors
+*.gguf
+/models/
 evaluation/benchmarks/
 
 # -----------------------
@@ -36,6 +46,7 @@ evaluation/benchmarks/
 # -----------------------
 data/
 tokenizer/*.txt
+tokenizer/qwen2.5/
 datasets/
 inference/dizel_ui/history/
 inference/dizel_ui/.dizel/
@@ -43,6 +54,18 @@ inference/dizel_ui/.dizel/
 *.json
 *.jsonl
 *.parquet
+
+# Build manifests and app metadata are source, not datasets.
+!package.json
+!package-lock.json
+!tsconfig.json
+!capabilities.json
+!inference/gui/package.json
+!inference/gui/package-lock.json
+!inference/gui/tsconfig.json
+
+# Imported by ThinkingDots.tsx; a source asset, not runtime data.
+!inference/gui/src/assets/thinking-dots.json
 
 # -----------------------
 # HuggingFace cache
@@ -57,6 +80,7 @@ data/raw/
 .vscode/
 .idea/
 node_modules/
+archived/
 
 # -----------------------
 # OS junk
@@ -70,8 +94,10 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
-tokenizer/dizel.model
-tokenizer/dizel.vocab
+*.tsbuildinfo
+release-artifacts/
+tokenizer/*.model
+tokenizer/*.vocab
 checkpoints/
 
 # -----------------------
@@ -80,10 +106,42 @@ checkpoints/
 *.log
 *.tmp
 *.temp
+reports/
+upload/
+ollama/
+
+# Local design/debug captures from the TUI and GUI review loops.
+scripts/.*.png
+scripts/.*.svg
+scripts/.*.cmd
+scripts/.*.json
+
+# Stale TUI preview captures; regenerate with scripts/snap_tui.py.
+inference/tui/preview-*.png
 
 # -----------------------
 # Other files
 # -----------------------
 .agent/
+.opencode/
 .shared/
+.superpowers/
+.workbuddy-ai/
 plans/
+docs/.hallmark/
+
+# -----------------------
+# Secrets (never commit)
+# -----------------------
+.env
+.env.*
+!.env.example
+.hf_token
+ollama/.cookie
+
+# Runtime data at the repo root (settings, avatar, usage counters, chats).
+# These used to live inside inference/dizel_gui/ — keep them out of git.
+.dizel/
+/.dizel/
+/data/history/
+/data/history_backup_before_retitle/

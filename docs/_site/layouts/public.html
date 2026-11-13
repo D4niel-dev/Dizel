@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+{{robots}}
+<link rel="canonical" href="{{canonical}}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
+<meta property="og:image:width" content="1475">
+<meta property="og:image:height" content="975">
+<meta property="og:image:alt" content="The Dizel desktop app with a chat sidebar, a session chip and a composer.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{title}}">
+<meta name="twitter:description" content="{{description}}">
+<meta name="twitter:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
+<meta name="theme-color" content="#F1F2EC">
+<link rel="icon" type="image/x-icon" href="{{base}}assets/app/Dizel.ico">
+<link rel="icon" type="image/png" href="{{base}}assets/app/Dizel.png">
+<link rel="preload" href="{{base}}assets/fonts/Newsreader-Variable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{base}}assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+{{theme_init}}
+<link rel="stylesheet" href="{{base}}styles/site.css">
+</head>
+<body class="site">
+<a class="s-site-skip" href="#main">Skip to content</a>
+{{nav}}
+<main id="main" tabindex="-1">{{body}}</main>
+{{footer}}
+<script src="{{base}}js/site.js" defer></script>
+</body>
+</html>

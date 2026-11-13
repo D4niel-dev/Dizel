@@ -11,6 +11,8 @@ import os
 import time
 from typing import Optional
 
+from training.display_utils import warning, ok, info, dim
+
 import numpy as np
 import torch
 
@@ -99,8 +101,8 @@ def build_memmap(cache_dir: str, total_tokens: int) -> np.ndarray:
     expected_bytes = total_tokens * 4  # int32 = 4 bytes
     if actual_bytes < expected_bytes:
         actual_tokens = actual_bytes // 4
-        print(f"[cache] ⚠ tokens.bin is {actual_bytes:,} bytes but expected {expected_bytes:,}")
-        print(f"[cache]   Clamping from {total_tokens:,} → {actual_tokens:,} tokens")
+        warning(f"tokens.bin is {actual_bytes:,} bytes but expected {expected_bytes:,}")
+        dim(f"  Clamping from {total_tokens:,} → {actual_tokens:,} tokens")
         total_tokens = actual_tokens
     return np.memmap(path, dtype=np.int32, mode="r", shape=(total_tokens,))
 
@@ -124,7 +126,7 @@ def is_bin_complete(cache_dir: str, num_shards: int) -> Optional[int]:
     expected_bytes = total * 4  # int32 = 4 bytes
     actual_bytes = os.path.getsize(bin_path)
     if actual_bytes != expected_bytes:
-        print(f"[cache] ⚠ tokens.bin size mismatch ({actual_bytes} vs {expected_bytes}), rebuilding...")
+        warning(f"tokens.bin size mismatch ({actual_bytes} vs {expected_bytes}), rebuilding...")
         return None
     return total
 
@@ -151,7 +153,7 @@ def load_all_cached_tokens(cache_dir: str, num_shards: int) -> Optional[np.ndarr
     # Stream .pt shards → tokens.bin (one at a time, no full RAM load)
     bin_path = tokens_bin_path(cache_dir)
     total_tokens = 0
-    print("[cache] Converting .pt shards → tokens.bin (streaming, low RAM)...")
+    info("Converting shards → tokens.bin (streaming, low RAM)...")
     with open(bin_path, "wb") as f:
         for i in range(num_shards):
             shard = load_shard_tokens(cache_dir, i)
@@ -162,7 +164,7 @@ def load_all_cached_tokens(cache_dir: str, num_shards: int) -> Optional[np.ndarr
 
     manifest["total_tokens"] = total_tokens
     save_manifest(cache_dir, manifest)
-    print(f"[cache] ✓ tokens.bin built: {total_tokens:,} tokens")
+    ok(f"tokens.bin built: {total_tokens:,} tokens")
 
     return build_memmap(cache_dir, total_tokens)
 
@@ -175,4 +177,4 @@ def clear_cache(cache_dir: str) -> None:
         fpath = os.path.join(cache_dir, fname)
         if os.path.isfile(fpath):
             os.remove(fpath)
-    print(f"[cache] Cleared: {cache_dir}")
+    ok(f"Cleared: {cache_dir}")

@@ -1,0 +1,133 @@
+{
+  "$comment": "Single source of truth for what each surface can do. `null` means the surface does not have it — that is the point of the file: gaps are recorded rather than discovered. Values are what a user would actually press or type.",
+  "version": 1,
+  "surfaces": ["tui", "gui"],
+  "capabilities": [
+    {
+      "id": "chat.send",
+      "name": "Send a message",
+      "tui": "Enter",
+      "gui": "Enter"
+    },
+    {
+      "id": "chat.newline",
+      "name": "New line without sending",
+      "tui": "Ctrl+Y",
+      "gui": "Shift+Enter"
+    },
+    {
+      "id": "chat.stop",
+      "name": "Stop generating",
+      "tui": "Ctrl+C",
+      "gui": "Stop button"
+    },
+    {
+      "id": "chat.new",
+      "name": "Start a new chat",
+      "tui": "/session new",
+      "gui": "Ctrl+N"
+    },
+    {
+      "id": "chat.copy",
+      "name": "Copy a reply",
+      "tui": "/export",
+      "gui": "Copy button"
+    },
+    {
+      "id": "chat.feedback",
+      "name": "Rate a reply",
+      "tui": null,
+      "gui": "Thumb up/down"
+    },
+    {
+      "id": "chat.edit",
+      "name": "Edit and resend a message",
+      "tui": null,
+      "gui": "Edit button"
+    },
+    {
+      "id": "chat.regenerate",
+      "name": "Regenerate the last reply",
+      "tui": "/reload",
+      "gui": "Regenerate button"
+    },
+    {
+      "id": "sessions.open",
+      "name": "Open the session list",
+      "tui": "Ctrl+T",
+      "gui": "Sidebar"
+    },
+    {
+      "id": "sessions.search",
+      "name": "Search sessions",
+      "tui": "Ctrl+K",
+      "gui": "Search box"
+    },
+    {
+      "id": "commands.palette",
+      "name": "Command palette",
+      "tui": "Ctrl+K",
+      "gui": null
+    },
+    {
+      "id": "context.rail",
+      "name": "Context rail / panel",
+      "tui": "Ctrl+R",
+      "gui": "Context rail"
+    },
+    {
+      "id": "artifacts",
+      "name": "Artifacts panel",
+      "tui": "Ctrl+A",
+      "gui": "Artifacts panel"
+    },
+    {
+      "id": "tools.toggle",
+      "name": "Turn model tool calls on or off",
+      "tui": "/tools tools on",
+      "gui": "/tools"
+    },
+    {
+      "id": "usage.window",
+      "name": "Inspect the 12-hour usage window",
+      "tui": "/usage",
+      "gui": "/usage"
+    },
+    {
+      "id": "model.switch",
+      "name": "Switch model or variant",
+      "tui": "/model",
+      "gui": "Model picker"
+    },
+    {
+      "id": "settings.open",
+      "name": "Open settings",
+      "tui": "/settings",
+      "gui": "Ctrl+,"
+    },
+    {
+      "id": "debug.panel",
+      "name": "Debug output panel",
+      "tui": "/history",
+      "gui": "Debug panel"
+    },
+    {
+      "id": "app.export",
+      "name": "Export a conversation",
+      "tui": "/export",
+      "gui": null
+    },
+    {
+      "id": "app.recover",
+      "name": "Recover from a dead model process",
+      "tui": null,
+      "gui": "Restart button"
+    },
+    {
+      "id": "app.update",
+      "name": "Check for and install updates",
+      "tui": "/update",
+      "gui": "Settings → About"
+    }
+  ]
+}

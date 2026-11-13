@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+release-*/
+release-artifacts/
+*.log
+.shot-*.png
+.DS_Store

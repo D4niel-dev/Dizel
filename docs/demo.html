@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dizel: browser demo of the desktop app</title>
+<meta name="description" content="A browser replica of the Dizel desktop app: same shell, same tokens, same keyboard model. Replies are scripted, so no model runs in the page.">
+<meta name="theme-color" content="#0e0e0f">
+<link rel="icon" type="image/png" href="assets/demo/Dizel.png">
+<link rel="stylesheet" href="styles/demo.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Title bar ─────────────────────────────────────────────────────── -->
+  <header class="titlebar">
+    <img class="titlebar-logo logo-mark" src="assets/demo/Dizel.png" alt="">
+    <div class="titlebar-spacer"></div>
+    <div class="tb-controls">
+      <button class="tb-btn" title="Minimize, window controls are inert in the browser demo" aria-disabled="true" tabindex="-1">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>
+      </button>
+      <button class="tb-btn" title="Maximize, window controls are inert in the browser demo" aria-disabled="true" tabindex="-1">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/></svg>
+      </button>
+      <button class="tb-btn close" title="Close, window controls are inert in the browser demo" aria-disabled="true" tabindex="-1">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Demo notice ───────────────────────────────────────────────────── -->
+  <div class="demo-bar" id="demo-bar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+    <span><b>Browser demo.</b> The shell, theme and keyboard model are the real ones. The assistant’s replies are scripted; no model runs in this page.</span>
+    <span class="spacer"></span>
+    <button class="demo-bar-x" id="demo-bar-x" aria-label="Hide demo notice">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div class="app-body">
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-brand">
+        <span class="sb-brand-text">
+          <span class="sb-title">Dizel</span>
+        </span>
+        <button class="sb-collapse" id="sb-collapse" title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M16.5 9.5L14 12l2.5 2.5"/></svg>
+        </button>
+      </div>
+
+      <nav class="sb-nav" aria-label="Workspace">
+        <button class="nav-item" id="new-chat" title="New chat (Ctrl+N)">
+          <span class="nav-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.2799 6.40005L11.7399 15.94C10.7899 16.89 7.96987 17.33 7.33987 16.7C6.70987 16.07 7.13987 13.25 8.08987 12.3L17.6399 2.75002C17.8754 2.49308 18.1605 2.28654 18.4781 2.14284C18.7956 1.99914 19.139 1.92124 19.4875 1.9139C19.8359 1.90657 20.1823 1.96991 20.5056 2.10012C20.8289 2.23033 21.1225 2.42473 21.3686 2.67153C21.6147 2.91833 21.8083 3.21243 21.9376 3.53609C22.0669 3.85976 22.1294 4.20626 22.1211 4.55471C22.1128 4.90316 22.0339 5.24635 21.8894 5.5635C21.7448 5.88065 21.5375 6.16524 21.2799 6.40005V6.40005Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M11 4H6C4.93913 4 3.92178 4.42142 3.17163 5.17157C2.42149 5.92172 2 6.93913 2 8V18C2 19.0609 2.42149 20.0783 3.17163 20.8284C3.92178 21.5786 4.93913 22 6 22H17C19.21 22 20 20.2 20 18V13" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="nav-label">New chat</span>
+        </button>
+        <button class="nav-item" id="nav-chats" title="Chats">
+          <span class="nav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.76953 4.58009C8.57706 3.74781 9.54639 3.08958 10.6178 2.64588C11.6892 2.20219 12.84 1.98233 13.9995 2.00001C18.4195 2.00001 21.9995 5.10005 21.9995 8.92005C21.9792 9.98209 21.7021 11.0234 21.1919 11.9551C20.6817 12.8867 19.9535 13.681 19.0696 14.27V16.75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M16 13.64C16 10.29 12.87 7.58008 9 7.58008C5.13 7.58008 2 10.29 2 13.64C2.01941 14.5684 2.26227 15.4785 2.70789 16.2931C3.1535 17.1077 3.78881 17.803 4.56006 18.3201V20.49C4.55903 20.7858 4.64489 21.0755 4.80701 21.3229C4.96912 21.5703 5.20032 21.7647 5.47192 21.8818C5.74353 21.999 6.04362 22.0338 6.33484 21.9819C6.62606 21.9301 6.89553 21.7938 7.10999 21.5901L9.10999 19.6901C12.94 19.6201 16 16.94 16 13.64Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span class="nav-label">Chats</span>
+        </button>
+        <button class="nav-item" id="nav-workspaces" title="Workspaces" aria-haspopup="true" aria-expanded="false">
+          <span class="nav-ico"><svg width="20" height="20" viewBox="0 0 512 512" fill="currentColor" stroke="none" aria-hidden="true"><g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)" fill="currentColor" stroke="none"> <path d="M1641 4944 c-83 -22 -165 -71 -224 -133 -99 -104 -137 -210 -137 -383 l0 -108 -108 0 c-178 0 -295 -44 -395 -149 -102 -106 -137 -209 -137 -396 l0 -120 -64 -33 c-115 -60 -207 -177 -241 -309 -22 -86 -22 -2380 0 -2466 45 -173 178 -307 350 -352 52 -13 277 -15 1875 -15 1598 0 1823 2 1875 15 172 45 305 179 350 352 22 86 22 1740 0 1826 -34 132 -126 249 -241 309 l-64 33 0 760 c0 642 -2 770 -15 818 -45 173 -178 307 -350 352 -86 22 -2391 22 -2474 -1z m2445 -330 c15 -11 37 -33 48 -48 21 -27 21 -38 24 -777 l2 -749 -160 0 -160 0 0 428 c0 470 -2 492 -61 603 -38 70 -126 157 -197 193 -113 57 -87 56 -1074 56 l-908 0 0 94 c0 102 9 137 43 175 49 53 -5 51 1249 48 1161 -2 1167 -2 1194 -23z m-640 -640 c15 -11 37 -33 48 -48 20 -27 21 -41 24 -457 l3 -429 -398 0 c-356 1 -401 3 -430 18 -17 9 -158 130 -313 267 -303 269 -332 292 -418 327 -56 22 -65 23 -529 26 l-473 3 0 94 c0 101 9 136 43 174 49 53 -5 51 1249 48 1161 -2 1167 -2 1194 -23z m-1579 -632 c17 -9 157 -129 311 -266 297 -264 335 -293 422 -329 l55 -22 862 -5 c851 -5 862 -5 889 -26 15 -11 37 -33 48 -48 21 -27 21 -34 21 -886 0 -852 0 -859 -21 -886 -11 -15 -33 -37 -48 -48 l-27 -21 -1819 0 -1819 0 -27 21 c-15 11 -37 33 -48 48 -21 27 -21 34 -24 1179 -1 634 0 1166 3 1184 7 40 49 91 90 109 24 10 142 13 565 13 486 0 538 -1 567 -17z"/> </g></svg></span>
+          <span class="nav-label">Workspaces</span>
+        </button>
+      </nav>
+
+      <div class="sb-divider"></div>
+      <div class="sb-label">
+        <span>Recent Chats</span>
+        <button class="sb-label-btn" id="toggle-recent" aria-label="Hide recent chats">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+      </div>
+      <div class="sb-recent is-open" id="sb-recent">
+        <div class="sb-recent-inner">
+          <div class="sb-search" id="sb-search" hidden>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="search" type="text" placeholder="Search chats…" autocomplete="off" spellcheck="false" aria-label="Search chats">
+          </div>
+          <div class="sb-list" id="sb-list" aria-label="Recent chats"></div>
+        </div>
+      </div>
+      <div class="sidebar-spacer" id="sidebar-spacer" hidden></div>
+
+      <button class="sb-foot" id="sb-foot" title="Edit profile">
+        <span class="sb-avatar-ring">
+          <span class="sb-avatar" id="sb-avatar">D</span>
+        </span>
+        <span class="sb-user" id="sb-user">Daniel</span>
+      </button>
+    </aside>
+
+    <!-- ── Secondary sidebar (Chats / workspaces) ──────────────────────── -->
+    <aside class="subsidebar" id="subsidebar" aria-label="Workspace panel" hidden></aside>
+
+    <!-- ── Main column ─────────────────────────────────────────────────── -->
+    <main class="main" id="main">
+      <div class="chat-header">
+        <span class="status-pill" id="status-pill">
+          <span class="pill-spinner"></span>
+          <span class="pill-text">Starting Dizel…</span>
+        </span>
+        <div class="header-actions">
+          <button class="hdr-btn" id="toggle-statusbar" title="Hide status bar" aria-label="Hide status bar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>
+          </button>
+          <button class="hdr-btn" id="open-settings" title="Settings (Ctrl+,)" aria-label="Settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="loadbar" id="loadbar"><span></span></div>
+
+      <div class="view" id="view"></div>
+
+      <div class="composer-wrap" id="composer-wrap">
+        <form class="composer" id="composer" autocomplete="off">
+          <textarea id="input" rows="1" placeholder="Message Dizel..." aria-label="Message Dizel"></textarea>
+          <div class="composer-bar">
+            <button type="button" class="bar-btn" id="btn-plus" title="Add to prompt" aria-label="Add to prompt" aria-haspopup="true" aria-expanded="false">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            </button>
+            <button type="button" class="bar-chip" id="btn-model" title="Model" aria-haspopup="true" aria-expanded="false">
+              <img src="assets/demo/Dizel.png" alt="">
+              <span class="chip-label" id="model-label">Dizel 1.5 Distill</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <button type="button" class="bar-chip" id="btn-tier" title="Model tier and response mode" aria-haspopup="true" aria-expanded="false">
+              <span id="tier-label">Flash</span>
+              <span class="chip-mode" id="tier-mode" hidden>Fast</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <span class="spacer"></span>
+            <button type="button" class="bar-btn" id="btn-mic" title="Dictation is only available in the desktop app" aria-label="Dictate">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+            </button>
+            <button type="submit" class="send-circle" id="btn-send" aria-label="Send" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+            </button>
+          </div>
+        </form>
+        <div class="composer-hint">
+          <span>Enter to send</span><i></i><span>Shift+Enter for new line</span><i></i><span>Dizel can make mistakes. Please verify important information.</span>
+        </div>
+      </div>
+
+      <div class="statusbar-wrap is-open" id="statusbar-wrap">
+        <footer class="statusbar" id="statusbar">
+          <span class="dot busy" id="sb-dot"></span>
+          <span id="sb-state">Starting</span>
+          <span class="sep">·</span><b id="sb-model">Dizel 1.5 Distill</b>
+          <span class="sep">·</span><span id="sb-params">454.78 M</span>
+          <span class="sep">·</span><span id="sb-device">DEMO</span>
+          <span class="spacer"></span>
+          <span id="sb-msgs">0 msg</span>
+          <span class="sep">·</span><span id="sb-ctx">~0 / 2048 ctx</span>
+          <span class="sep">·</span><span id="sb-used">1 / 1024 used</span>
+          <span class="sep">·</span><span id="sb-time">0h 0m</span>
+          <span class="ctx-bar" title="Approximate context usage"><span class="ctx-fill" id="ctx-fill"></span></span>
+        </footer>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ── Popover (workspaces, attach, model, tier) ───────────────────────── -->
+<div class="popover" id="popover" role="menu" hidden></div>
+
+<!-- ── Settings ────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="settings" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-head">
+      <h2 id="settings-title">Settings</h2>
+      <span class="spacer"></span>
+      <button class="modal-close" id="settings-close" aria-label="Close settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <nav class="modal-tabs" id="settings-tabs" aria-label="Settings sections"></nav>
+      <div class="modal-panel" id="settings-panel"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Profile ─────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="profile" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profile-title" style="width:min(420px,100%)">
+    <div class="modal-head">
+      <h2 id="profile-title">Profile</h2>
+      <span class="spacer"></span>
+      <button class="modal-close" id="profile-close" aria-label="Close profile">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-panel">
+      <p class="hint">The name appears in the greeting and beside your avatar. It stays in this browser.</p>
+      <div class="field">
+        <label for="profile-name">Display name</label>
+        <input type="text" id="profile-name" maxlength="32" autocomplete="off">
+      </div>
+      <button id="profile-save" class="action-pill" style="margin-top:4px">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/demo-icons.js" defer></script>
+<script src="js/demo.js" defer></script>
+</body>
+</html>
