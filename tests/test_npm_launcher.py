@@ -28,7 +28,7 @@ def run_node(*args, env=None):
 
 def test_package_manifest_is_publishable():
     package = json.loads((NPM / "package.json").read_text(encoding="utf-8"))
-    assert package["name"] == "dizel"
+    assert package["name"] == "@d4niel-dev/dizel"
     assert package["bin"] == {"dizel": "bin/dizel.js"}
     assert package["license"] == "MIT"
     assert package["engines"]["node"] == ">=18"

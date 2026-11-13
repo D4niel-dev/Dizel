@@ -1,7 +1,7 @@
 # Dizel npm launcher
 
 ```bash
-npm install -g dizel@latest
+npm install -g @d4niel-dev/dizel@latest
 dizel install
 dizel doctor
 dizel tui
