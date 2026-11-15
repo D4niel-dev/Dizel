@@ -41,6 +41,8 @@ app version from `dizel_core/version.py`.
 
 ### Fixed
 
+- Windows `.cmd` launchers are checked out with CRLF on every platform, so the
+  terminal launcher and its CI check agree on Linux and Windows.
 - Scoped docs CSS resets no longer collapse component margins in the hero,
   footers, and architecture cards.
 - Staged terminal updates skip automatic apply on a source checkout with
