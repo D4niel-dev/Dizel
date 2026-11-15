@@ -29,13 +29,14 @@ class ResetCommand(Command):
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         if invocation.args and invocation.args[0].lower() in ("force", "yes", "-y"):
-            return _reset(app)
+            app._log_system(_reset(app), "ok")
+            return ""
 
         from inference.tui.panels.modals import ConfirmModal
 
         def _confirmed(confirmed: bool | None) -> None:
             if confirmed:
-                app._log_system(_reset(app))
+                app._log_system(_reset(app), "ok")
 
         app.push_screen(
             ConfirmModal(

@@ -218,6 +218,7 @@ class DPOConfigV16Pro(PosttrainConfigV16Pro):
     """Experimental preference tuning on top of the Pro SFT checkpoint."""
 
     data_path: str = "data/v16/posttrain/dpo.jsonl"
+    val_data_path: str = ""
     output_dir: str = "checkpoints/dizel-1.6-pro-dpo"
     run_name: str = "dizel-1.6-pro-dpo"
     reference_checkpoint: str = ""

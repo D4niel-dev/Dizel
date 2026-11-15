@@ -22,7 +22,8 @@ from .settings import SettingsCommand
 from .tag import TagCommand
 from .diff import DiffCommand
 from .macro import MacroCommand
-from .update_cmd import UpdateCommand
+from .update_cmd import CheckUpdateCommand, UpdateCommand
+from .debug import DebugCommand
 from .skills import SkillsCommand, register_skills
 
 def register_builtins():
@@ -50,5 +51,7 @@ def register_builtins():
     registry.register(DiffCommand())
     registry.register(MacroCommand())
     registry.register(UpdateCommand())
+    registry.register(CheckUpdateCommand())
+    registry.register(DebugCommand())
     registry.register(SkillsCommand())
     register_skills()

@@ -2201,7 +2201,7 @@
 
     if (tab === "About") {
       body += `<dl class="kv">
-        <dt>Version</dt><dd>2.0.0 (desktop shell)</dd>
+        <dt>Version</dt><dd>2.0.1 (desktop shell)</dd>
         <dt>Shell</dt><dd>Electron 33 · React 18 · Vite 5</dd>
         <dt>Engine</dt><dd>Python sidecar · ChatManager</dd>
         <dt>Models</dt><dd>Dizel 1.5 Distill · Dizel 1.6 Flash Preview (unpublished)</dd>

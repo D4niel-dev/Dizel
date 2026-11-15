@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Install Dizel — Docs</title>
-<meta name="description" content="Install Dizel: Python, PyTorch, and requirements for the local model, desktop app, and terminal client.">
+<meta name="description" content="Install Dizel with the npm launcher or from a Python checkout: requirements for the local model, desktop app, and terminal client.">
 
 <link rel="canonical" href="https://d4niel-dev.github.io/Dizel/guide/install.html">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://d4niel-dev.github.io/Dizel/guide/install.html">
 <meta property="og:title" content="Install Dizel — Docs">
-<meta property="og:description" content="Install Dizel: Python, PyTorch, and requirements for the local model, desktop app, and terminal client.">
+<meta property="og:description" content="Install Dizel with the npm launcher or from a Python checkout: requirements for the local model, desktop app, and terminal client.">
 <meta property="og:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta property="og:image:width" content="1475">
 <meta property="og:image:height" content="975">
 <meta property="og:image:alt" content="The Dizel desktop app with a chat sidebar, a session chip and a composer.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Install Dizel — Docs">
-<meta name="twitter:description" content="Install Dizel: Python, PyTorch, and requirements for the local model, desktop app, and terminal client.">
+<meta name="twitter:description" content="Install Dizel with the npm launcher or from a Python checkout: requirements for the local model, desktop app, and terminal client.">
 <meta name="twitter:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta name="theme-color" content="#F1F2EC">
 <link rel="icon" type="image/x-icon" href="../assets/app/Dizel.ico">
@@ -82,8 +82,8 @@
 
 <main id="main" tabindex="-1"><div class="s-shell">
   <div class="s-docs-bar">
-    <a class="s-docs-title" href="../index.html">Dizel Docs <span class="s-docs-label">v1.5</span></a>
-    <span class="s-docs-version">Record 2026-11</span>
+    <a class="s-docs-title" href="../index.html">Dizel Docs <span class="s-docs-label">v2.0.1 app</span></a>
+    <span class="s-docs-version">Model v1.5 · Record 2026-11</span>
   </div>
   <div class="s-docs-layout">
     <nav class="s-docs-side" aria-label="Documentation">
@@ -111,17 +111,23 @@
       </details>
       <div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Getting started</span><span>/</span><span>Install</span></div>
               <h1>Install Dizel</h1>
-              <p class="s-docs-lede">Dizel runs from a checkout. You need Python and Node; a GPU is optional for the terminal client.</p>
+              <p class="s-docs-lede">Dizel runs from a Python checkout, or on Windows through the npm launcher. You need Python and Node; a GPU is optional for the terminal client.</p>
               
               <div class="s-callout"><b>Start with v1.5.</b> It is the published model and the one the app loads by default. The 1.6 preview has no weights yet.</div>
-              <div class="s-callout"><b>npm launcher.</b> Windows users can install the small launcher with <code>npm install -g @d4niel-dev/dizel@latest</code>, then run <code>dizel install</code> and <code>dizel doctor</code>. It downloads the matching release; Python and model weights remain separate.</div>
+              <div class="s-callout is-neutral"><b>Windows fast path.</b> Install the small launcher; it downloads the matching release, verifies SHA-256, installs the terminal client, and opens the desktop installer.</div>
+              <div class="s-code">
+                <button class="copy" type="button" data-copy>Copy</button>
+                <pre><code>npm install -g @d4niel-dev/dizel@latest
+dizel install
+dizel doctor</code></pre>
+              </div>
 
               <section class="s-docs-section">
                 <h2 id="requirements">Before you start</h2>
                 <ul>
                   <li><strong>Python 3.10+</strong> for the engine and both clients.</li>
                   <li><strong>PyTorch 2.1+</strong> — CUDA is recommended for local inference.</li>
-                  <li><strong>Node.js 18+</strong> for the desktop app.</li>
+                  <li><strong>Node.js 18+</strong> for the npm launcher and the desktop app.</li>
                   <li><strong>Windows</strong> for the <code>dizel.cmd</code> launcher; the Python modules also run on macOS and Linux.</li>
                 </ul>
               </section>
@@ -205,7 +211,7 @@ npm run dev</code></pre>
   <a href="#requirements">Before you start</a>
 <a href="#install-steps">Install</a>
   <div class="s-toc-foot">
-    Version: v1.5 · <a href="https://github.com/D4niel-dev/Dizel/blob/main/docs/_site/pages/guide-install.html" target="_blank" rel="noopener">Edit this page ↗</a>
+    Model v1.5 · App v2.0.1<br><a href="https://github.com/D4niel-dev/Dizel/blob/main/docs/_site/pages/guide-install.html" target="_blank" rel="noopener">Edit this page ↗</a>
   </div>
 </aside>
 
@@ -227,6 +233,7 @@ npm run dev</code></pre>
         <a href="../guide/launch.html">Desktop app</a>
         <a href="../guide/launch.html#tui">Terminal UI</a>
         <a href="../demo.html">Interface demo</a>
+        <a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm launcher ↗</a>
       </div>
       <div class="s-foot-col">
         <h3>Research</h3>
@@ -242,7 +249,7 @@ npm run dev</code></pre>
       </div>
     </div>
     <div class="s-foot-bottom">
-      <span>Dizel 1.6 Flash Preview · Record 2026-11</span>
+      <span>Dizel 1.6 Flash Preview · App v2.0.1 · Record 2026-11</span>
       <span>MIT licensed · Built in public on one T4</span>
       <a href="../model.html#mc-citation">Citation</a>
       <a href="#main">Back to top ↑</a>

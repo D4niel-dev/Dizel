@@ -1,6 +1,7 @@
 """Modal screens used by the TUI commands and shortcuts."""
 
 from inference.tui.panels.modals.command_palette import CommandPaletteModal
+from inference.tui.panels.modals.debug_panel import DebugPanelModal
 from inference.tui.panels.modals.common import (
     ConfirmModal,
     PickerItem,
@@ -21,12 +22,14 @@ from inference.tui.panels.modals.pickers import (
 )
 from inference.tui.panels.modals.session_manager import SessionManagerModal
 from inference.tui.panels.modals.settings_modal import SettingsModal
+from inference.tui.panels.modals.tool_approval import ToolApprovalModal
 
 __all__ = [
     "ApiKeyModal",
     "CheckpointPickerModal",
     "CommandPaletteModal",
     "ConfirmModal",
+    "DebugPanelModal",
     "ExportFormatModal",
     "FileBrowserModal",
     "HelpBrowserModal",
@@ -40,4 +43,5 @@ __all__ = [
     "SettingsModal",
     "TextPromptModal",
     "TierPickerModal",
+    "ToolApprovalModal",
 ]

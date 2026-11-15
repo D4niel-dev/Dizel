@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
@@ -33,7 +33,10 @@ def tools_state() -> Dict[str, Any]:
     """Whether the model may call tools, and which ones exist."""
     from dizel_core import tools
 
-    return {"enabled": tools.is_enabled(), "available": sorted(tools.catalog())}
+    return {
+        "enabled": tools.is_enabled(),
+        "available": sorted(tools.catalog(include_writes=True)),
+    }
 
 
 @router.post("/tools")
@@ -41,7 +44,23 @@ def tools_toggle(req: ToolsRequest) -> Dict[str, Any]:
     from dizel_core import tools
 
     tools.set_enabled(req.enabled)
-    return {"enabled": tools.is_enabled(), "available": sorted(tools.catalog())}
+    return {
+        "enabled": tools.is_enabled(),
+        "available": sorted(tools.catalog(include_writes=True)),
+    }
+
+
+class ToolApprovalRequest(BaseModel):
+    approval_id: str
+    approved: bool
+
+
+@router.post("/tools/approve")
+def tools_approve(req: ToolApprovalRequest) -> Dict[str, Any]:
+    """Resolve one pending diff approval from the SSE tool loop."""
+    if not ChatService.resolve_tool_approval(req.approval_id, req.approved):
+        raise HTTPException(status_code=404, detail="Approval request is no longer pending.")
+    return {"status": "ok", "approved": req.approved}
 
 
 class UsageDebugRequest(BaseModel):

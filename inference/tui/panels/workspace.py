@@ -7,11 +7,12 @@ import time
 
 from inference.tui.rendering.assistant_message import AssistantMessage
 from inference.tui.rendering.message_block import MessageBlock, message_style
-from inference.tui.rendering.tool_block import ToolBlock
+from inference.tui.rendering.tool_block import ToolLine
 from inference.tui.rendering.status_block import StatusBlock
 from inference.tui.bridge.chat_bridge import ChatBridge
 from inference.tui.bridge.tool_bridge import ToolBridge
-from inference.tui.rendering.empty_state import EmptyStateBlock
+from inference.tui.panels.context_panel import ContextPanel
+from inference.tui.rendering.empty_state import EmptyStateBlock, StarterShelf
 from inference.tui.settings_apply import chat_pref
 
 
@@ -26,9 +27,13 @@ class WorkspacePanel(VerticalScroll):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.current_message: AssistantMessage | None = None
+        self._context_rail_visible = False
+        self._tool_rows: dict[int, ToolLine] = {}
+        self._tool_results: dict[int, tuple[str, str, dict]] = {}
 
     def on_mount(self) -> None:
         self._set_empty_mode(bool(self.query(EmptyStateBlock)))
+        self._set_context_rail(False)
 
     def _set_empty_mode(self, empty: bool) -> None:
         # The desktop composer sits mid-screen with the welcome on an empty
@@ -38,6 +43,36 @@ class WorkspacePanel(VerticalScroll):
             self.app.query_one("#workspace-container").set_class(empty, "-empty")
         except Exception:
             pass
+        self.call_after_refresh(self._sync_starter_shelf)
+
+    def _set_context_rail(self, visible: bool) -> None:
+        self._context_rail_visible = visible
+        self.call_after_refresh(self._sync_context_rail)
+
+    def _sync_context_rail(self) -> None:
+        """The rail belongs to a transcript: hidden on the welcome only."""
+        try:
+            panel = self.app.query_one(ContextPanel)
+            panel.set_class(self._context_rail_visible, "-visible")
+            if not self._context_rail_visible and panel.has_focus:
+                self.app.query_one("#prompt-input").focus()
+        except Exception:
+            pass
+
+    def _sync_starter_shelf(self) -> None:
+        """The starter prompts sit under the composer, only while empty."""
+        try:
+            container = self.app.query_one("#workspace-container")
+            row = self.app.query_one("#starter-row")
+        except Exception:
+            return
+        empty = container.has_class("-empty")
+        shelves = list(row.query(StarterShelf))
+        if empty and not shelves:
+            row.mount(StarterShelf())
+        elif not empty:
+            for shelf in shelves:
+                shelf.remove()
 
     # ── Scroll ───────────────────────────────────────────────────────
     def _follow(self) -> None:
@@ -87,14 +122,130 @@ class WorkspacePanel(VerticalScroll):
         for child in self.query(EmptyStateBlock):
             child.remove()
         if had_empty:
-            # Back to a normal transcript: the composer returns to the bottom.
+            # Back to a normal transcript: the composer returns to the bottom
+            # and the context rail docks for the rest of the session.
             self._set_empty_mode(False)
+            self._set_context_rail(True)
 
     def add_user_message(self, text: str) -> None:
         self._remove_empty_state()
         self.mount(
             Static(MessageBlock("USER", text, **message_style(self.app, timestamp=time.time())))
         )
+        self._follow()
+
+    def add_debug_turn(self, text: str) -> None:
+        """Mount a completed assistant turn without charging model metrics."""
+        self._remove_empty_state()
+        message = AssistantMessage()
+        self.mount(message)
+        message.stream.append(text)
+        message.update_stream()
+        message.stream.finish()
+        message.finalize(text, record_metrics=False)
+        self._follow()
+
+    def add_debug_tools(self) -> None:
+        """Mount finished tool rows with representative details for inspection."""
+        self._remove_empty_state()
+        details = [
+            (
+                9001,
+                "grep",
+                "TODO · src",
+                {
+                    "path": "src",
+                    "query": "TODO",
+                    "glob": "*.tsx",
+                    "result": (
+                        "src/App.tsx:12: // TODO: remove the fixture marker\n"
+                        "src/lib/tools.ts:4: // TODO: shared renderer\n\n"
+                        "2 matches in 2 files."
+                    ),
+                    "result_truncated": False,
+                },
+            ),
+            (
+                9002,
+                "read_file",
+                "src/App.tsx:1-12",
+                {
+                    "path": "src/App.tsx",
+                    "result": (
+                        "src/App.tsx — lines 1-12 of 48\n"
+                        "import { useState } from \"react\";\n\n"
+                        "export function App() {\n"
+                        "  const [ready, setReady] = useState(false);\n\n"
+                        "  return (\n"
+                        "    <main>\n"
+                        "      <h1>Dizel</h1>\n"
+                        "      <p>{ready ? \"ready\" : \"loading\"}</p>\n"
+                        "    </main>\n"
+                        "  );\n"
+                        "}\n"
+                    )
+                },
+            ),
+            (
+                9003,
+                "edit_file",
+                "src/App.tsx",
+                {
+                    "diff": (
+                        "--- a/src/App.tsx\n"
+                        "+++ b/src/App.tsx\n"
+                        "@@ -1,3 +1,4 @@\n"
+                        "-export function App() {\n"
+                        "+export function App() {\n"
+                        "+  // reviewed by the tool fixture\n"
+                        "   return null;\n"
+                        " }"
+                    ),
+                    "path": "src/App.tsx",
+                    "additions": 2,
+                    "deletions": 1,
+                    "action": "edit",
+                },
+            ),
+            (
+                9004,
+                "write_file",
+                "src/debug-fixture.ts",
+                {
+                    "content": (
+                        "const fixture = {\n"
+                        "  surface: 'terminal',\n"
+                        "  detail: 'visible after the call',\n"
+                        "};\n\n"
+                        "export default fixture;\n"
+                    ),
+                    "path": "src/debug-fixture.ts",
+                    "action": "create",
+                    "result": "Created src/debug-fixture.ts (+6/-0)",
+                },
+            ),
+            (
+                9005,
+                "web_search",
+                "dizel local model",
+                {
+                    "query": "dizel local model",
+                    "search_url": "https://duckduckgo.com/?q=dizel+local+model",
+                    "result": (
+                        "[1] Dizel 1.5 — local-first model\n"
+                        "A small model and desktop app that run locally.\n"
+                        "Source: https://github.com/D4niel-dev/Dizel\n\n"
+                        "[2] Dizel documentation\n"
+                        "Install, launch, and model notes.\n"
+                        "Source: https://d4niel-dev.github.io/Dizel/"
+                    )
+                },
+            ),
+        ]
+        for key, name, detail, payload in details:
+            row = ToolLine(name, "DONE", detail, details=payload)
+            self._tool_rows[key] = row
+            self.mount(row)
         self._follow()
 
     def start_assistant_message(self) -> None:
@@ -147,6 +298,8 @@ class WorkspacePanel(VerticalScroll):
 
     @on(ChatBridge.GenerationError)
     def on_error(self, event: ChatBridge.GenerationError) -> None:
+        if self.current_message:
+            self.current_message.stop()
         self.current_message = None
         self.add_system_message(f"Error: {event.error_msg}", "error")
         self.app.generation_state = "IDLE"
@@ -157,23 +310,45 @@ class WorkspacePanel(VerticalScroll):
 
     @on(ToolBridge.ToolStarted)
     def on_tool_start(self, event: ToolBridge.ToolStarted) -> None:
-        self.mount(Static(ToolBlock(event.tool_name, "RUNNING", event.detail)))
+        row = self._tool_rows.get(event.key)
+        if row is None or not row.is_mounted:
+            row = ToolLine(event.tool_name, "RUNNING", event.detail)
+            self._tool_rows[event.key] = row
+            self.mount(row)
+        result = self._tool_results.pop(event.key, None)
+        if result is not None:
+            row.finish(*result)
         self._follow_if_pinned()
 
     @on(ToolBridge.ToolCompleted)
     def on_tool_completed(self, event: ToolBridge.ToolCompleted) -> None:
-        self.mount(Static(ToolBlock(event.tool_name, "DONE", event.detail)))
+        row = self._tool_rows.get(event.key)
+        if row is None or not row.is_mounted:
+            self._tool_results[event.key] = ("DONE", event.detail, event.details)
+        else:
+            row.finish("DONE", event.detail, event.details)
         self._follow_if_pinned()
 
     @on(ToolBridge.ToolFailed)
     def on_tool_failed(self, event: ToolBridge.ToolFailed) -> None:
-        self.mount(Static(ToolBlock(event.tool_name, "FAILED", event.error_msg)))
+        row = self._tool_rows.get(event.key)
+        if row is None or not row.is_mounted:
+            self._tool_results[event.key] = ("FAILED", event.error_msg, event.details)
+        else:
+            row.finish("FAILED", event.error_msg, event.details)
         self._follow_if_pinned()
 
     def clear_workspace(self, show_empty: bool = True) -> None:
         for child in list(self.children):
             child.remove()
         self.current_message = None
+        self._tool_rows.clear()
+        self._tool_results.clear()
+        try:
+            self.app.clear_reply_metrics()
+        except Exception:
+            pass
         if show_empty:
             self.mount(EmptyStateBlock())
         self._set_empty_mode(show_empty)
+        self._set_context_rail(not show_empty)

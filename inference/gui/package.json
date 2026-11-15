@@ -1,8 +1,8 @@
 {
   "name": "dizel-gui",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
-  "description": "Dizel — desktop application",
+  "description": "Dizel \u2014 desktop application",
   "author": "D4niel-dev",
   "license": "MIT",
   "type": "module",
@@ -59,32 +59,57 @@
       {
         "from": "../../api",
         "to": "app/api",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../dizel_core",
         "to": "app/dizel_core",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../model",
         "to": "app/model",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../core",
         "to": "app/core",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../utils",
         "to": "app/utils",
-        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../inference",
         "to": "app/inference",
-        "filter": ["__init__.py", "tui/**/*", "!**/__pycache__/**", "!**/*.pyc"]
+        "filter": [
+          "__init__.py",
+          "tui/**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
       },
       {
         "from": "../../config.py",

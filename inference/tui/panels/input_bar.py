@@ -138,7 +138,10 @@ class InputBar(Container):
             color = DANGER
         elif percent >= 75:
             color = WARN
-        bar = f"[{color}]{'▰' * filled}[/][{BORDER_HI}]{'▱' * (cells - filled)}[/]"
+        bar = " ".join(
+            f"[{color}]▰[/]" if index < filled else f"[{BORDER_HI}]▱[/]"
+            for index in range(cells)
+        )
         return color, bar
 
     def refresh_footer(self, *_: object) -> None:
@@ -358,6 +361,7 @@ class InputBar(Container):
             return
 
         event.input.value = ""
+        self.app.clear_reply_metrics()
         self.app.generation_state = "THINKING"
         workspace.add_user_message(text)
         self.app.session_bridge.add_message("user", text)

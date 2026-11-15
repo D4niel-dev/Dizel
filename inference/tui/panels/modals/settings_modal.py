@@ -280,12 +280,7 @@ class SettingsModal(ModalScreen[bool]):
             ),
             FieldSpec(
                 "appearance", "show_speed", "Show reply speed", "bool",
-                "Estimated tokens per second beside each reply.",
-                pane="chat", group="Replies",
-            ),
-            FieldSpec(
-                "appearance", "show_model_tag", "Show model tag", "bool",
-                "Which model answered, in each reply's meta line.",
+                "Estimated tokens per second in the status line.",
                 pane="chat", group="Replies",
             ),
             FieldSpec(
@@ -294,7 +289,7 @@ class SettingsModal(ModalScreen[bool]):
             ),
             FieldSpec(
                 "appearance", "show_timestamps", "Show timestamps", "bool",
-                "Time beside each reply's token count.", pane="chat", group="Transcript",
+                "Time beside each message.", pane="chat", group="Transcript",
             ),
             FieldSpec(
                 "appearance", "clock_24h", "24-hour clock", "bool",
@@ -308,12 +303,6 @@ class SettingsModal(ModalScreen[bool]):
                 "appearance", "message_spacing", "Message spacing", "select",
                 "Gap between turns.",
                 (("Compact", "compact"), ("Comfortable", "comfortable")),
-                pane="chat", group="Transcript",
-            ),
-            FieldSpec(
-                "appearance", "message_width", "Message width", "select",
-                "How wide the conversation runs.",
-                (("Comfortable", "comfortable"), ("Wide", "wide"), ("Full", "full")),
                 pane="chat", group="Transcript",
             ),
             FieldSpec(

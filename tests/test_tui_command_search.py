@@ -7,6 +7,7 @@ import unittest
 from inference.tui.commands.matching import match_score
 from inference.tui.commands.registry import Command, CommandRegistry
 from inference.tui.panels.slash_drawer import MAX_ROWS, SlashDrawer
+from inference.tui.theme import SELECT_BG
 
 
 class Dummy(Command):
@@ -75,6 +76,13 @@ class DrawerTests(unittest.TestCase):
         command = Dummy("frontend-design", category="Local", help_text="Design.", source="project")
         row = drawer._row(command, False, 96)
         self.assertIn("local · Design.", row)
+
+    def test_selected_row_has_a_rail_and_the_header_has_a_rule(self):
+        drawer = SlashDrawer()
+        row = drawer._row(Dummy("help", help_text="Commands."), True, 60)
+        self.assertIn("▌", row)
+        self.assertIn(f"on {SELECT_BG}", row)
+        self.assertEqual(drawer._divider(12).count("─"), 12)
 
 
 if __name__ == "__main__":

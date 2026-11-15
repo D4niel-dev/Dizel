@@ -11,7 +11,7 @@ from inference.tui.commands.parser import CommandInvocation
 # that registry now, so offering it as a pre-search toggle was a second way to do
 # the same thing.
 AVAILABLE_TOOLS = {
-    "tools": "Let the model call tools: read_file, grep, find_files, calc, web_search…",
+    "tools": "Let the model call tools: read, grep, search, calc, and approved writes",
     "deep_think": "Reason in <think>…</think> before answering",
 }
 

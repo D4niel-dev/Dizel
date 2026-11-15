@@ -9,15 +9,25 @@ full list, esc puts it away.
 from __future__ import annotations
 
 from rich.markup import escape
+from textual.geometry import Offset
 from textual.widgets import Static
 
-from inference.tui.theme import ACCENT, SELECT_BG, TEXT, TEXT_3, VIOLET
+from inference.tui.settings_apply import chat_pref
+from inference.tui.theme import (
+    ACCENT,
+    BORDER_HI,
+    SELECT_BG,
+    TEXT,
+    TEXT_2,
+    TEXT_3,
+    VIOLET,
+)
 
 NAME_WIDTH = 14
 MAX_ROWS = 7
 # The composer's measure. Painting happens before layout, so self.size.width is
 # still 0 at that point — measuring there rendered the drawer at 40 columns.
-DRAWER_WIDTH = 96
+DRAWER_WIDTH = 120
 
 
 class SlashDrawer(Static):
@@ -27,9 +37,8 @@ class SlashDrawer(Static):
     SlashDrawer {
         display: none;
         height: auto;
-        width: 96;
+        width: 120;
         max-width: 100%;
-        background: $surface;
         padding: 0 1;
     }
 
@@ -56,18 +65,40 @@ class SlashDrawer(Static):
         return self._matches[max(0, min(self._index, len(self._matches) - 1))]
 
     def show(self, matches: list, prefix: str) -> None:
+        opening = not self.has_class("-open")
         self._matches = list(matches)
         self._prefix = prefix
         self._index = 0
         self._window_start = 0
         self.add_class("-open")
         self._paint()
+        if opening:
+            self.call_after_refresh(self._paint)
+            self.call_after_refresh(self._animate_open)
 
     def hide(self) -> None:
+        self.styles.offset = (0, 0)
         self._matches = []
         self._index = 0
         self._window_start = 0
         self.remove_class("-open")
+
+    def _animate_open(self) -> None:
+        if not chat_pref(self.app, "animations", True):
+            self.styles.offset = (0, 0)
+            return
+        self.styles.offset = (0, 2)
+        self.animate(
+            "offset",
+            Offset(0, 0),
+            duration=0.14,
+            easing="out_cubic",
+            level="basic",
+        )
+
+    def on_resize(self, event) -> None:
+        if self.is_open:
+            self.call_after_refresh(self._paint)
 
     def move(self, delta: int) -> None:
         if not self._matches:
@@ -98,8 +129,10 @@ class SlashDrawer(Static):
             self.app.action_toggle_palette()
             event.stop()
             return
+        if row < 2:
+            return
 
-        index = self._window_start + row - 1
+        index = self._window_start + row - 2
         if 0 <= index < len(self._matches):
             name = self._matches[index].name
             self.hide()
@@ -110,9 +143,9 @@ class SlashDrawer(Static):
 
     # ── rendering ────────────────────────────────────────────────────────
     def _paint(self) -> None:
-        width = DRAWER_WIDTH
+        width = max(20, self.size.width or DRAWER_WIDTH)
         visible = self._matches[self._window_start:self._window_start + MAX_ROWS]
-        rows = [self._header(width)]
+        rows = [self._header(width), self._divider(width)]
         for position, command in enumerate(visible):
             absolute = self._window_start + position
             rows.append(self._row(command, absolute == self._index, width))
@@ -129,6 +162,10 @@ class SlashDrawer(Static):
             f"[{TEXT_3}]{count}  {hint}[/]"
         )
 
+    @staticmethod
+    def _divider(width: int) -> str:
+        return f"[{BORDER_HI}]{'─' * width}[/]"
+
     def _row(self, command, selected: bool, width: int) -> str:
         name = f"/{command.name}"
         description = command.help_text or ""
@@ -137,17 +174,29 @@ class SlashDrawer(Static):
             description = f"local · {description}"
         elif source == "user":
             description = f"user · {description}"
+
+        typed = len(self._prefix)
+        if selected:
+            # The rail takes the same first cell as the unselected row's space,
+            # so names and descriptions stay in one column while moving.
+            description_room = max(0, width - 1 - NAME_WIDTH)
+            if len(description) > description_room:
+                description = description[: max(0, description_room - 1)].rstrip() + "…"
+            body = f"{name[:NAME_WIDTH]:<{NAME_WIDTH}}{description}"
+            body = body[: width - 1].ljust(max(0, width - 1))
+            name_text = escape(body[:NAME_WIDTH])
+            description_text = escape(body[NAME_WIDTH:])
+            return (
+                f"[bold {ACCENT} on {SELECT_BG}]▌[/]"
+                f"[bold {TEXT} on {SELECT_BG}]{name_text}[/]"
+                f"[{TEXT_2} on {SELECT_BG}]{description_text}[/]"
+            )
+
         # One line per command: anything longer is clipped rather than allowed to
         # run past the drawer and off the screen.
         room = width - NAME_WIDTH - 3
         if len(description) > room:
             description = description[: max(0, room - 1)].rstrip() + "…"
-
-        if selected:
-            text = f" {name:<{NAME_WIDTH}}{description}"
-            return f"[bold {TEXT} on {SELECT_BG}]{escape(text[: width - 2]):<{width - 2}}[/]"
-
-        typed = len(self._prefix)
         head = name[: typed + 1]
         tail = name[typed + 1 :]
         coloured = f"[b {ACCENT}]{escape(head)}[/]{escape(tail)}"

@@ -142,7 +142,7 @@
                   </tr>
                 </tbody>
               </table>
-              <p class="s-ledger-foot">Each value is copied from the last validation run; nothing here polls or animates. <b>Sources:</b> training log, held-out evaluation, and model card.</p>
+              <p class="s-ledger-foot">Each value is copied from the last validation run; nothing here polls. <b>Sources:</b> training log, held-out evaluation, and model card.</p>
             </aside>
           </div>
         </div>
@@ -152,9 +152,9 @@
             <div class="s-section-head">
               <div>
                 <p class="s-kicker">Availability</p>
-                <h2>Two models.<br>One is ready.</h2>
+                <h2>Three tiers.<br>One is ready.</h2>
               </div>
-              <p class="s-section-copy">The app runs v1.5 today. The 1.6 preview has no published weights and no downstream benchmarks; its training log is the public evidence. <b>We do not blur those two states.</b></p>
+              <p class="s-section-copy">The app runs v1.5 today. The 1.6 preview has no published weights and no downstream benchmarks; its training log is the public evidence. 1.6 Pro is planned and has no trained artifact. <b>We do not blur those states.</b></p>
             </div>
             <table class="s-matrix">
               <thead>
@@ -166,7 +166,7 @@
                   <td data-label="Status"><span class="s-tag is-ok"><i></i>Published</span></td>
                   <td class="num" data-label="Parameters">454.78M<small>all active</small></td>
                   <td data-label="Runs on">Desktop app · TUI · GGUF</td>
-                  <td><a href="index.html">Install v1.5 →</a></td>
+                  <td><a href="guide/install.html">Install v1.5 →</a></td>
                 </tr>
                 <tr>
                   <th scope="row"><b>Dizel 1.6 Flash</b><small>Sparse MoE · preview</small></th>
@@ -174,6 +174,13 @@
                   <td class="num" data-label="Parameters">435.3M<small>293.7M active</small></td>
                   <td data-label="Runs on" class="s-empty">Weights pending</td>
                   <td><a href="model.html#mc-training">Training log →</a></td>
+                </tr>
+                <tr>
+                  <th scope="row"><b>Dizel 1.6 Pro</b><small>Sparse MoE · planned</small></th>
+                  <td data-label="Status"><span class="s-tag is-muted"><i></i>Planned</span></td>
+                  <td class="num" data-label="Parameters">1.63B<small>973M active</small></td>
+                  <td data-label="Runs on" class="s-empty">Not trained</td>
+                  <td class="s-empty">No artifact</td>
                 </tr>
               </tbody>
             </table>
@@ -190,7 +197,7 @@
                 <a class="s-text-link" href="guide/index.html">Browse all documentation →</a>
               </div>
               <ol class="s-links-list">
-                <li><a href="guide/install.html"><span class="s-num">01</span><span><span class="s-link-title">Install Dizel</span><span class="s-link-desc">Python, PyTorch, and the desktop app.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
+                <li><a href="guide/install.html"><span class="s-num">01</span><span><span class="s-link-title">Install Dizel</span><span class="s-link-desc">npm on Windows, or a Python checkout.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
                 <li><a href="guide/launch.html#tui"><span class="s-num">02</span><span><span class="s-link-title">Use the terminal</span><span class="s-link-desc">Keyboard-first TUI, sessions, and commands.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
                 <li><a href="model.html"><span class="s-num">03</span><span><span class="s-link-title">Read the model card</span><span class="s-link-desc">Architecture, training, evaluation, and limits.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
                 <li><a href="guide/index.html"><span class="s-num">04</span><span><span class="s-link-title">Browse the docs</span><span class="s-link-desc">The guide index and what runs today.</span></span><span class="s-arrow" aria-hidden="true">→</span></a></li>
@@ -250,9 +257,9 @@
             </div>
             <div class="s-route" aria-live="polite">
               <div class="s-node is-token"><b data-route-token>def add(</b><small>token</small></div>
-              <div class="s-wire" aria-hidden="true"></div>
+              <div class="s-wire s-wire-a" aria-hidden="true"></div>
               <div class="s-node is-router"><b>router</b><small>top two</small></div>
-              <div class="s-wire" aria-hidden="true"></div>
+              <div class="s-wire s-wire-b" aria-hidden="true"></div>
               <div class="s-experts" role="group" aria-label="Expert load">
                 <div class="s-expert is-active" data-expert="0"><span>E0</span><i></i></div>
                 <div class="s-expert" data-expert="1"><span>E1</span><i></i></div>
@@ -296,6 +303,7 @@
         <a href="guide/launch.html">Desktop app</a>
         <a href="guide/launch.html#tui">Terminal UI</a>
         <a href="demo.html">Interface demo</a>
+        <a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm launcher ↗</a>
       </div>
       <div class="s-foot-col">
         <h3>Research</h3>
@@ -311,7 +319,7 @@
       </div>
     </div>
     <div class="s-foot-bottom">
-      <span>Dizel 1.6 Flash Preview · Record 2026-11</span>
+      <span>Dizel 1.6 Flash Preview · App v2.0.1 · Record 2026-11</span>
       <span>MIT licensed · Built in public on one T4</span>
       <a href="model.html#mc-citation">Citation</a>
       <a href="#main">Back to top ↑</a>

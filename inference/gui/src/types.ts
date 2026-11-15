@@ -217,6 +217,51 @@ export interface MessageFeedback {
   createdAt: number;
 }
 
+export type ToolStatus = "running" | "done" | "failed";
+
+/** Everything a finished tool call needs to explain itself in the detail view. */
+export interface ToolPayload {
+  name: string;
+  detail: string;
+  result?: string;
+  result_truncated?: boolean;
+  path?: string;
+  query?: string;
+  glob?: string;
+  url?: string;
+  search_url?: string;
+  action?: string;
+  diff?: string;
+  diff_truncated?: boolean;
+  additions?: number;
+  deletions?: number;
+  content?: string;
+  content_truncated?: boolean;
+  old?: string;
+  new?: string;
+  replacement_truncated?: boolean;
+}
+
+export interface ToolCall extends ToolPayload {
+  id: string;
+  status: ToolStatus;
+  /** Debug fixture: not a real tool call. */
+  synthetic?: boolean;
+}
+
+export interface ToolApproval {
+  id: string;
+  tool: string;
+  path: string;
+  action: string;
+  diff: string;
+  additions: number;
+  deletions: number;
+  toolId?: number | string;
+  /** Debug fixture: resolve locally instead of answering a server request. */
+  synthetic?: boolean;
+}
+
 /** One version of a turn: the prompt as edited, and the reply it produced. */
 export interface Fork {
   prompt: string;
@@ -251,6 +296,8 @@ export interface Message {
   /** Files this message carried. Their text is also folded into `content` for
    *  the model; this copy exists so the transcript can show and open them. */
   attachments?: Attachment[];
+  /** Tool calls this turn made, in execution order. */
+  tools?: ToolCall[];
 }
 
 export interface ModelInfo {
@@ -313,5 +360,17 @@ export type StreamEvent =
   | { type: "thinking"; text: string }
   | { type: "token"; text: string }
   | { type: "notice"; text: string }
+  | ({ type: "tool"; phase: "start" | "done" | "failed"; id: number } & ToolPayload)
+  | {
+      type: "approval";
+      id: string;
+      tool_id: number;
+      tool: string;
+      path: string;
+      action: string;
+      diff: string;
+      additions: number;
+      deletions: number;
+    }
   | { type: "done"; text: string; session_id: string }
   | { type: "error"; message: string };

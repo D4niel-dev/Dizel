@@ -18,7 +18,7 @@ GLOBAL_KEYS = (
     ("ctrl+k", "Command palette"),
     ("ctrl+y", "Multi-line editor"),
     ("ctrl+t", "Sessions panel"),
-    ("ctrl+r", "Context rail"),
+    ("ctrl+r", "Focus context rail"),
     ("ctrl+a", "Artifacts panel"),
     ("ctrl+l", "Clear transcript"),
     ("esc", "Interrupt generation"),

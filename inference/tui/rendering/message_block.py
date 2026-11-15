@@ -8,6 +8,7 @@ from rich.markdown import Markdown
 from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.panel import Panel
+from rich.table import Table
 from rich import box
 
 from inference.tui.settings_apply import chat_pref
@@ -22,11 +23,8 @@ from inference.tui.theme import (
     DIFF_DEL,
     DIFF_DEL_BG,
     DIFF_HUNK,
-    RAIL,
-    STYLE_ASSISTANT,
-    STYLE_SYSTEM,
-    STYLE_USER,
     SURFACE,
+    TEXT,
     TEXT_2,
     TEXT_3,
     WARN,
@@ -57,6 +55,20 @@ def _parse_think_blocks(text: str):
 
 _FENCE = re.compile(r"```([\w+-]*)[ \t]*\n(.*?)```", re.S)
 
+# OpenAI's Responses API prefixes reasoning summaries with a bold title block.
+# Treat that first block, or a title still waiting for its body, as disclosure
+# metadata so the header can carry it without repeating it in the body.
+_SUMMARY_TITLE = re.compile(r"^\*\*([^*\n]+)\*\*(?:\r?\n\r?\n|$)")
+
+
+def reasoning_summary(text: str) -> tuple[str | None, str]:
+    content = text.strip()
+    match = _SUMMARY_TITLE.match(content)
+    if not match:
+        return None, content
+    return match.group(1).strip(), content[match.end() :].rstrip()
+
+
 # Left rail only, the way OpenCode marks a reasoning block. Rich boxes are
 # eight four-character lines: top, head, head_row, mid, row, foot_row, foot,
 # bottom. Blank lines suppress the horizontal rules.
@@ -68,6 +80,19 @@ THOUGHT_BOX = box.Box(
     "    \n"
     "    \n"
     "┃   \n"
+    "    \n"
+)
+
+# One accent rail on the left, no rules or right edge. The surface behind it is
+# the message block; the rail is the only frame.
+USER_BOX = box.Box(
+    "    \n"
+    "▌   \n"
+    "▌   \n"
+    "▌   \n"
+    "    \n"
+    "    \n"
+    "▌   \n"
     "    \n"
 )
 
@@ -197,16 +222,31 @@ class MessageBlock:
         self.timestamp = timestamp
         self.separators = separators
         self.spacing = spacing
-        if isinstance(content, str):
+        if isinstance(content, str) and role.upper() == "USER":
+            # A typed prompt is plain text, not a document. Keeping it as Text
+            # lets a short message stay a compact card instead of measuring to
+            # the full transcript width.
+            self.content = Text(content, style=TEXT)
+        elif isinstance(content, str):
             main_text, thought_text = _parse_think_blocks(content)
             renderables = []
             if thought_text:
+                title, thought_body = reasoning_summary(thought_text)
+                label = (
+                    f"Thought: {title}"
+                    if title
+                    else f"Thought · {len(thought_text):,} chars"
+                )
                 renderables.append(
                     Panel(
-                        _markdown(thought_text),
-                        title=f"✻ Thought · {len(thought_text):,} chars",
+                        Markdown(
+                            thought_body,
+                            code_theme=CODE_THEME,
+                            style=TEXT_3,
+                        ),
+                        title=Text(label, style=WARN),
                         title_align="left",
-                        border_style=WARN,
+                        border_style=BORDER_HI,
                         box=THOUGHT_BOX,
                         padding=(0, 1),
                     )
@@ -219,35 +259,33 @@ class MessageBlock:
         else:
             self.content = content
 
-    def _role_style(self):
-        role = self.role.upper()
-        if role == "USER":
-            return "you", STYLE_USER, "▌"
-        if role == "ASSISTANT":
-            return "dizel", STYLE_ASSISTANT, "◆"
-        return role.lower(), STYLE_SYSTEM, RAIL
+    def _with_stamp(self, content: RenderableType) -> RenderableType:
+        """Quiet right-side metadata, not a role header."""
+        if not self.timestamp:
+            return content
+        grid = Table.grid(expand=True, padding=(0, 1))
+        grid.add_column(ratio=1)
+        grid.add_column(justify="right", width=len(self.timestamp))
+        grid.add_row(content, Text(self.timestamp, style=TEXT_3))
+        return grid
 
     def __rich__(self) -> RenderableType:
-        label, color, glyph = self._role_style()
-        header = Text.assemble((f"{glyph} ", color), (label, f"bold {color}"))
-        if self.timestamp:
-            header.append(f"  {self.timestamp}", style=TEXT_3)
-
         pad = (1, 0, 1, 0) if self.spacing != "compact" else (0, 0, 0, 0)
 
-        # What you said reads as a block on a raised surface; what the model said
-        # reads as writing. Same distinction the desktop makes between the user
-        # bubble and the assistant turn.
+        # OpenCode's grammar: the prompt is a rail-marked block and the answer is
+        # prose. Role labels only add a second layer of chrome above both.
         if self.role.upper() == "USER":
             bubble = Panel(
-                self.content,
-                box=box.SIMPLE,
+                self._with_stamp(self.content),
+                box=USER_BOX,
+                border_style=ACCENT,
                 padding=(0, 1),
                 style=f"on {SURFACE}",
+                expand=True,
             )
-            body = Padding(Group(header, bubble), pad)
+            body = Padding(bubble, pad)
         else:
-            body = Padding(Group(header, Padding(self.content, (0, 0, 0, 2))), pad)
+            body = Padding(self._with_stamp(self.content), pad)
         if self.separators:
             return Group(Rule(characters="─", style=BORDER), body)
         return body

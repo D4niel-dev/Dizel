@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 import zipfile
@@ -137,6 +138,24 @@ def repo_root(root: Optional[os.PathLike | str] = None) -> Path:
 
 def state_dir(root: Optional[os.PathLike | str] = None) -> Path:
     return repo_root(root) / ".dizel" / "updates"
+
+
+def auto_apply_allowed(root: Optional[os.PathLike | str] = None) -> bool:
+    """Never overwrite a source checkout that still has uncommitted work."""
+    base = repo_root(root)
+    if not (base / ".git").exists():
+        return True
+    try:
+        status = subprocess.run(
+            ["git", "-C", str(base), "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        return False
+    return status.returncode == 0 and not status.stdout.strip()
 
 
 def _state_path(root: Optional[os.PathLike | str] = None) -> Path:
@@ -768,9 +787,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     check = commands.add_parser("check", help="Check GitHub for a newer release")
     check.add_argument("--timeout", type=float, default=15.0)
 
+    update = commands.add_parser(
+        "update", help="Check for, download, and stage a newer TUI release"
+    )
+    update.add_argument("--timeout", type=float, default=15.0)
+    update.add_argument("--quiet", action="store_true")
+
     apply_cmd = commands.add_parser("apply", help="Apply a staged TUI update")
     apply_cmd.add_argument("--quiet", action="store_true")
     apply_cmd.add_argument("--json", action="store_true")
+    apply_cmd.add_argument(
+        "--force", action="store_true", help="Apply even in a dirty source checkout"
+    )
 
     stage = commands.add_parser("stage", help="Stage a downloaded TUI archive")
     stage.add_argument("archive")
@@ -786,7 +814,48 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         if args.command == "check":
             return _print_check(check_for_update(root=root, timeout=args.timeout))
+        if args.command == "update":
+            result = check_for_update(root=root, timeout=args.timeout)
+            if not result.available or not result.info:
+                print(f"{APP_NAME} {result.current} is up to date.")
+                return 0
+            info = result.info
+            if not info.tui:
+                print(
+                    f"{APP_NAME} {info.version} is available, but this release has no "
+                    f"terminal package. Desktop installer: {info.url}"
+                )
+                return 1
+            if not args.quiet:
+                print(f"Downloading {info.tui.name}...", flush=True)
+                last = [-20]
+
+                def progress(received: int, total: int) -> None:
+                    if not total:
+                        return
+                    percent = int(received * 100 / total)
+                    if percent < last[0] + 20 and percent != 100:
+                        return
+                    last[0] = percent
+                    print(f"  {percent}%", flush=True)
+
+                download_tui_update(info, root=root, progress=progress)
+            else:
+                download_tui_update(info, root=root)
+            print(
+                f"{APP_NAME} {info.version} downloaded and staged. Start Dizel to apply it; "
+                "chats and settings are kept."
+            )
+            return 0
         if args.command == "apply":
+            if pending_update(root) and not args.force and not auto_apply_allowed(root):
+                if not args.quiet:
+                    print(
+                        "The staged update was not applied: this source checkout has "
+                        "uncommitted changes. Use --force to apply it anyway.",
+                        file=sys.stderr,
+                    )
+                return 0
             result = apply_pending_update(root=root)
             if args.json:
                 print(json.dumps(result or {"applied": None}))

@@ -29,8 +29,10 @@ current stylesheet mixes `margin-top: 1`, `margin: 0 3`, `margin: 1 0 0 0`,
 `padding: 0 2` and `padding: 0 1` with no system behind them — that is why the
 screen reads as flat rather than calm.
 
-Horizontal: the sidebar is a fixed `32` cells. The transcript column is capped at
-`96` and centred, so long lines don't run the full width of a wide terminal.
+Horizontal: the sidebar and context rail are fixed `32` cells. In a conversation
+the transcript and composer fill the remaining workspace with two-cell gutters,
+left-aligned like OpenCode; the empty welcome keeps its composed `120`-cell
+composer centered.
 
 ## 2. Type hierarchy without font sizes
 
@@ -92,10 +94,15 @@ title, optional tag. Titles `$text-2`, the open one `$text`. Pinned sessions get
 `•` instead of the rail. Section labels (`PINNED`, `RECENT`) follow the same
 uppercase treatment with `gap-2` above.
 
-**Empty state** — the only screen with room to breathe, so it earns a real
-composition: greeting (display), one line of meta, then three starters separated
-by `gap-1`, then the hint at `gap-2`. Starters are the same row as a session:
-accent glyph, body text, and they fill the composer on click.
+**Empty state** — the only screen with room to breathe, so it stays quiet: a
+time-aware greeting (display), one muted subline, then three starters separated
+by `gap-1`. Starters are the same row as a session: accent glyph, body text, and
+they fill the composer on click. The animated wordmark, greeting, and subline are
+centered over the composer: the full `ansi_shadow` art at 32+ rows, a three-row
+`digital` LCD face below that; both come from pyfiglet, never plain text. The art
+is centered as a block with its rows left-aligned, so the shadow row stays
+aligned. The three starters live in a shelf under the composer. Model, mode, and
+shortcuts stay in the composer footer and status bar.
 
 **Composer** — three rows, `$surface`, `$border`, and `$accent` on `:focus-within`.
 Prompt glyph in accent. No placeholder that repeats what the border already says.
@@ -131,20 +138,21 @@ model, device, context, message count. Nothing here is interactive.
    *Note:* `margin-bottom` on `.option-list--option` has no effect (the list
    renders options on a fixed virtual grid), so separation comes from the tone
    difference between title and preview rather than a gap row.
-2. **Panels are overlays — shipped.** `ctrl+r` (context) and `ctrl+a` (artifacts)
-   push a `PanelOverlay`: a right-docked panel over a dimmed workspace, closed with
-   `escape` or the same key. Panels are built fresh and filled after mount, so the
-   layout copies stay inert and `ArtifactPanel._seen` no longer has to be shared —
-   it is rebuilt from `session_bridge.current_messages` each time.
-   *Gotcha:* `ContextPanel { display: none }` applies to **every** instance, so the
-   copy inside the overlay was invisible until `#overlay-dock ContextPanel` was
-   given `display: block`. Same class, same rule, different parent.
+2. **Context rail is session-only; artifacts are overlays — 2026-11-15.** The
+   context panel is hidden on the welcome and docks as a 32-column rail once a
+   transcript starts. From then on it is permanent: `ctrl+r` focuses it (and its
+   internal scroll), `escape` cannot close it. It lists the shared MCP plugin
+   catalog — server, connected/connecting/error/off state, and ready tool count —
+   alongside context, built-in tools, and host load. Artifacts still use
+   `PanelOverlay` with `ctrl+a`. The old overlay-copy visibility gotcha is gone
+   with the copy.
 3. **Cool palette confirmed.** No warm shift; parity with the desktop wins.
 
 ### Correction to an earlier claim
 The "6 dead columns" in the first review were **container padding**, not the
 hidden panels — measured `workspace-container w=120` against `WorkspacePanel w=114`.
-The panels take zero width because they are closed, which is correct.
+The hidden artifact panel takes zero width because it is closed; the context rail
+is a 32-cell dock only once a chat transcript exists.
 
 ### A rule costs a row (learned the hard way)
 Textual borders are **inside** the widget's box. A `height: 1` widget with
@@ -199,11 +207,11 @@ gutter for tool activity, and puts context + shortcuts in the composer footer.
 This pass adopts those elements without changing the warm palette or the
 single-column layout:
 
-1. **Thought.** Live turns use a left-railed `Collapsible`: open while the model
-   is thinking, titled `Thinking for Ns`/`Nm Ns`/`Nh Nm`, and switched to
-   `Thought for …` when the answer starts, then folded on finalize. Reloaded
-   history keeps the `Thought · N chars` fallback because older turns carry no
-   timing data.
+1. **Thought.** Live turns use a left-railed `Collapsible`, open while the model
+   is thinking and folded on finalize. Section 12 now gives it OpenCode's live
+   spinner + `Thinking` header and `Thought: Ns` done line; reloaded history
+   keeps the `Thought · N chars` fallback because older turns carry no timing
+   data.
 2. **Tool rows.** `│ ✻ tool  running  detail`, `│ ✓ tool  done`, `│ ✗ tool
    failed` — a two-cell icon gutter with a one-line detail preview. Unified
    `diff` / `patch` fences render green additions, red deletions, and blue hunk
@@ -227,10 +235,12 @@ The top of the terminal now carries the working set, not just the current title.
 1. **Tab strip.** `SessionTabs` now owns the top edge of the window; the old
    `TopBar` title/stats block is gone, and the status line/composer footer carry
    the live numbers. It uses Textual's `Tabs` widget for click/left-right
-   switching, with a raised active tab and an accent underline. A fixed `×` and
-   `+` at the right close the active tab and start a new one. Tab widget IDs
-   carry a `session-` prefix because raw session ids begin with a timestamp
-   digit, which Textual rejects as an identifier.
+   switching, with a raised active tab and an accent underline. On 2026-11-15
+   the actions moved onto the strip: every tab owns its `×`, and the `+` follows
+   the newest tab instead of sitting at the far right. Above ten tabs the strip
+   gains a one-row horizontal scrollbar and scrolls to the newest tab. Tab
+   widget IDs carry a `session-` prefix because raw session ids begin with a
+   timestamp digit, which Textual rejects as an identifier.
 2. **Lifecycle.** `DizelCMDApp.open_tabs` is the source of truth. New chats and
    loaded sessions open or reuse a tab; the session panel, session manager and
    slash commands all call the same `load_session_to_workspace` path. Closing a
@@ -283,34 +293,75 @@ shell, palette, and OpenCode structure stay.
    `◆ DIZEL` cell was removed because the window title already carries the mark
    and the cell read as a second tab. A one-cell left inset keeps the active tab
    off the window edge. `+` is accent, `×` turns red on hover.
-2. **Welcome as a composition.** A `LOCAL WORKSPACE` kicker, the pyfiglet
-   wordmark, time-aware greeting, one context line, the subline, three starter
-   shelves, and a keycap hint row. Three of 24 starters are sampled for each new
-   welcome; hover lifts the whole row to `$surface-hi`, bolds the label, and
-   brightens the glyph and `↵`. The column is 68 cells on the transcript measure.
-   Full-height rhythm is `gap-1` from the kicker to the wordmark, `gap-2` into
-   the greeting and the first starter, and `gap-3` before the keycap hint;
-   compact keeps `gap-0/1` so 80×24 still fits.
-3. **Density.** Below 34 rows the wordmark yields (`-compact`); below 26 rows the
-   margins tighten (`-tiny`). At 80×24 the full onboarding still fits — kicker,
-   greeting, context, subline, starters, keycaps — with `max_scroll_y = 0`.
-4. **Composer deck.** A filled mode/tier chip, the model with a trailing profile
-   stripped so `Dizel 1.6 Flash` never repeats `Flash`, a five-cell context
-   gauge (three at compact widths), and a hint that reacts to state: `↵ send`
-   while there is text, `esc stop` while generating, `shift+tab mode` when idle.
-   The chip carries two cells of padding, footer groups sit three cells apart,
-   and the gauge and percentage keep two spaces between them. Accent and warning
-   colors on the gauge encode capacity. The prompt glyph brightens with focus.
-5. **Transcript signals.** `▌ you` stays quiet; `◆ dizel` carries the mark. The
-   reply meta line is `◷ <time> · <chars>`, so a finished turn is visibly
-   finished. Code fences get an accent language label; thought blocks use `✻`.
+2. **Welcome as a composition.** A time-aware greeting, one muted subline, and
+   three starter shelves. The 2026-11-15 simplification removed the `LOCAL
+   WORKSPACE` kicker, model/tier line, and keycap hint row: each repeated a
+   signal already carried by the tab strip, composer footer, or status bar. The
+   pyfiglet wordmark stays above the greeting, centered with the subline over the
+   composer; the three starter shelves moved to a shelf under the composer. The
+   mark stays ASCII art at every size (`ansi_shadow` normally, the three-row
+   `digital` face below 32 rows). Three of
+   24 starters are sampled for each new welcome; hover lifts the whole row to
+   `$surface-hi`, bolds the label, and brightens the glyph and `↵`. The welcome
+   column is 68 cells on the transcript measure, with `gap-1` into the subline.
+3. **Density.** Below 34 rows the padding tightens (`-compact`); below 26 rows
+   the margins tighten (`-tiny`); below 64 columns the subline steps aside
+   (`-narrow`). Below 32 rows the wordmark switches to the three-row `digital`
+   face. At 80×24 the compact wordmark, greeting, composer, and starter shelf fit
+   with `max_scroll_y = 0`.
+4. **Composer deck.** A flat surface block with one thick, full-cell accent
+   left rail, not a rounded frame or a hairline border. Inside: a filled
+   mode/tier chip, the model with a trailing profile stripped so
+   `Dizel 1.6 Flash` never repeats `Flash`, a five-cell segmented context gauge
+   (three at compact widths; spaced `▰` fill and `▱` empty cells), and a hint
+   that reacts to state: `↵ send` while there is text, `esc stop` while
+   generating, `shift+tab mode` when idle. The chip carries two cells of
+   padding, footer groups sit three cells apart, and the gauge and percentage
+   keep two spaces between them. Accent and warning colors on the gauge encode
+   capacity. The prompt glyph and rail brighten with focus.
+5. **Transcript signals.** An OpenCode-style agent log inside Dizel's tab and
+   session-rail shell. User prompts are full-width surface blocks with a blue
+   left rail and no role label; the timestamp is quiet right-side metadata.
+   Assistant answers are unlabeled prose. Model and MCP tool calls become
+   persistent inline rows: a one-cell spinner while running, then `*` search,
+   `→` read/list, `✓` other, or `×` failure, with the target on the same line.
+   `write_file` and `edit_file` first raise a full diff approval card; writes
+   are locked to the project root, use atomic replacement, and are never offered
+   to surfaces without an approval hook. System notes are separate railed
+   voices:
+   every wrapped line keeps a `▌` rail, with `~` muted info, `✓` accent
+   success, and `×` danger failure. Code fences get an accent language label.
+   Reasoning uses the GUI Thought block: `✻` plus a rotating thought phrase and
+   live clock while pending, an accent-pulsing header and accent rail while
+   open, and `- Thought for Ns` / `+ Thought for Ns` once the pass ends. The
+   body is muted Markdown behind a `┃` rail. A model without `<think>` tags gets
+   the GUI generating row instead: animated three dots and the same phrase
+   rotation until the first answer token. Neither state shows an empty `…`
+   answer body. The tabs and session-only context rail stay, unlike OpenCode's
+   single-window header.
+   Command feedback shares the composer's measure and thick rail in the notice
+   strip above it; `/clear` and `/reset` speak there instead of leaving a line
+   in the transcript they just emptied, so the welcome stays centred. Transient
+   notices clear after 1.4s; errors persist until the next notice.
 6. **Selection.** Lists select with a deep-blue accent tint (`$select-bg`
    `#143048`) and bold text instead of the old orange fill or a full accent bar.
-   The open session keeps its accent rail; the slash drawer and command palette
-   use the same tint.
-7. **Status line.** State, provider, and tokens on the left; context hints on the
-   right. At 110+ columns the version joins the right side as reference data; at
-   narrow widths hints switch to `^K`/`^T`.
+   The open session keeps its accent rail. The slash drawer floats on
+   `$bg-deep`, carries a header rule, and marks its selected row with a one-cell
+   accent rail; it slides up two rows on open (0.14s) when animations are on.
+   The command palette uses the same tint.
+7. **Status line.** State, last-reply timing, and tokens on the left; context
+   hints on the right. The last reply shows `◷ 2.3s · 376 chars · ~41 tok/s`
+   (compact `158ch · ~12t/s` on narrower terminals), replacing the per-message
+   meta line. Context tokens stay unless the line is under 70 columns with
+   reply stats; at narrow widths hints collapse to `^K  ^T  /help`. At wide
+   widths the version joins the right side as reference data. Debug mode adds a
+   violet `DEBUG` marker before the hints.
+8. **Debug mode.** `/debug` toggles a developer surface. Diagnostics (`status`,
+   `ctx`, `usage`, `bundle`) open a scrollable modal that never touches the saved
+   transcript; fixtures (`echo`, `markdown`, `thought`, `filler`, `error`) append
+   turns for render/scroll tests; runtime controls (`simulate`, `budget`,
+   `ctxfull`, `replay`) drive the live UI. The GUI's equivalent debug badge and
+   panel remain the reference.
 
 ### Verification
 

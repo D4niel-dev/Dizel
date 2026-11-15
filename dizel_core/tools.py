@@ -9,9 +9,10 @@ The harness finds those, runs them, and feeds the result back for another round.
 
 Design rules, all of which exist to keep a 1.6B model from making a mess:
 
-* **Read-only.** Nothing here writes, deletes, or executes a shell command. A model
-  that can run arbitrary commands on the user's machine is a vulnerability with a
-  chat interface.
+* **Reviewed writes.** `write_file` and `edit_file` change files only after the
+  calling surface shows a diff and the user approves it. Nothing deletes or
+  executes a shell command; a model with arbitrary command execution is a
+  vulnerability with a chat interface.
 * **Bounded.** Every tool caps its output. An unbounded result would blow the
   2,048-token window in one call and take the conversation with it.
 * **Off by default.** The prompt block costs tokens on every request, so tools are
@@ -21,20 +22,30 @@ Design rules, all of which exist to keep a 1.6B model from making a mess:
 from __future__ import annotations
 
 import ast
+import difflib
 import json
 import math
 import operator
+import os
 import re
+import stat
+import tempfile
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List
+from urllib.parse import quote_plus
 
 MAX_FILE_CHARS = 6000
 MAX_ENTRIES = 60
 MAX_MATCHES = 40
 MAX_SCAN_FILES = 400
 MAX_FETCH_CHARS = 3000
+MAX_WRITE_CHARS = 120_000
+MAX_DIFF_CHARS = 80_000
+MAX_UI_RESULT_CHARS = 14_000
+MAX_UI_CONTENT_CHARS = 20_000
 
 BLOCKED_SUFFIXES = {
     ".pyc", ".pyo", ".so", ".dll", ".exe", ".bin", ".pt", ".gguf", ".safetensors",
@@ -56,16 +67,48 @@ def is_enabled() -> bool:
     return _ENABLED
 
 
+@dataclass(frozen=True)
+class FileChange:
+    """One reviewed file change; the approval modal renders this."""
+
+    tool: str
+    path: str
+    action: str
+    diff: str
+    additions: int
+    deletions: int
+
+
 @dataclass
 class Tool:
     name: str
     description: str
     args: Dict[str, str]
     run: Callable[..., str]
+    requires_approval: bool = False
 
     def schema(self) -> str:
         args = ", ".join(f'"{k}": {v}' for k, v in self.args.items())
         return f'<tool name="{self.name}">{{{args}}}</tool>  — {self.description}'
+
+
+_UI_META = threading.local()
+
+
+def _ui_begin() -> None:
+    _UI_META.current = {}
+
+
+def _ui_record(**values: Any) -> None:
+    meta = getattr(_UI_META, "current", None)
+    if isinstance(meta, dict):
+        meta.update({key: value for key, value in values.items() if value is not None})
+
+
+def _ui_end() -> Dict[str, Any]:
+    meta = getattr(_UI_META, "current", None)
+    _UI_META.current = None
+    return meta if isinstance(meta, dict) else {}
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -201,6 +244,214 @@ def _file_info(path: str) -> str:
     return f"{path}\n{stat.st_size:,} bytes · {lines:,} lines · modified {stamp}"
 
 
+# ── Reviewed writes ──────────────────────────────────────────────────────────
+def _project_root() -> Path:
+    return Path.cwd().resolve()
+
+
+def _resolve_write(path: str) -> tuple[Path | None, str]:
+    raw = str(path or "").strip().strip("\"'")
+    if not raw:
+        return None, "No path given."
+    root = _project_root()
+    target = Path(raw).expanduser()
+    if not target.is_absolute():
+        target = root / target
+    try:
+        target = target.resolve(strict=False)
+    except OSError as error:
+        return None, f"Invalid path: {error}"
+    try:
+        relative = target.relative_to(root)
+    except ValueError:
+        return None, "File changes are limited to the current project directory."
+    if any(part in BLOCKED_PARTS for part in relative.parts):
+        return None, "Refusing to write generated, binary, or VCS internals."
+    if target.suffix.lower() in BLOCKED_SUFFIXES:
+        return None, "Refusing to write binary or archive files."
+    if target.exists() and not target.is_file():
+        return None, "Not a regular file."
+    return target, ""
+
+
+def _read_for_edit(path: Path) -> tuple[str | None, str]:
+    if not path.exists():
+        return "", ""
+    try:
+        if path.stat().st_size > MAX_WRITE_CHARS:
+            return None, "File is too large to edit safely."
+        with open(path, "r", encoding="utf-8", errors="replace", newline="") as handle:
+            return handle.read(), ""
+    except OSError as error:
+        return None, f"Could not read file: {error}"
+
+
+def _diff_change(before: str, after: str, display: str) -> tuple[str | None, int, int, str]:
+    before_lines = before.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+    after_lines = after.replace("\r\n", "\n").replace("\r", "\n").splitlines()
+    lines = list(
+        difflib.unified_diff(
+            before_lines,
+            after_lines,
+            fromfile=f"a/{display}",
+            tofile=f"b/{display}",
+            lineterm="",
+        )
+    )
+    diff = "\n".join(lines)
+    additions = sum(
+        1 for line in lines if line.startswith("+") and not line.startswith("+++")
+    )
+    deletions = sum(
+        1 for line in lines if line.startswith("-") and not line.startswith("---")
+    )
+    if len(diff) > MAX_DIFF_CHARS:
+        return None, additions, deletions, "Diff is too large to review safely."
+    return diff, additions, deletions, ""
+
+
+def _approved(change: FileChange, approve: Callable[[FileChange], bool] | None) -> tuple[bool, str]:
+    if approve is None:
+        return False, "Write refused: this surface cannot approve file changes."
+    try:
+        if approve(change):
+            return True, ""
+    except Exception as error:
+        return False, f"Write refused: approval failed ({error})."
+    return False, "Write cancelled."
+
+
+def _atomic_write(target: Path, text: str) -> None:
+    parent = target.parent
+    if not parent.is_dir():
+        raise OSError(f"Parent directory does not exist: {parent}")
+    mode = stat.S_IMODE(target.stat().st_mode) if target.exists() else None
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".dizel.tmp", dir=parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if mode is not None:
+            os.chmod(temporary, mode)
+        os.replace(temporary, target)
+    except Exception:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
+        raise
+
+
+def _write_file(
+    path: str,
+    content: str,
+    approve: Callable[[FileChange], bool] | None = None,
+) -> str:
+    target, error = _resolve_write(path)
+    if target is None:
+        return f"[write_file] {error}"
+    content = str(content or "")
+    if len(content) > MAX_WRITE_CHARS:
+        return f"[write_file] Content is too large ({len(content):,} chars)."
+
+    display = target.relative_to(_project_root()).as_posix()
+    existed = target.exists()
+    before, read_error = _read_for_edit(target)
+    if before is None:
+        return f"[write_file] {read_error}"
+    if existed and before == content:
+        return f"[write_file] No change: {display}"
+
+    diff, additions, deletions, diff_error = _diff_change(before, content, display)
+    if diff is None:
+        return f"[write_file] {diff_error}"
+    change = FileChange(
+        "write_file",
+        display,
+        "overwrite" if existed else "create",
+        diff,
+        additions,
+        deletions,
+    )
+    _ui_record(
+        action=change.action,
+        diff=change.diff,
+        additions=change.additions,
+        deletions=change.deletions,
+    )
+    allowed, reason = _approved(change, approve)
+    if not allowed:
+        return f"[write_file] {reason}"
+    try:
+        _atomic_write(target, content)
+    except OSError as write_error:
+        return f"[write_file] Failed: {write_error}"
+    verb = "Overwrote" if existed else "Created"
+    return f"[write_file] {verb} {display} (+{additions}/-{deletions})"
+
+
+def _edit_file(
+    path: str,
+    old: str,
+    new: str,
+    approve: Callable[[FileChange], bool] | None = None,
+) -> str:
+    target, error = _resolve_write(path)
+    if target is None:
+        return f"[edit_file] {error}"
+    old = str(old or "")
+    new = str(new or "")
+    if not old:
+        return "[edit_file] The old snippet is empty."
+    if old == new:
+        return "[edit_file] No change requested."
+    if not target.exists():
+        return f"[edit_file] No such file: {path}"
+
+    before, read_error = _read_for_edit(target)
+    if before is None:
+        return f"[edit_file] {read_error}"
+
+    old_normalized = old.replace("\r\n", "\n").replace("\r", "\n")
+    new_normalized = new.replace("\r\n", "\n").replace("\r", "\n")
+    if "\r\n" in before:
+        old_match = old_normalized.replace("\n", "\r\n")
+        replacement = new_normalized.replace("\n", "\r\n")
+    else:
+        old_match = old_normalized
+        replacement = new_normalized
+
+    first = before.find(old_match)
+    if first < 0:
+        return "[edit_file] Old snippet was not found; read the file again."
+    if before.find(old_match, first + 1) >= 0:
+        return "[edit_file] Old snippet occurs more than once; make it unique."
+    after = before[:first] + replacement + before[first + len(old_match) :]
+
+    display = target.relative_to(_project_root()).as_posix()
+    diff, additions, deletions, diff_error = _diff_change(before, after, display)
+    if diff is None:
+        return f"[edit_file] {diff_error}"
+    change = FileChange("edit_file", display, "edit", diff, additions, deletions)
+    _ui_record(
+        action=change.action,
+        diff=change.diff,
+        additions=change.additions,
+        deletions=change.deletions,
+    )
+    allowed, reason = _approved(change, approve)
+    if not allowed:
+        return f"[edit_file] {reason}"
+    try:
+        _atomic_write(target, after)
+    except OSError as write_error:
+        return f"[edit_file] Failed: {write_error}"
+    return f"[edit_file] Edited {display} (+{additions}/-{deletions})"
+
+
 # ── Web ──────────────────────────────────────────────────────────────────────
 def _web_search(query: str, max_results: int = 4) -> str:
     try:
@@ -315,6 +566,20 @@ REGISTRY: Dict[str, Tool] = {
              {"pattern": "string", "path": "string?", "glob": "string?"}, _grep),
         Tool("file_info", "size, line count and modified time of a path",
              {"path": "string"}, _file_info),
+        Tool(
+            "write_file",
+            "create or overwrite a project file; the user reviews a diff and approves",
+            {"path": "string", "content": "string"},
+            _write_file,
+            requires_approval=True,
+        ),
+        Tool(
+            "edit_file",
+            "replace one unique snippet in a project file; the user approves the diff",
+            {"path": "string", "old": "string", "new": "string"},
+            _edit_file,
+            requires_approval=True,
+        ),
         Tool("web_search", "search the web and return the top results",
              {"query": "string"}, _web_search),
         Tool("fetch_url", "fetch a web page and return its text",
@@ -336,8 +601,12 @@ def set_external(entries: Dict[str, "Tool"]) -> None:
     _EXTERNAL = dict(entries or {})
 
 
-def catalog() -> Dict[str, "Tool"]:
-    merged = dict(REGISTRY)
+def catalog(include_writes: bool = False) -> Dict[str, "Tool"]:
+    merged = {
+        name: tool
+        for name, tool in REGISTRY.items()
+        if include_writes or not tool.requires_approval
+    }
     for name in sorted(_EXTERNAL):
         if name not in merged:
             merged[name] = _EXTERNAL[name]
@@ -378,24 +647,175 @@ def parse_calls(text: str) -> List[Dict[str, Any]]:
     return calls
 
 
-def execute(call: Dict[str, Any]) -> str:
+def display_detail(call: Dict[str, Any]) -> str:
+    """The one-line target shown by either surface's tool row."""
+    name = str(call.get("name") or "?")
+    args = call.get("args") or {}
+    path = str(args.get("path") or "").strip()
+    if name == "read_file" and path:
+        start = args.get("start")
+        end = args.get("end")
+        if start or end:
+            return f"{path}:{start or 1}-{end or '…'}"
+        return path
+    if name in ("list_dir", "file_info") and path:
+        return path
+    if name == "find_files":
+        return " ".join(
+            part for part in (str(args.get("pattern") or "*"), path) if part
+        )
+    if name == "grep":
+        return " ".join(
+            part for part in (str(args.get("pattern") or ""), path or ".") if part
+        )
+    if name == "web_search":
+        return str(args.get("query") or "")
+    if name == "fetch_url":
+        return str(args.get("url") or "")
+    if name == "calc":
+        return str(args.get("expression") or "")
+    if name in ("write_file", "edit_file"):
+        return path
+    return ", ".join(f"{key}={value}" for key, value in args.items())
+
+
+def _clip_ui(value: Any, limit: int) -> tuple[str, bool]:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text, False
+    return text[:limit].rstrip() + "\n…", True
+
+
+def ui_payload(call: Dict[str, Any], outcome: str = "") -> Dict[str, Any]:
+    """What the transcript needs to explain a tool call after it ran.
+
+    The model receives the full outcome; a surface gets a bounded copy plus the
+    fields its detail view knows how to render (path, query, written content,
+    diff, sources).
+    """
+    name = str(call.get("name") or "?")
+    args = call.get("args") or {}
+    result, result_truncated = _clip_ui(outcome, MAX_UI_RESULT_CHARS)
+    payload: Dict[str, Any] = {
+        "name": name,
+        "detail": display_detail(call),
+        "result": result,
+        "result_truncated": result_truncated,
+    }
+
+    path = str(args.get("path") or "").strip()
+    if path:
+        payload["path"] = path
+    if name == "grep":
+        payload["query"] = str(args.get("pattern") or "")
+        payload["glob"] = str(args.get("glob") or "")
+    elif name == "find_files":
+        payload["query"] = str(args.get("pattern") or "")
+    elif name == "web_search":
+        query = str(args.get("query") or "").strip()
+        payload["query"] = query
+        if query:
+            payload["search_url"] = f"https://duckduckgo.com/?q={quote_plus(query)}"
+    elif name == "fetch_url":
+        payload["url"] = str(args.get("url") or "")
+
+    if name == "write_file":
+        content, truncated = _clip_ui(args.get("content"), MAX_UI_CONTENT_CHARS)
+        payload["content"] = content
+        payload["content_truncated"] = truncated
+    elif name == "edit_file":
+        old, old_truncated = _clip_ui(args.get("old"), MAX_UI_CONTENT_CHARS)
+        new, new_truncated = _clip_ui(args.get("new"), MAX_UI_CONTENT_CHARS)
+        payload["old"] = old
+        payload["new"] = new
+        payload["replacement_truncated"] = old_truncated or new_truncated
+
+    meta = call.get("_ui") or {}
+    for key in ("action", "diff", "additions", "deletions"):
+        if key not in meta:
+            continue
+        if key == "diff":
+            diff, truncated = _clip_ui(meta[key], MAX_UI_RESULT_CHARS)
+            payload["diff"] = diff
+            payload["diff_truncated"] = truncated
+        else:
+            payload[key] = meta[key]
+
+    return payload
+
+
+def outcome_failed(name: str, outcome: str) -> bool:
+    """Whether a tool's returned text represents a failed call for UI status."""
+    text = (outcome or "").strip()
+    prefix = f"[{name}] "
+    if text.startswith(prefix):
+        text = text[len(prefix) :]
+    return text.startswith(
+        (
+            "No such",
+            "Not a ",
+            "Refusing",
+            "Could not",
+            "Bad pattern",
+            "Fetch failed",
+            "Search failed",
+            "Only http",
+            "Write cancelled",
+            "Write refused",
+            "Failed:",
+            "Old snippet",
+            "File is too large",
+            "Diff is too large",
+            "File changes are limited",
+            "Content is too large",
+            "No path",
+            "Invalid path",
+            "Parent directory",
+            "MCP call failed",
+        )
+    )
+
+
+def execute(
+    call: Dict[str, Any],
+    approve: Callable[[FileChange], bool] | None = None,
+) -> str:
     """Run one parsed call and return text to feed back to the model."""
     name = call.get("name", "")
     if call.get("error"):
         return f"[{name}] {call['error']}"
-    tool = catalog().get(name)
+    tool = catalog(include_writes=True).get(name)
     if tool is None:
-        return f"[{name}] No such tool. Available: {', '.join(sorted(catalog()))}."
+        available = ", ".join(sorted(catalog()))
+        return f"[{name}] No such tool. Available: {available}."
+    args = call.get("args", {})
+    _ui_begin()
     try:
-        return tool.run(**call.get("args", {}))
+        if tool.requires_approval:
+            if approve is None:
+                outcome = (
+                    f"[{name}] Write refused: this surface cannot approve "
+                    "file changes."
+                )
+            else:
+                outcome = tool.run(**args, approve=approve)
+        else:
+            outcome = tool.run(**args)
     except TypeError as error:
-        return f"[{name}] Bad arguments: {error}"
+        outcome = f"[{name}] Bad arguments: {error}"
     except Exception as error:
-        return f"[{name}] Failed: {error}"
+        outcome = f"[{name}] Failed: {error}"
+    finally:
+        meta = _ui_end()
+        if meta:
+            call["_ui"] = meta
+    return outcome
 
 
-def prompt_block() -> str:
+def prompt_block(allow_writes: bool = False) -> str:
     """The instructions to inject when tools are enabled."""
-    listing = "\n".join(f"  {tool.schema()}" for tool in catalog().values())
+    listing = "\n".join(
+        f"  {tool.schema()}" for tool in catalog(include_writes=allow_writes).values()
+    )
     # Not str.format: the protocol example contains literal braces.
     return TOOL_PROMPT.replace("{tools}", listing)

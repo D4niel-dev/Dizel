@@ -1,6 +1,9 @@
 (() => {
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const reduceMotion = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
 
   // ── Theme ──────────────────────────────────────────────────────────────
   const themeButton = $("[data-theme-toggle]");
@@ -143,8 +146,10 @@
   const tokenButtons = $$("[data-token]");
   const routeToken = $("[data-route-token]");
   const routeReadout = $("[data-route-readout]");
+  const routeFrame = $(".s-route");
   const expertNodes = $$("[data-expert]");
   if (tokenButtons.length && routeToken && routeReadout) {
+    let routeTimer;
     const selectToken = (value) => {
       tokenButtons.forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.token === value));
@@ -155,6 +160,16 @@
         node.classList.toggle("is-active", active.includes(index));
       });
       routeReadout.textContent = `E${active[0]} + E${active[1]} · 2 of 4 awake`;
+      if (routeFrame && !reduceMotion) {
+        routeFrame.classList.remove("is-routing");
+        void routeFrame.offsetWidth;
+        routeFrame.classList.add("is-routing");
+        window.clearTimeout(routeTimer);
+        routeTimer = window.setTimeout(
+          () => routeFrame.classList.remove("is-routing"),
+          1100,
+        );
+      }
     };
     tokenButtons.forEach((button) => {
       button.addEventListener("click", () => selectToken(button.dataset.token));
@@ -209,5 +224,46 @@
     window.addEventListener("scroll", syncToc, { passive: true });
     window.addEventListener("resize", syncToc);
     syncToc();
+  }
+
+  // ── Below-fold reveals ─────────────────────────────────────────────────
+  if (!reduceMotion && "IntersectionObserver" in window) {
+    const groups = [
+      [".s-section-head", 0],
+      [".s-matrix tbody tr", 45],
+      [".s-links-list li", 45],
+      [".s-evidence > *", 60],
+      [".s-lab-head", 0],
+      [".s-token-row", 0],
+      [".s-route", 0],
+      [".s-limit-list li", 40],
+    ];
+    const targets = [];
+    groups.forEach(([selector, step]) => {
+      $$(selector).forEach((element, index) => {
+        if (element.getBoundingClientRect().top <= window.innerHeight * 0.92) return;
+        element.classList.add("reveal");
+        if (step) {
+          element.style.setProperty(
+            "--reveal-delay",
+            `${Math.min(index, 5) * step}ms`,
+          );
+        }
+        targets.push(element);
+      });
+    });
+    if (targets.length) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-in");
+            observer.unobserve(entry.target);
+          });
+        },
+        { rootMargin: "0px 0px -6% 0px", threshold: 0.08 },
+      );
+      targets.forEach((element) => observer.observe(element));
+    }
   }
 })();

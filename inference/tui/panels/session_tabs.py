@@ -1,13 +1,49 @@
 from __future__ import annotations
 
-from textual import events, on
+from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.widgets import Static, Tab, Tabs
+from textual.widgets import Button, Tab, Tabs
+
+MAX_VISIBLE_TABS = 10
+
+
+class TabClose(Button):
+    """The close control attached to one session tab."""
+
+    def __init__(self, session_id: str, active: bool) -> None:
+        self.session_id = session_id
+        classes = "tab-inline-close" + (" -active" if active else "")
+        super().__init__(
+            "×",
+            id=f"tab-x-{session_id}",
+            classes=classes,
+            compact=True,
+            tooltip="Close tab",
+        )
+
+
+class SessionTabsWidget(Tabs):
+    """Tabs that keep the active tab and the trailing actions in view."""
+
+    def _scroll_active_tab(self) -> None:
+        if self.has_class("is-scrollable"):
+            try:
+                tabs = list(self.query("#tabs-list > Tab"))
+                if tabs and self.active == (tabs[-1].id or ""):
+                    self.query_one("#tabs-scroll").scroll_end(
+                        animate=False,
+                        force=True,
+                        y_axis=False,
+                    )
+                    return
+            except Exception:
+                pass
+        super()._scroll_active_tab()
 
 
 class SessionTabs(Horizontal):
-    """Open chats as tabs. The fixed actions at the right create and close."""
+    """Open chats as tabs. Each tab closes itself; the newest carries create."""
 
     @staticmethod
     def _tab_id(session_id: str) -> str:
@@ -19,9 +55,7 @@ class SessionTabs(Horizontal):
         return (tab_id or "").removeprefix("session-")
 
     def compose(self) -> ComposeResult:
-        yield Tabs(id="session-tabs")
-        yield Static("×", id="tab-close", classes="tab-action")
-        yield Static("+", id="tab-new", classes="tab-action")
+        yield SessionTabsWidget(id="session-tabs")
 
     def on_mount(self) -> None:
         self.call_after_refresh(self.refresh_tabs)
@@ -67,6 +101,75 @@ class SessionTabs(Horizontal):
         if wanted and current in live_ids and tabs.active != active_id:
             tabs.active = active_id
 
+        scrollable = len(wanted) > MAX_VISIBLE_TABS
+        self.set_class(scrollable, "is-scrollable")
+        tabs.set_class(scrollable, "is-scrollable")
+        new_tab = await self._sync_tab_actions(tabs, wanted, current)
+
+        if (
+            new_tab is not None
+            and scrollable
+            and wanted
+            and current == wanted[-1]
+        ):
+            self.call_after_refresh(
+                lambda: self.set_timer(0.05, lambda: self._scroll_to_widget(new_tab))
+            )
+
+    async def _sync_tab_actions(
+        self,
+        tabs: Tabs,
+        wanted: list[str],
+        current: str,
+    ) -> Button | None:
+        """Keep every close button beside its tab and create after the last."""
+        actions = [
+            *tabs.query(".tab-inline-close"),
+            *tabs.query("#tab-new-inline"),
+        ]
+        for widget in actions:
+            await widget.remove()
+
+        try:
+            tab_list = tabs.query_one("#tabs-list", Horizontal)
+        except Exception:
+            return None
+
+        tab_by_session = {
+            self._session_id(tab.id): tab for tab in tabs.query(Tab)
+        }
+        last: TabClose | None = None
+        for session_id in wanted:
+            tab = tab_by_session.get(session_id)
+            if tab is None:
+                continue
+            close = TabClose(session_id, session_id == current)
+            await tab_list.mount(close, after=tab)
+            last = close
+
+        new_tab = Button(
+            "+",
+            id="tab-new-inline",
+            classes="tab-inline-new",
+            compact=True,
+            tooltip="New chat",
+        )
+        if last is not None:
+            await tab_list.mount(new_tab, after=last)
+        else:
+            await tab_list.mount(new_tab)
+        return new_tab
+
+    def _scroll_to_widget(self, widget: Button) -> None:
+        try:
+            self.query_one("#tabs-scroll").scroll_to_widget(
+                widget,
+                animate=False,
+                force=True,
+            )
+        except Exception:
+            pass
+
     async def _activate(self, event: Tabs.TabActivated) -> None:
         try:
             tabs = self.query_one("#session-tabs", Tabs)
@@ -89,10 +192,18 @@ class SessionTabs(Horizontal):
     def _tab_activated(self, event: Tabs.TabActivated) -> None:
         self.run_worker(self._activate(event), group="session-tabs-activate")
 
-    @on(events.Click, "#tab-new")
+    @on(Button.Pressed, "#tab-new-inline")
     def _new_tab(self) -> None:
         self.app.action_new_session()
 
-    @on(events.Click, "#tab-close")
-    def _close_tab(self) -> None:
-        self.app.close_active_tab()
+    @on(Button.Pressed, ".tab-inline-close")
+    def _close_tab(self, event: Button.Pressed) -> None:
+        event.stop()
+        session_id = getattr(event.button, "session_id", "")
+        if not session_id:
+            return
+        self.app.close_tab(session_id)
+        try:
+            self.app.query_one("#prompt-input").focus()
+        except Exception:
+            pass

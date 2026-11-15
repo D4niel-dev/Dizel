@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Releases — Dizel</title>
-<meta name="description" content="Dizel releases: v1.5 published, v1.6 Flash Preview training, known limits, and release policy.">
+<meta name="description" content="Dizel releases: v2.0.1 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 
 <link rel="canonical" href="https://d4niel-dev.github.io/Dizel/releases.html">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://d4niel-dev.github.io/Dizel/releases.html">
 <meta property="og:title" content="Releases — Dizel">
-<meta property="og:description" content="Dizel releases: v1.5 published, v1.6 Flash Preview training, known limits, and release policy.">
+<meta property="og:description" content="Dizel releases: v2.0.1 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 <meta property="og:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta property="og:image:width" content="1475">
 <meta property="og:image:height" content="975">
 <meta property="og:image:alt" content="The Dizel desktop app with a chat sidebar, a session chip and a composer.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Releases — Dizel">
-<meta name="twitter:description" content="Dizel releases: v1.5 published, v1.6 Flash Preview training, known limits, and release policy.">
+<meta name="twitter:description" content="Dizel releases: v2.0.1 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 <meta name="twitter:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta name="theme-color" content="#F1F2EC">
 <link rel="icon" type="image/x-icon" href="assets/app/Dizel.ico">
@@ -84,9 +84,95 @@
   <header class="s-doc-head">
     <div class="s-crumb"><a href="index.html">Dizel</a><span>/</span><span>Releases</span></div>
     <h1>Releases</h1>
-    <div class="s-doc-meta"><span>Record 2026-11</span><span>v1.5 published</span><span>v1.6 preview</span></div>
+    <div class="s-doc-meta"><span>Record 2026-11</span><span>v2.0.1 app</span><span>v1.5 model</span><span>v1.6 preview</span></div>
   </header>
 </div>
+
+<section class="s-section" id="app">
+  <div class="s-shell">
+    <div class="s-section-head">
+      <div>
+        <p class="s-kicker">App release</p>
+        <h2>v2.0.1 is live.</h2>
+      </div>
+      <p class="s-section-copy">The Electron app, terminal client, and npm launcher ship together. This maintenance release focuses on updates, readable tool output, and one version source. The model is still v1.5; v1.6 remains a preview.</p>
+    </div>
+    <table class="s-matrix">
+      <thead>
+        <tr><th scope="col">Channel</th><th scope="col">Version</th><th scope="col">What ships</th><th scope="col">Get it</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><b>Desktop app</b><small>Windows installer</small></th>
+          <td data-label="Version">v2.0.1</td>
+          <td data-label="What ships">NSIS installer, blockmap, auto-update manifest</td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.1" target="_blank" rel="noopener">Download ↗</a></td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Terminal client</b><small>Portable archive</small></th>
+          <td data-label="Version">v2.0.1</td>
+          <td data-label="What ships"><code>Dizel-TUI-2.0.1.zip</code> and its <code>.cmd</code> launcher</td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.1" target="_blank" rel="noopener">Download ↗</a></td>
+        </tr>
+        <tr>
+          <th scope="row"><b>npm launcher</b><small><code>@d4niel-dev/dizel</code></small></th>
+          <td data-label="Version">v2.0.1</td>
+          <td data-label="What ships">Downloads and SHA-256 verifies the matching release</td>
+          <td><a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm ↗</a></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="s-docs-note">The launcher needs Node.js 18+, Python 3.10+, and a model checkpoint. It downloads the app; it does not bundle Python or weights.</p>
+  </div>
+</section>
+
+<section class="s-section" id="changelog">
+  <div class="s-shell">
+    <div class="s-section-head">
+      <div>
+        <p class="s-kicker">Changelog</p>
+        <h2>What changed in 2.0.1.</h2>
+      </div>
+      <p class="s-section-copy">A focused maintenance release: safer updates, readable tool results, and one version source.</p>
+    </div>
+    <table class="s-matrix">
+      <thead>
+        <tr><th scope="col">Area</th><th scope="col">Change</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><b>Updates</b><small>Both clients</small></th>
+          <td>Terminal checks, downloads, and stages releases in the background, applies them on quit or next launch, and exposes <code>/update</code>, <code>/update install</code>, and <code>/check-update</code>. Both surfaces mark available, downloading, and ready states. Dirty source checkouts are never overwritten.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Tool output</b><small>Both clients</small></th>
+          <td>Tool rows expand into inline drawers instead of separate modals. Edits show a numbered diff, writes show the file content, reads show line ranges, and searches show the query, URL, and results. Code is syntax-highlighted.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Approvals</b><small>Desktop</small></th>
+          <td>Write and edit approvals carry the target path, action, diff, and line counts before the call is allowed.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Versioning</b><small>All channels</small></th>
+          <td><code>dizel_core/version.py</code> is the single app version. <code>set_version.py</code> stamps the GUI, lockfile, and npm manifests, CI rejects drift, and desktop and terminal banners read the same source.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Distribution</b><small>npm</small></th>
+          <td>The launcher now publishes as <code>@d4niel-dev/dizel</code>; install docs point at the scoped package.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Docs</b><small>Website</small></th>
+          <td>Spacing resets were corrected so section, footer, and card rhythm match the design system; release links and app labels now point at 2.0.1.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Research tooling</b><small>v1.6</small></th>
+          <td>Reward-filter scoring and DPO pair selection scripts, with the Transformers version required by Qwen3 and Skywork reward models.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="s-docs-note">Full history: <a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md ↗</a></p>
+  </div>
+</section>
 
 <section class="s-section">
   <div class="s-shell">
@@ -166,6 +252,7 @@
         <a href="guide/launch.html">Desktop app</a>
         <a href="guide/launch.html#tui">Terminal UI</a>
         <a href="demo.html">Interface demo</a>
+        <a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm launcher ↗</a>
       </div>
       <div class="s-foot-col">
         <h3>Research</h3>
@@ -181,7 +268,7 @@
       </div>
     </div>
     <div class="s-foot-bottom">
-      <span>Dizel 1.6 Flash Preview · Record 2026-11</span>
+      <span>Dizel 1.6 Flash Preview · App v2.0.1 · Record 2026-11</span>
       <span>MIT licensed · Built in public on one T4</span>
       <a href="model.html#mc-citation">Citation</a>
       <a href="#main">Back to top ↑</a>

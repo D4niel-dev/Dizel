@@ -14,4 +14,9 @@ class ClearCommand(Command):
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
         app.action_clear_workspace()
-        return "Workspace cleared. The model still has the conversation — /reset starts fresh."
+        # Feedback belongs above the composer, not in the transcript it just
+        # cleared: a mounted result would dock the composer back to the bottom.
+        app._log_system(
+            "Workspace cleared · model context kept · /reset starts fresh.", "ok"
+        )
+        return ""

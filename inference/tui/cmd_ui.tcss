@@ -38,12 +38,15 @@ Screen {
 }
 
 /* ── Session tabs ───────────────────────────────────────────────────────── */
-/* The active tab is a raised surface with an accent underline; the strip
-   itself stays chrome-coloured and owns the top edge of the window. */
+/* The active tab is a raised surface with an accent underline. Every tab
+   carries its own close control; create follows the newest tab. Above ten
+   tabs the strip gains one row for a horizontal scrollbar. */
 SessionTabs {
     height: 2;
     background: $bg-deep;
 }
+
+SessionTabs.is-scrollable { height: 3; }
 
 #session-tabs {
     width: 1fr;
@@ -52,9 +55,22 @@ SessionTabs {
     background: $bg-deep;
 }
 
+SessionTabs.is-scrollable #session-tabs { height: 3; }
+
+SessionTabs.is-scrollable #session-tabs > #tabs-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-size-horizontal: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-color-hover: $accent;
+    scrollbar-color-active: $accent-hi;
+    scrollbar-background: $bg-deep;
+    scrollbar-background-hover: $surface;
+}
+
 #session-tabs Tab {
     height: 1;
-    padding: 0 2;
+    padding: 0 1;
     color: $text-3;
     background: $bg-deep;
 }
@@ -80,28 +96,53 @@ SessionTabs {
     background: $border;
 }
 
-.tab-action {
+Button.tab-inline-close {
     width: 3;
-    height: 2;
-    content-align: center middle;
-    color: $text-3;
+    min-width: 0;
+    height: 1;
+    min-height: 1;
+    padding: 0;
+    border: none;
     background: $bg-deep;
+    color: $text-3;
     text-style: bold;
+    content-align: center middle;
 }
 
-.tab-action:hover {
-    color: $text;
+Button.tab-inline-close:hover,
+Button.tab-inline-close:focus {
     background: $surface;
+    color: $danger;
 }
 
-#tab-close:hover { color: $danger; }
+Button.tab-inline-close.-active {
+    background: $surface;
+    color: $text-2;
+}
 
-#tab-new {
+Button.tab-inline-close.-active:hover,
+Button.tab-inline-close.-active:focus {
+    color: $danger;
+}
+
+Button.tab-inline-new {
+    width: 3;
+    min-width: 0;
+    height: 1;
+    min-height: 1;
+    padding: 0;
+    border: none;
+    background: $bg-deep;
     color: $accent;
     text-style: bold;
+    content-align: center middle;
 }
 
-#tab-new:hover { color: $accent-hi; }
+Button.tab-inline-new:hover,
+Button.tab-inline-new:focus {
+    background: $surface;
+    color: $accent-hi;
+}
 
 #main-layout {
     layout: horizontal;
@@ -220,27 +261,12 @@ EmptyStateBlock {
     height: 1fr;
 }
 
-/* Content flows from the top-left under the title block, the way OpenCode's
-   does. Centring a small block in a large window is what made this read as an
-   empty void rather than a screen. */
+/* The welcome and composer share one centred column. */
 #empty-content {
     width: 1fr;
     height: 1fr;
     align: center middle;
     padding: 1 4;
-}
-
-.empty-kicker {
-    width: auto;
-    height: 1;
-    text-align: left;
-    margin-bottom: 1;
-}
-
-.empty-logo {
-    width: auto;
-    text-align: left;
-    margin-bottom: 1;
 }
 
 #empty-column {
@@ -249,9 +275,30 @@ EmptyStateBlock {
     height: auto;
 }
 
-.empty-greeting { width: auto; text-align: left; margin-top: 2; }
-.empty-meta { width: auto; text-align: left; margin-top: 0; }
-.empty-prompt { width: auto; text-align: left; margin-top: 1; }
+/* Center the ASCII art as a block; centering each line breaks its shadow row. */
+.empty-logo-row {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin-bottom: 1;
+}
+.empty-logo {
+    width: auto;
+    height: auto;
+    text-align: left;
+}
+.empty-greeting {
+    width: 100%;
+    text-align: center;
+    content-align: center top;
+    margin-top: 0;
+}
+.empty-prompt {
+    width: 100%;
+    text-align: center;
+    content-align: center top;
+    margin-top: 0;
+}
 
 /* A starter is a shelf row, not a line of loose text: the fill runs the full
    measure and the enter key sits on the right edge. */
@@ -262,8 +309,6 @@ EmptyStateBlock {
     margin-top: 1;
     background: transparent;
 }
-
-#empty-column > .empty-suggestion:first-of-type { margin-top: 2; }
 
 .empty-suggestion:hover { background: $surface-hi; }
 
@@ -280,28 +325,27 @@ EmptyStateBlock {
 .empty-suggestion:hover .suggestion-arrow { color: $accent-hi; }
 .empty-suggestion:hover .suggestion-glyph { color: $accent-hi; }
 
-.empty-hint { width: 100%; height: auto; text-align: left; margin-top: 3; }
-
-/* The welcome is the only screen with room to compose; on short terminals the
-   wordmark and supporting copy yield to the greeting and the three starters. */
+/* On short terminals the padding tightens; the compact wordmark keeps the
+   greeting above the composer. */
 EmptyStateBlock.-compact #empty-content { padding: 1 2; }
-EmptyStateBlock.-compact .empty-logo { display: none; }
+EmptyStateBlock.-compact .empty-logo-row { margin-bottom: 0; }
 EmptyStateBlock.-compact .empty-greeting { margin-top: 0; }
-EmptyStateBlock.-compact .empty-kicker { margin-bottom: 0; }
-EmptyStateBlock.-compact .empty-hint { margin-top: 2; }
 
 EmptyStateBlock.-tiny #empty-content { padding: 0 2; }
 EmptyStateBlock.-tiny .empty-greeting { margin-top: 0; }
-EmptyStateBlock.-tiny #empty-column > .empty-suggestion:first-of-type { margin-top: 1; }
 
 /* Opening the sidebar on an 80-column terminal leaves a 48-cell workspace:
-   the supporting copy and keycaps step aside so the greeting and starters fit. */
+   the supporting copy steps aside so the wordmark and greeting fit. */
 EmptyStateBlock.-narrow #empty-content { padding: 0 1; }
-EmptyStateBlock.-narrow .empty-prompt,
-EmptyStateBlock.-narrow .empty-hint { display: none; }
-EmptyStateBlock.-narrow .empty-kicker { margin-bottom: 0; }
+EmptyStateBlock.-narrow .empty-prompt { display: none; }
 
 .assistant-msg { height: auto; }
+/* The GUI generating row: moving dots and a rotating phrase while the first
+   answer token is still in flight. */
+.asm-wait {
+    height: 1;
+    margin-bottom: 1;
+}
 
 Collapsible {
     background: $surface;
@@ -317,42 +361,47 @@ CollapsibleTitle { color: $text-3; background: $surface; }
 .asm-collapsible {
     background: transparent;
     border: none;
-    border-left: solid $border-hi;
+    border-left: heavy $border-hi;
     margin-left: 2;
     margin-bottom: 1;
     padding: 0 1;
 }
 
+/* The live header breathes in accent; the finished Thought line gets amber. */
+.asm-collapsible.-thinking { border-left: heavy $accent; }
+.asm-collapsible.-thinking CollapsibleTitle { color: $accent; }
 .asm-collapsible CollapsibleTitle {
     background: transparent;
     color: $warn;
+    padding: 0;
 }
 .asm-collapsible CollapsibleTitle:hover { color: $text; }
+/* Header and reasoning body both sit one cell inside the rail. */
+.asm-collapsible Contents { padding: 1 0 0 0; }
 
 /* ── Notice line ────────────────────────────────────────────────────────── */
 /* ── Composer ───────────────────────────────────────────────────────────── */
 /* OpenCode's composer is a filled block with a single accent rail down the
-   left edge — not a bordered rectangle. The rail is always there; focus lifts
-   the fill instead of recolouring a border. */
-/* The desktop centres the composer in a max-width column rather than running it
-   edge to edge. Same idea here: a fixed measure, centred by the parent. */
+   left edge — not a bordered rectangle. The rail is always there; focus
+   brightens its blue. */
+/* OpenCode-like left measure: the conversation starts near the window edge and
+   grows to the measured column, instead of floating in a centred box. */
 #transcript-row {
     width: 100%;
     height: 1fr;
-    align: center top;
+    align: left top;
+    padding: 0 2;
 }
 
+/* The conversation owns the workspace width; the two-cell gutters keep it off
+   the window and the context rail without turning it into a narrow column. */
 #transcript-row > WorkspacePanel {
-    width: 96;
+    width: 100%;
     max-width: 100%;
     height: 100%;
 }
 
-/* Chat → Transcript → Message width. Comfortable is the measured default; Wide
-   and Full let the transcript breathe on big terminals while the composer
-   keeps its own measure. */
-#workspace-container.-width-wide #transcript-row > WorkspacePanel { width: 120; }
-#workspace-container.-width-full #transcript-row > WorkspacePanel { width: 100%; }
+SlashDrawer { width: 100%; background: $bg-deep; }
 
 /* The desktop composer sits mid-screen with the welcome on an empty chat, then
    docks to the bottom once a conversation starts. Same placement here: while
@@ -365,6 +414,8 @@ CollapsibleTitle { color: $text-3; background: $surface; }
 #workspace-container.-empty #transcript-row {
     height: auto;
     max-height: 1fr;
+    align: center top;
+    padding: 0;
 }
 
 #workspace-container.-empty WorkspacePanel {
@@ -379,31 +430,66 @@ CollapsibleTitle { color: $text-3; background: $surface; }
 
 #drawer-row {
     height: auto;
-    align: center bottom;
+    align: left bottom;
+    padding: 0 2;
 }
 
 #composer-row {
     height: 6;
-    align: center middle;
+    align: left middle;
+    padding: 0 2;
 }
 
-/* Our own composer: a rounded frame with a prompt glyph and a footer that
-   carries the state and the send hint. Rounded rather than square because a
-   terminal has no shadows — the corner shape is the only softness available. */
-/* No fill: a rectangular background behind a rounded border leaves square
-   corners sticking out past the curve. The frame alone is the shape. */
-InputBar {
-    height: 5;
+/* The notice is the composer's companion strip: same measure, same rail. */
+#notice-row {
+    height: auto;
+    align: left middle;
+    padding: 0 2;
+}
+
+#workspace-container.-empty #drawer-row {
+    align: center bottom;
+    padding: 0;
+}
+#workspace-container.-empty #composer-row {
+    align: center middle;
+    padding: 0;
+}
+#workspace-container.-empty #notice-row {
+    align: center middle;
+    padding: 0;
+}
+#workspace-container.-empty InputBar,
+#workspace-container.-empty NoticeLine,
+#workspace-container.-empty SlashDrawer { width: 96; }
+
+/* Starter prompts sit under the composer, only while the chat is empty. */
+#starter-row {
+    height: auto;
+    align: center top;
+}
+
+StarterShelf {
     width: 96;
     max-width: 100%;
-    background: transparent;
-    border: round $border;
-    padding: 0 1;
+    height: auto;
+}
+
+/* OpenCode's composer grammar: a filled block with one accent rail on the
+   left, not a rounded frame. Focus brightens the rail, not the whole border. */
+InputBar {
+    height: 5;
+    width: 100%;
+    max-width: 100%;
+    background: $surface;
+    border: none;
+    border-left: thick $accent;
+    padding: 1 1;
 }
 
 InputBar:focus-within {
-    background: transparent;
-    border: round $accent;
+    background: $surface;
+    border-left: thick $accent-hi;
 }
 
 #input-row { height: 1; layout: horizontal; }
@@ -448,17 +534,20 @@ InputBar Input:focus { background: transparent; }
 NoticeLine {
     display: none;
     height: 1;
-    margin: 0 3;
+    width: 100%;
+    max-width: 100%;
     background: $surface;
-    border-left: solid $accent;
+    border-left: thick $accent;
     padding: 0 1;
     color: $text-2;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
 }
 
 NoticeLine.-shown { display: block; }
 
-NoticeLine.-error { border-left: solid $danger; }
-NoticeLine.-ok { border-left: solid $accent; }
+NoticeLine.-error { border-left: thick $danger; }
+NoticeLine.-ok { border-left: thick $accent; }
 
 /* ── Status line ────────────────────────────────────────────────────────── */
 StatusBar {
@@ -473,16 +562,24 @@ StatusBar {
 #status-right { width: auto; height: 1; text-align: right; }
 
 /* ── Context rail ───────────────────────────────────────────────────────── */
+/* A chat-session rail: hidden on the welcome, permanent once messages exist.
+   ctrl+r focuses it, but there is no close path from inside a session. */
 ContextPanel {
-    width: 26;
+    width: 32;
     height: 100%;
     background: $bg-deep;
     border-left: solid $border;
     padding: 1 2;
     display: none;
+    scrollbar-size-vertical: 1;
+    scrollbar-background: $bg-deep;
 }
 
 ContextPanel.-visible { display: block; }
+
+ContextPanel:focus {
+    border-left: solid $accent;
+}
 
 .panel-header {
     height: 1;
@@ -492,6 +589,7 @@ ContextPanel.-visible { display: block; }
 }
 .ctx-item { height: 1; color: $text-2; }
 #ctx-tools { height: auto; }
+#ctx-plugins { height: auto; }
 
 /* ── Artifacts ──────────────────────────────────────────────────────────── */
 ArtifactPanel {
@@ -539,6 +637,45 @@ ModalScreen {
 .modal-card.-wide { width: 94; max-width: 96%; }
 .modal-card.-dense .modal-sub { display: none; }
 .modal-card.-compact { width: 58; }
+
+/* A file change is read before it is approved: path, stat, diff, then gate. */
+.approval-card { width: 110; max-width: 96%; height: 82%; }
+.approval-path {
+    height: auto;
+    color: $text;
+    text-style: bold;
+    margin-top: 1;
+}
+.approval-stats { height: 1; color: $text-3; margin-top: 1; }
+.approval-diff {
+    height: 1fr;
+    background: $code-bg;
+    border: solid $border;
+    margin-top: 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $code-bg;
+}
+.approval-diff-text { height: auto; padding: 0 1; }
+.approval-warning { height: auto; color: $warn; margin-top: 1; }
+
+.tool-line { height: auto; }
+.tool-line:hover { background: $surface; }
+.tool-line:focus { background: $surface; }
+
+/* Debug output is reference data, never transcript material. */
+.debug-card { width: 108; max-width: 96%; height: 80%; }
+.debug-scroll {
+    height: 1fr;
+    background: $code-bg;
+    border: solid $border;
+    margin-top: 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $code-bg;
+}
+.debug-body { height: auto; color: $text-2; padding: 0 1; }
+.debug-footer { height: 1; color: $text-3; margin-top: 1; }
 
 .modal-head { height: 1; layout: horizontal; }
 .modal-title { width: 1fr; height: 1; color: $text; text-style: bold; }
@@ -851,9 +988,8 @@ SelectOverlay {
 SelectOverlay > .option-list--option { padding: 0 1; }
 SelectOverlay > .option-list--option-highlighted { background: $select-bg; color: $text; }
 
-/* ── Panel overlays (ctrl+r / ctrl+a) ──────────────────────────────────── */
-/* Panels float over the transcript rather than narrowing it: a terminal has no
-   room for a permanently parked column. */
+/* ── Panel overlays (ctrl+a) ────────────────────────────────────────────── */
+/* Artifacts still float over the transcript; the context rail is permanent. */
 PanelOverlay {
     background: rgba(0, 0, 0, 0.55);
     align: right top;
@@ -867,9 +1003,6 @@ PanelOverlay {
     padding: 1 2;
 }
 
-/* The layout copies of these panels are display:none until -visible, and that
-   rule applies to every instance — including the one inside the overlay. */
-#overlay-dock ContextPanel,
 #overlay-dock ArtifactPanel {
     display: block;
     width: 100%;

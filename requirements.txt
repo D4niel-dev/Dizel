@@ -12,7 +12,8 @@
 # ── Core: model + tokenizer ──────────────────────────────────────────────
 torch>=2.1.0
 numpy>=1.24.0
-transformers>=4.40.0
+# 4.51+ is required for Qwen3 / Skywork-Reward-V2 (v1.6 DPO filter).
+transformers>=4.51.0
 tokenizers>=0.19.0
 sentencepiece>=0.1.99
 safetensors>=0.4.0

@@ -20,16 +20,91 @@ def _when(timestamp: float) -> str:
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(timestamp))
 
 
+def _download_busy(app: Any) -> bool:
+    thread = getattr(app, "_update_thread", None)
+    return bool(thread and thread.is_alive())
+
+
+async def _check(app: Any, download: bool) -> str:
+    from dizel_core import updater
+
+    if download and _download_busy(app) and not updater.pending_update():
+        return "An update is already downloading — try /update install again in a moment."
+
+    try:
+        result = await asyncio.to_thread(
+            updater.check_for_update,
+            root=_root(),
+            timeout=15.0,
+        )
+    except updater.UpdateError as error:
+        return f"Update check failed: {error}"
+
+    if not result.available or not result.info:
+        return f"Dizel {result.current} is up to date."
+
+    info = result.info
+    if not info.tui:
+        return (
+            f"Dizel {info.version} is available, but this release has no terminal "
+            f"package. Desktop installer: {info.url}"
+        )
+    try:
+        app.update_ready = info.version
+    except Exception:
+        pass
+    if not download:
+        return (
+            f"Dizel {info.version} is available. Run /update install to download, "
+            "apply, and restart, or leave automatic updates on."
+        )
+
+    last = [-25]
+
+    def progress(received: int, total: int) -> None:
+        if not total:
+            return
+        percent = int(received * 100 / total)
+        if percent < last[0] + 25 and percent != 100:
+            return
+        last[0] = percent
+        try:
+            app.call_from_thread(
+                app._log_system, f"Downloading Dizel {info.version} · {percent}%"
+            )
+        except Exception:
+            pass
+
+    try:
+        await asyncio.to_thread(
+            updater.download_tui_update,
+            info,
+            root=_root(),
+            progress=progress,
+        )
+    except updater.UpdateError as error:
+        return f"Update download failed: {error}"
+
+    if not updater.pending_update():
+        return "The update downloaded, but staging it failed. Try /update install again."
+
+    return (
+        f"Dizel {info.version} downloaded and staged. Run /update install to restart now; "
+        "otherwise it applies when you quit."
+    )
+
+
 class UpdateCommand(Command):
     name = "update"
-    help_text = "Check, download, and stage a newer Dizel release."
+    help_text = "Check, download, stage, and install Dizel updates."
     category = "Runtime"
-    usage = "/update [check|now|status|auto on|off|apply|notes]"
+    usage = "/update [check|now|install|apply|status|auto on|off|notes]"
     palette_hint = "/update "
     aliases = ["upgrade"]
     examples = [
         "/update",
-        "/update now",
+        "/update install",
+        "/update check",
         "/update status",
         "/update auto off",
         "/update notes",
@@ -40,8 +115,14 @@ class UpdateCommand(Command):
 
         action = (invocation.args[0].lower() if invocation.args else "check").strip()
 
-        if action in ("check", "now", "download", "upgrade"):
-            return await self._check(app, download=action in ("now", "download", "upgrade"))
+        if action in ("check",):
+            return await _check(app, download=False)
+
+        if action in ("now", "download", "upgrade"):
+            return await _check(app, download=True)
+
+        if action in ("install", "apply", "restart"):
+            return await self._install(app)
 
         if action == "status":
             return self._status()
@@ -58,82 +139,25 @@ class UpdateCommand(Command):
                 else "Automatic update checks are off. /update check still works."
             )
 
-        if action == "apply":
-            pending = updater.pending_update()
-            if not pending:
-                return "No update is staged. Run /update now first."
-            return (
-                f"Dizel {pending.get('version')} is staged. Close this session and run "
-                "dizel.cmd — it applies before the app starts. Your chats and settings are kept."
-            )
-
         if action == "notes":
             return await self._notes()
 
         return self.usage
 
-    async def _check(self, app: Any, download: bool) -> str:
+    async def _install(self, app: Any) -> str:
         from dizel_core import updater
 
-        try:
-            result = await asyncio.to_thread(
-                updater.check_for_update,
-                root=_root(),
-                timeout=15.0,
-            )
-        except updater.UpdateError as error:
-            return f"Update check failed: {error}"
+        pending = updater.pending_update()
+        if not pending:
+            message = await _check(app, download=True)
+            pending = updater.pending_update()
+            if not pending:
+                return message
 
-        if not result.available or not result.info:
-            return f"Dizel {result.current} is up to date."
-
-        info = result.info
-        if not download:
-            if not info.tui:
-                return (
-                    f"Dizel {info.version} is available, but this release has no terminal "
-                    f"package. Desktop installer: {info.url}"
-                )
-            return (
-                f"Dizel {info.version} is available. Run /update now to download it, "
-                "or leave automatic updates on."
-            )
-
-        if not info.tui:
-            return (
-                f"Release {info.tag} has no TUI package. Use the desktop installer: {info.url}"
-            )
-
-        last = [-25]
-
-        def progress(received: int, total: int) -> None:
-            if not total:
-                return
-            percent = int(received * 100 / total)
-            if percent < last[0] + 25 and percent != 100:
-                return
-            last[0] = percent
-            try:
-                app.call_from_thread(
-                    app._log_system, f"Downloading Dizel {info.version} · {percent}%"
-                )
-            except Exception:
-                pass
-
-        try:
-            await asyncio.to_thread(
-                updater.download_tui_update,
-                info,
-                root=_root(),
-                progress=progress,
-            )
-        except updater.UpdateError as error:
-            return f"Update download failed: {error}"
-
-        return (
-            f"Dizel {info.version} downloaded and staged. It will apply the next time "
-            "you start Dizel — chats and settings are kept."
-        )
+        version = str(pending.get("version") or "update")
+        app._log_system(f"Restarting Dizel to apply {version}…", "ok")
+        app.request_update_restart()
+        return f"Applying Dizel {version} and restarting…"
 
     def _status(self) -> str:
         from dizel_core import updater
@@ -146,7 +170,9 @@ class UpdateCommand(Command):
             f"  last check         {_when(float(state.get('last_check') or 0))}",
         ]
         if pending:
-            lines.append(f"  staged             {pending.get('version')} — restart to apply")
+            lines.append(
+                f"  staged             {pending.get('version')} — /update install to restart"
+            )
         else:
             lines.append("  staged             none")
         applied = state.get("applied_version")
@@ -177,3 +203,16 @@ class UpdateCommand(Command):
         if not result.available:
             body = f"Dizel {result.current} is up to date. Latest release: {info.version}\n\n{body}"
         return body
+
+
+class CheckUpdateCommand(Command):
+    name = "check-update"
+    help_text = "Check GitHub for a newer Dizel release."
+    category = "Runtime"
+    usage = "/check-update"
+    palette_hint = "/check-update"
+    aliases = ["check-updates", "update-check"]
+    examples = ["/check-update"]
+
+    async def execute(self, app: Any, invocation: CommandInvocation) -> str:
+        return await _check(app, download=False)

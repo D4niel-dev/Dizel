@@ -1,7 +1,7 @@
 # Dizel official site — design spec
 
-**Status:** Direction approved; implementation pending
-**Date:** 2026-11-13
+**Status:** Direction approved; Phase 1 implemented; motion pass added 2026-11-14
+**Date:** 2026-11-13 (updated 2026-11-14)
 **Owner:** D4niel-dev
 **Scope:** Rework the static `docs/` GitHub Pages site
 **Visual reference:** the interactive research-lab mockup shown in the 2026-11-13 session (Home, Model card, Docs, 390 px preview, design notes). The mockup is the light-theme reference; the night theme re-maps the same tokens and hierarchy. The mockup's inline ring was a stand-in for the brand mark; production uses the official `assets/app/Dizel.png` directly.
@@ -285,11 +285,15 @@ Newsreader is added to `docs/assets/fonts/` with its OFL license and preloaded. 
 
 ### Motion
 
-- Hover/focus transitions only, 150–200 ms.
-- No scroll reveals, no counters, no word-by-word text, no marquee, no parallax.
-- The router lab changes state on click with no entrance animation.
-- The theme toggle applies immediately. No background/color cross-fade, so text does not appear to melt between themes.
-- `prefers-reduced-motion: reduce` disables transitions and smooth scrolling.
+The 2026-11-14 pass adds a restrained motion layer. It still follows the record-first rule: motion explains state or direction, never decorates a headline.
+
+- Tokens: 140 ms micro, 220 ms UI, 420 ms reveal; one ease curve (`cubic-bezier(.22,1,.36,1)`).
+- **One load sequence** on the home cover: the kicker rule draws, the copy rises 10 px, and the ledger rows assemble once with a 40–50 ms stagger. Values never count up or poll.
+- **Below-fold reveals** on home and releases only: section heads, matrix rows, start-here rows, evidence, and limit rows rise 12 px once with a short stagger. Content already in view is never hidden; docs reading pages stay still.
+- **Router lab:** selecting a token draws the two signal wires and hits the two active experts. The state change is the animation; there is no idle motion.
+- **Micro-interactions:** nav underline draw, button arrow shift and press, list-row left rule, matrix-row tint, tab panel fade, copy-button pop, and a theme-icon rotate. The theme itself still switches instantly; no background cross-fade.
+- Motion uses transform and opacity only. No counters, marquee, parallax, word-by-word text, glow, or looping animation.
+- `prefers-reduced-motion: reduce` disables transitions, animations, delays, and smooth scrolling. Reveals never run; content is visible without JavaScript.
 
 ### Anti-slop checklist
 
@@ -645,7 +649,8 @@ Phase 1 is complete only when:
   - the `theme-color` meta updates.
 - Keyboard pass: skip link, nav, mobile menu, theme toggle, docs tabs, router tokens, copy buttons, model-card rail.
 - Contrast check in both themes: paper, muted text, periwinkle links, primary button text, status tags, and code comments.
-- `prefers-reduced-motion` shows no transitions; the theme switch itself is instant.
+- `prefers-reduced-motion` shows no transitions, animations, or delays; the theme switch itself is instant.
+- Reveals run only below the fold, once, and never hide content when JavaScript is unavailable; no motion causes layout shift.
 - The demo still opens and behaves as before, with its own dark theme and no public toggle.
 - No old landing dependency remains on the new pages.
 - The model card contains no invented numbers; every row maps to README/evaluation.

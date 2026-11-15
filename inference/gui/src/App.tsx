@@ -13,6 +13,7 @@ import { Sidebar } from "./components/Sidebar";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { StatusBar } from "./components/StatusBar";
 import { DebugPanel, Toast } from "./components/DebugPanel";
+import { ToolApprovalDialog } from "./components/ToolApprovalDialog";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./store/chatStore";
 import { useUpdates } from "./hooks/useUpdates";
@@ -245,6 +246,13 @@ export default function App() {
     };
   }, [attachPaths]);
 
+  const updateBadge =
+    updateState &&
+    (updateState.status === "available" ||
+      updateState.status === "downloading" ||
+      updateState.status === "downloaded")
+      ? updateState
+      : null;
   const header = headerState(status, booted);
   const modelLoading = status?.load?.status === "loading";
   // On an empty, ready chat the composer sits inside the welcome flow; once
@@ -290,6 +298,30 @@ export default function App() {
               <span className="debug-badge" title="Debug mode — type /help in the composer">
                 DEBUG
               </span>
+            )}
+
+            {updateBadge && (
+              <button
+                className={`update-badge is-${updateBadge.status}`}
+                onClick={() => openSettings("About")}
+                title={
+                  updateBadge.status === "downloaded"
+                    ? `Dizel ${updateBadge.latestVersion} is ready — open Settings to restart`
+                    : updateBadge.status === "downloading"
+                      ? `Downloading Dizel ${updateBadge.latestVersion} — ${updateBadge.progress}%`
+                      : `Dizel ${updateBadge.latestVersion} is available`
+                }
+                aria-label="Open update settings"
+              >
+                <Icon name="download" size={12} />
+                <span>
+                  {updateBadge.status === "downloaded"
+                    ? `v${updateBadge.latestVersion} ready`
+                    : updateBadge.status === "downloading"
+                      ? `${updateBadge.progress}%`
+                      : `v${updateBadge.latestVersion}`}
+                </span>
+              </button>
             )}
 
             <div className="header-actions">
@@ -414,6 +446,7 @@ export default function App() {
       <SettingsDialog />
       <ProfileDialog />
       <PluginsDialog />
+      <ToolApprovalDialog />
 
       {dragging && (
         <div className="drop-overlay">

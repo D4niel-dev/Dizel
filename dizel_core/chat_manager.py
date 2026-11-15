@@ -1037,6 +1037,8 @@ class ChatManager:
         verbosity:   Optional[str] = None,
         max_rounds:  int = 3,
         on_tool:     Optional[Callable[[dict, str], None]] = None,
+        on_tool_start: Optional[Callable[[dict], None]] = None,
+        approve_tool: Optional[Callable[[object], bool]] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
         continuation: bool = False,
     ) -> None:
@@ -1069,7 +1071,11 @@ class ChatManager:
         parse_calls = tool_registry.parse_calls
 
         original = self.system_prompt
-        self.system_prompt = (original or "") + "\n\n" + tool_registry.prompt_block()
+        self.system_prompt = (
+            (original or "")
+            + "\n\n"
+            + tool_registry.prompt_block(allow_writes=approve_tool is not None)
+        )
         state = {"round": 0, "done": False}
 
         def restore() -> None:
@@ -1105,7 +1111,12 @@ class ChatManager:
 
             results = []
             for call in calls:
-                outcome = execute(call)
+                if on_tool_start is not None:
+                    try:
+                        on_tool_start(call)
+                    except Exception:
+                        pass
+                outcome = execute(call, approve=approve_tool)
                 if on_tool is not None:
                     try:
                         on_tool(call, outcome)

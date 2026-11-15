@@ -25,6 +25,7 @@ from training.posttrain_checkpoint_v16 import (
 
 __all__ = [
     "load_jsonl_records",
+    "split_indices",
     "split_records",
     "build_optimizer",
     "make_amp_context",
@@ -104,21 +105,34 @@ def load_jsonl_records(path: str, limit: Optional[int] = None) -> list[dict]:
     return records
 
 
-def split_records(records: list[dict], val_fraction: float, seed: int):
-    """Deterministic split; always leaves at least one training example."""
-    if not records:
+def split_indices(count: int, val_fraction: float, seed: int):
+    """Return deterministic ``(train_indices, val_indices)`` for a dataset.
+
+    The split is defined once here so offline data filters and the trainers
+    cannot silently disagree about which records are held out.  A dataset with
+    more than one record always reserves at least one validation record.
+    """
+    if count <= 0:
         raise ValueError("Cannot split an empty post-training dataset")
-    order = list(range(len(records)))
+    order = list(range(count))
     rng = torch.Generator().manual_seed(int(seed))
     order = torch.randperm(len(order), generator=rng).tolist()
-    shuffled = [records[i] for i in order]
-    n_val = int(len(shuffled) * max(0.0, min(0.5, float(val_fraction))))
-    if len(shuffled) > 1:
+    n_val = int(count * max(0.0, min(0.5, float(val_fraction))))
+    if count > 1:
         n_val = max(1, n_val)
     else:
         n_val = 0
-    n_train = len(shuffled) - n_val
-    return shuffled[:n_train], shuffled[n_train:]
+    n_train = count - n_val
+    return order[:n_train], order[n_train:]
+
+
+def split_records(records: list[dict], val_fraction: float, seed: int):
+    """Deterministic split; always leaves at least one training example."""
+    train_indices, val_indices = split_indices(len(records), val_fraction, seed)
+    return (
+        [records[index] for index in train_indices],
+        [records[index] for index in val_indices],
+    )
 
 
 def build_optimizer(model, cfg) -> optim.Optimizer:

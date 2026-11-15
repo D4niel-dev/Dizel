@@ -12,6 +12,9 @@ import type {
   SavedPrompt,
   SessionSummary,
   SkillInfo,
+  StreamEvent,
+  ToolApproval,
+  ToolCall,
   WorkspaceView,
 } from "../types";
 import {
@@ -392,6 +395,25 @@ function patchLast(messages: Message[], patch: (m: Message) => Message): Message
   return messages;
 }
 
+type ToolEvent = Extract<StreamEvent, { type: "tool" }>;
+
+function toolEventPatch(event: ToolEvent): ToolCall {
+  const patch: ToolCall = {
+    id: String(event.id),
+    name: event.name,
+    detail: event.detail,
+    status: event.phase === "start" ? "running" : event.phase,
+  };
+  const fields = event as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(fields)) {
+    if (["type", "phase", "id", "name", "detail"].includes(key) || value === undefined) {
+      continue;
+    }
+    (patch as unknown as Record<string, unknown>)[key] = value;
+  }
+  return patch;
+}
+
 /** Files are folded into the prompt as tagged blocks the model can read. */
 function composePrompt(text: string, attachments: Attachment[], vision: boolean): string {
   if (attachments.length === 0) return text;
@@ -486,6 +508,8 @@ interface ChatState {
   debug: boolean;
   debugPanel: { title: string; body: string } | null;
   toast: string | null;
+  approval: ToolApproval | null;
+  resolveApproval: (approved: boolean) => Promise<void>;
   /** Prompt templates available without debug mode, invoked as /name. */
   skills: SkillInfo[];
   skillsDir: string;
@@ -609,6 +633,7 @@ export const useChat = create<ChatState>((set, get) => ({
   debug: false,
   debugPanel: null,
   toast: null,
+  approval: null,
   skills: [],
   skillsDir: "",
   skillsProjectDir: "",
@@ -897,6 +922,47 @@ export const useChat = create<ChatState>((set, get) => ({
 
   closeDebugPanel: () => set({ debugPanel: null }),
 
+  resolveApproval: async (approved) => {
+    const approval = get().approval;
+    if (!approval) return;
+
+    if (approval.synthetic) {
+      const rowId = String(approval.toolId ?? "debug-write");
+      set((state) => ({
+        approval: null,
+        messages: patchLast(state.messages, (message) => ({
+          ...message,
+          tools: message.tools?.map((tool) =>
+            tool.id === rowId
+              ? {
+                  ...tool,
+                  status: approved ? ("done" as const) : ("failed" as const),
+                  detail: approved ? tool.detail : "cancelled",
+                  action: approval.action,
+                  path: approval.path,
+                  diff: approval.diff,
+                  additions: approval.additions,
+                  deletions: approval.deletions,
+                  result: approved
+                    ? `Edited ${approval.path} (+${approval.additions}/-${approval.deletions})`
+                    : "Write cancelled.",
+                }
+              : tool,
+          ),
+        })),
+      }));
+      get().notify(approved ? "Debug write approved." : "Debug write rejected.");
+      return;
+    }
+
+    try {
+      await api.resolveToolApproval(approval.id, approved);
+      set({ approval: null });
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
   setBudgetOverride: (value) => set({ budgetOverride: value }),
 
   /**
@@ -1039,6 +1105,7 @@ export const useChat = create<ChatState>((set, get) => ({
             "/echo <text>      append a fake reply (render test)",
             "/markdown         append every markdown style (render test)",
             "/thought          append a Thought panel with every markdown style",
+            "/tooltest         append inspectable tool results and a synthetic write approval",
             "/filler <n>       append n words of filler (scroll test)",
             "/error <text>     raise the error banner (UI test)",
             "/simulate <state>  loading | error | streaming | off",
@@ -1182,6 +1249,112 @@ export const useChat = create<ChatState>((set, get) => ({
           "Appended a fake reply with a full-markdown Thought panel (not saved).",
         );
         return true;
+
+      case "tooltest": {
+        const diff = [
+          "--- a/src/App.tsx",
+          "+++ b/src/App.tsx",
+          "@@ -1,3 +1,4 @@",
+          "-export function App() {",
+          "+export function App() {",
+          "+  // reviewed by the tool-approval fixture",
+          "   return null;",
+          " }",
+        ].join("\n");
+        const written = [
+          "const fixture = {",
+          "  surface: 'desktop',",
+          "  detail: 'visible after the call',",
+          "};",
+          "",
+          "export default fixture;",
+        ].join("\n");
+        set((state) => ({
+          debugPanel: null,
+          approval: {
+            id: `debug-approval-${Date.now()}`,
+            toolId: "debug-write",
+            tool: "edit_file",
+            path: "src/App.tsx",
+            action: "edit",
+            diff,
+            additions: 2,
+            deletions: 1,
+            synthetic: true,
+          },
+          messages: [
+            ...state.messages,
+            {
+              id: uid(),
+              role: "assistant" as const,
+              content:
+                "Synthetic tool flow — resolve the write card above, then click any tool row to inspect its details.",
+              createdAt: Date.now(),
+              tools: [
+                {
+                  id: "debug-grep",
+                  synthetic: true,
+                  name: "grep",
+                  detail: "TODO · src",
+                  status: "done" as const,
+                  query: "TODO",
+                  path: "src",
+                  glob: "*.tsx",
+                  result:
+                    "src/App.tsx:12: // TODO: remove the fixture marker\nsrc/lib/tools.ts:4: // TODO: shared renderer\n\n2 matches in 2 files.",
+                },
+                {
+                  id: "debug-read",
+                  synthetic: true,
+                  name: "read_file",
+                  detail: "src/App.tsx:1-12",
+                  status: "done" as const,
+                  path: "src/App.tsx",
+                  result:
+                    "src/App.tsx — lines 1-12 of 48\nimport { useState } from \"react\";\n\nexport function App() {\n  const [ready, setReady] = useState(false);\n\n  return (\n    <main>\n      <h1>Dizel</h1>\n      <p>{ready ? \"ready\" : \"loading\"}</p>\n    </main>\n  );\n}\n",
+                },
+                {
+                  id: "debug-write-file",
+                  synthetic: true,
+                  name: "write_file",
+                  detail: "src/debug-fixture.ts",
+                  status: "done" as const,
+                  path: "src/debug-fixture.ts",
+                  action: "create",
+                  content: written,
+                  result: "Created src/debug-fixture.ts (+6/-0)",
+                  additions: 6,
+                  deletions: 0,
+                },
+                {
+                  id: "debug-search",
+                  synthetic: true,
+                  name: "web_search",
+                  detail: "dizel local model",
+                  status: "done" as const,
+                  query: "dizel local model",
+                  search_url: "https://duckduckgo.com/?q=dizel+local+model",
+                  result:
+                    "[1] Dizel 1.5 — local-first model\nA small model and desktop app that run locally.\nSource: https://github.com/D4niel-dev/Dizel\n\n[2] Dizel documentation\nInstall, launch, and model notes.\nSource: https://d4niel-dev.github.io/Dizel/",
+                },
+                {
+                  id: "debug-write",
+                  synthetic: true,
+                  name: "edit_file",
+                  detail: "src/App.tsx",
+                  status: "running" as const,
+                  path: "src/App.tsx",
+                  action: "edit",
+                  diff,
+                  additions: 2,
+                  deletions: 1,
+                },
+              ],
+            },
+          ],
+        }));
+        return true;
+      }
 
       case "ctxfull": {
         // Fills the conversation with roughly a full context window so the *real*
@@ -1727,6 +1900,7 @@ export const useChat = create<ChatState>((set, get) => ({
       messages: [...state.messages, userMessage, assistantMessage],
       streaming: true,
       error: null,
+      approval: null,
       draft: "",
       attachments: [],
       preview: null,
@@ -1776,8 +1950,51 @@ export const useChat = create<ChatState>((set, get) => ({
                 })),
               }));
               break;
+            case "tool": {
+              const patch = toolEventPatch(event);
+              set((state) => ({
+                messages: patchLast(state.messages, (m) => {
+                  const tools = m.tools ? [...m.tools] : [];
+                  const index = tools.findIndex((tool) => tool.id === patch.id);
+                  if (index >= 0) tools[index] = { ...tools[index], ...patch };
+                  else tools.push(patch);
+                  return { ...m, tools };
+                }),
+              }));
+              break;
+            }
+            case "approval":
+              set((state) => ({
+                approval: {
+                  id: event.id,
+                  toolId: event.tool_id,
+                  tool: event.tool,
+                  path: event.path,
+                  action: event.action,
+                  diff: event.diff,
+                  additions: event.additions,
+                  deletions: event.deletions,
+                },
+                messages: patchLast(state.messages, (m) => ({
+                  ...m,
+                  tools: m.tools?.map((tool) =>
+                    tool.id === String(event.tool_id)
+                      ? {
+                          ...tool,
+                          path: event.path,
+                          action: event.action,
+                          diff: event.diff,
+                          additions: event.additions,
+                          deletions: event.deletions,
+                        }
+                      : tool,
+                  ),
+                })),
+              }));
+              break;
             case "done":
               set((state) => ({
+                approval: null,
                 messages: patchLast(state.messages, (m) => ({
                   ...m,
                   content: event.text || m.content,
@@ -1810,6 +2027,7 @@ export const useChat = create<ChatState>((set, get) => ({
             case "error":
               set((state) => ({
                 error: event.message,
+                approval: null,
                 messages: patchLast(state.messages, (m) => ({
                   ...m,
                   streaming: false,
@@ -1817,6 +2035,11 @@ export const useChat = create<ChatState>((set, get) => ({
                   durationMs: Date.now() - startedAt,
                   thoughtMs: reasoningElapsed() ?? m.thoughtMs,
                   content: m.content || event.message,
+                  tools: m.tools?.map((tool) =>
+                    tool.status === "running"
+                      ? { ...tool, status: "failed" as const }
+                      : tool,
+                  ),
                 })),
               }));
               break;
@@ -1845,7 +2068,7 @@ export const useChat = create<ChatState>((set, get) => ({
       }));
     } finally {
       controller = null;
-      set({ streaming: false });
+      set({ streaming: false, approval: null });
       get().commitFork();
       get().commitContinue();
       void get().refreshStatus();

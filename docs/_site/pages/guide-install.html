@@ -1,7 +1,7 @@
 <!--meta
 {
   "title": "Install Dizel — Docs",
-  "description": "Install Dizel: Python, PyTorch, and requirements for the local model, desktop app, and terminal client.",
+  "description": "Install Dizel with the npm launcher or from a Python checkout: requirements for the local model, desktop app, and terminal client.",
   "nav": "docs",
   "layout": "docs",
   "docs_active": "install"
@@ -11,17 +11,23 @@
 
               <div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Getting started</span><span>/</span><span>Install</span></div>
               <h1>Install Dizel</h1>
-              <p class="s-docs-lede">Dizel runs from a checkout. You need Python and Node; a GPU is optional for the terminal client.</p>
+              <p class="s-docs-lede">Dizel runs from a Python checkout, or on Windows through the npm launcher. You need Python and Node; a GPU is optional for the terminal client.</p>
               
               <div class="s-callout"><b>Start with v1.5.</b> It is the published model and the one the app loads by default. The 1.6 preview has no weights yet.</div>
-              <div class="s-callout"><b>npm launcher.</b> Windows users can install the small launcher with <code>npm install -g @d4niel-dev/dizel@latest</code>, then run <code>dizel install</code> and <code>dizel doctor</code>. It downloads the matching release; Python and model weights remain separate.</div>
+              <div class="s-callout is-neutral"><b>Windows fast path.</b> Install the small launcher; it downloads the matching release, verifies SHA-256, installs the terminal client, and opens the desktop installer.</div>
+              <div class="s-code">
+                <button class="copy" type="button" data-copy>Copy</button>
+                <pre><code>npm install -g @d4niel-dev/dizel@latest
+dizel install
+dizel doctor</code></pre>
+              </div>
 
               <section class="s-docs-section">
                 <h2 id="requirements">Before you start</h2>
                 <ul>
                   <li><strong>Python 3.10+</strong> for the engine and both clients.</li>
                   <li><strong>PyTorch 2.1+</strong> — CUDA is recommended for local inference.</li>
-                  <li><strong>Node.js 18+</strong> for the desktop app.</li>
+                  <li><strong>Node.js 18+</strong> for the npm launcher and the desktop app.</li>
                   <li><strong>Windows</strong> for the <code>dizel.cmd</code> launcher; the Python modules also run on macOS and Linux.</li>
                 </ul>
               </section>

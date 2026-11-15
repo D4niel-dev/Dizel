@@ -75,10 +75,9 @@ def _trace(handle, message: str) -> None:
 class PanelOverlay(ModalScreen):
     """A panel floating over the workspace instead of narrowing it.
 
-    The desktop keeps these parked; a terminal can't afford a permanent column,
-    so ctrl+r / ctrl+a raise them over the transcript and escape puts them away.
-    Panels are built fresh here and filled after mount, which keeps the layout
-    instance free of state that would otherwise have to be shared.
+    The artifacts panel still uses this overlay. The context rail is permanent
+    and never closes. Panels are built fresh here and filled after mount, which
+    keeps the layout instance free of state that would otherwise be shared.
     """
 
     BINDINGS = [Binding("escape", "close_overlay", "Close")]
@@ -116,7 +115,7 @@ class DizelCMDApp(App):
         Binding("ctrl+k", "toggle_palette", "Command palette", priority=True),
         Binding("ctrl+f", "toggle_palette", "All commands", priority=True),
         Binding("ctrl+t", "toggle_session", "Sessions", priority=True),
-        Binding("ctrl+r", "toggle_context", "Context rail", priority=True),
+        Binding("ctrl+r", "focus_context", "Focus context rail", priority=True),
         Binding("ctrl+y", "multiline_input", "Multi-line", priority=True),
         Binding("ctrl+a", "toggle_artifacts", "Artifacts", priority=True),
     ]
@@ -131,6 +130,11 @@ class DizelCMDApp(App):
     context_tokens = reactive(0)
     budget_tokens = reactive(0)
     tools_revision = reactive(0)
+    debug_mode = reactive(False)
+    # Version of an available or staged update; empty when there is none.
+    update_ready = reactive("")
+    # (seconds, visible answer chars, estimated tok/s) for the last reply.
+    last_reply = reactive(None)
 
     def __init__(
         self,
@@ -154,6 +158,7 @@ class DizelCMDApp(App):
         self._load_last_event_at = 0.0
         self._sessions_auto = True
         self._update_thread = None
+        self.restart_requested = False
         self.usage_manager = UsageManager()
         self._tool_states = {name: False for name in AVAILABLE_TOOLS}
         register_builtins()
@@ -716,12 +721,43 @@ class DizelCMDApp(App):
     def refresh_context(self) -> None:
         self.tools_revision += 1
 
+    def set_debug_mode(self, enabled: bool) -> None:
+        self.debug_mode = bool(enabled)
+        note = (
+            "Debug mode on — /debug help lists commands."
+            if self.debug_mode
+            else "Debug mode off."
+        )
+        self._log_system(note, "ok" if self.debug_mode else "info")
+
+    def show_debug_output(self, title: str, body: str) -> None:
+        from inference.tui.panels.modals.debug_panel import DebugPanelModal
+
+        self.push_screen(DebugPanelModal(title, body))
+
+    def record_reply_metrics(self, seconds: float, chars: int, per_second: int) -> None:
+        """The last reply's elapsed time, answer size, and estimated throughput."""
+        self.last_reply = (max(0.0, float(seconds)), max(0, int(chars)), max(0, int(per_second)))
+
+    def clear_reply_metrics(self) -> None:
+        if self.last_reply is not None:
+            self.last_reply = None
+
     def _log_system(self, message: str, level: str = "info") -> None:
         """A transient app notice, shown above the composer, never in the transcript."""
         try:
             self.query_one(NoticeLine).show(message, level)
         except Exception:
             pass
+
+    def request_update_restart(self, delay: float = 0.6) -> None:
+        """Close the UI so main() can apply the staged update and relaunch cleanly."""
+        try:
+            self.chat_bridge.stop()
+        except Exception:
+            pass
+        self.restart_requested = True
+        self.set_timer(delay, self.exit)
 
     def _start_update_check(self) -> None:
         """Check once per interval and stage a TUI update in the background."""
@@ -734,8 +770,9 @@ class DizelCMDApp(App):
         try:
             pending = updater.pending_update(root)
             if pending:
+                self.update_ready = str(pending.get("version") or "")
                 self._log_system(
-                    f"Update {pending.get('version')} is staged — restart via dizel.cmd to apply it.",
+                    f"Update {pending.get('version')} is staged — /update install restarts now.",
                     "ok",
                 )
         except Exception:
@@ -755,6 +792,9 @@ class DizelCMDApp(App):
             except Exception:
                 pass
 
+        def set_update_ready(version: str) -> None:
+            self.update_ready = version
+
         def worker() -> None:
             try:
                 result = updater.check_for_update(root=root, timeout=12.0)
@@ -766,6 +806,10 @@ class DizelCMDApp(App):
                         f"Dizel {info.version} is available, but this release has no terminal package."
                     )
                     return
+                try:
+                    self.call_from_thread(set_update_ready, info.version)
+                except Exception:
+                    pass
                 notify(f"Dizel {info.version} is available — downloading in the background…")
                 last = [-20]
 
@@ -780,7 +824,7 @@ class DizelCMDApp(App):
 
                 updater.download_tui_update(info, root=root, progress=progress)
                 notify(
-                    f"Update {info.version} ready — restart via dizel.cmd to apply it.",
+                    f"Update {info.version} ready — /update install restarts now.",
                     "ok",
                 )
             except Exception:
@@ -814,7 +858,8 @@ class DizelCMDApp(App):
                 # the two read as one column instead of two unrelated widths.
                 with Horizontal(id="transcript-row"):
                     yield WorkspacePanel()
-                yield NoticeLine()
+                with Horizontal(id="notice-row"):
+                    yield NoticeLine()
                 # A row exists purely to centre the composer: a vertical
                 # container stretches children, so `align` has nothing to centre.
                 from inference.tui.panels.slash_drawer import SlashDrawer
@@ -825,6 +870,7 @@ class DizelCMDApp(App):
                     yield SlashDrawer()
                 with Horizontal(id="composer-row"):
                     yield InputBar()
+                yield Horizontal(id="starter-row")
             yield ArtifactPanel()
             yield ContextPanel()
         yield StatusBar()
@@ -994,6 +1040,13 @@ class DizelCMDApp(App):
         if self.generation_state not in ("STREAMING", "THINKING"):
             return
         self.chat_bridge.stop()
+        try:
+            workspace = self.query_one(WorkspacePanel)
+            if workspace.current_message is not None:
+                workspace.current_message.stop()
+                workspace.current_message = None
+        except Exception:
+            pass
         self.generation_state = "IDLE"
         self._log_system("Interrupted.")
 
@@ -1053,14 +1106,21 @@ class DizelCMDApp(App):
             return True
         return False
 
-    def action_toggle_context(self) -> None:
+    def action_focus_context(self) -> None:
         from inference.tui.panels.context_panel import ContextPanel
 
         if self._dismiss_overlay():
             return
         if self._modal_open():
             return
-        self.push_screen(PanelOverlay(ContextPanel()))
+        try:
+            panel = self.query_one(ContextPanel)
+        except Exception:
+            return
+        if not panel.has_class("-visible"):
+            self._log_system("The context rail appears when a chat starts.")
+            return
+        panel.focus()
 
     def action_toggle_artifacts(self) -> None:
         from inference.tui.panels.artifact_panel import ArtifactPanel

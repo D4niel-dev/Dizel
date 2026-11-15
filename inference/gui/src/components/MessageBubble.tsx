@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import type { Message, Prefs } from "../types";
 import { Icon } from "./Icon";
 import { ThinkingDots } from "./ThinkingDots";
+import { ToolLog } from "./ToolLog";
 import { formatBytes } from "./AttachmentPreview";
 import { MessageFeedbackControls } from "./MessageFeedbackControls";
 import { modelName } from "../services/model";
@@ -535,8 +536,11 @@ export function MessageBubble({
   // Reasoning gets the ThoughtBlock; everything else keeps the older rotating
   // line while it waits for the first answer token.
   const hasThought = Boolean(thoughtText);
-  const waitingForText = Boolean(message.streaming) && !parsed.main && !hasThought;
-  const showGenerating = !hasThought && (holding || waitingForText);
+  const tools = view.tools ?? [];
+  const hasTools = tools.length > 0;
+  const waitingForText =
+    Boolean(message.streaming) && !parsed.main && !hasThought && !hasTools;
+  const showGenerating = !hasThought && !hasTools && (holding || waitingForText);
 
   // `max_new_tokens` cuts a reply wherever the budget runs out, which in practice
   // is mid-word. A finished sentence ends in punctuation; a truncated one does not.
@@ -587,6 +591,8 @@ export function MessageBubble({
           highlight={prefs.syntaxHighlight}
         />
       )}
+
+      {hasTools && <ToolLog tools={tools} />}
 
       {!holding && parsed.main && (
         <Markdown text={typedMain} highlight={prefs.syntaxHighlight} />

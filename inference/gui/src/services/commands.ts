@@ -59,6 +59,7 @@ export const DEBUG_COMMANDS: CommandEntry[] = [
   debug("echo", "Append a fake reply"),
   debug("markdown", "Append every markdown style", ["md"]),
   debug("thought", "Append a Thought fixture", ["think"]),
+  debug("tooltest", "Append inspectable tool results and an approval card"),
   debug("filler", "Append n words of filler"),
   debug("error", "Raise the error banner"),
   debug("simulate", "loading | error | streaming | off"),

@@ -10,10 +10,26 @@ defaults to the base/SFT checkpoint; with ``--resume`` it comes from the
 checkpoint metadata, or from an explicit ``--reference_checkpoint``.  A missing
 reference path fails immediately.
 
+``--data`` is the training split.  If ``--val_data`` is supplied, that file is
+used verbatim as the held-out set and ``--val_fraction`` is ignored.  The RM
+filter writes a filtered train file and an unfiltered val file, so keep the
+latter here.
+
+DPO does not consume an external reward model: the loss uses only the policy
+and frozen-reference log-probabilities.  To use the Skywork RM, score/filter
+the pairs offline with ``scripts/score_dpo_pairs_v16.py`` first.  The
+``rm_*`` metadata fields are ignored by this trainer.
+
 Usage:
     python training/dpo_v16.py \
         --base_checkpoint checkpoints/dizel-1.6-preview-m1-sft-best.pt \
         --data data/v16/posttrain/dpo.jsonl \
+        --tokenizer_model tokenizer/qwen2.5 --local_files_only
+
+    python training/dpo_v16.py \
+        --base_checkpoint checkpoints/dizel-1.6-preview-m1-sft-best.pt \
+        --data data/v16/posttrain/dpo_rm_filtered.jsonl \
+        --val_data data/v16/posttrain/dpo_rm_val.jsonl \
         --tokenizer_model tokenizer/qwen2.5 --local_files_only
 """
 
@@ -69,6 +85,7 @@ def parse_args():
     parser.add_argument("--resume", default="")
     parser.add_argument("--reference_checkpoint", default="")
     parser.add_argument("--data", default="")
+    parser.add_argument("--val_data", default="")
     parser.add_argument("--output_dir", default="")
     parser.add_argument("--run_name", default="")
     parser.add_argument("--drive_checkpoint_dir", default="")
@@ -124,6 +141,8 @@ def apply_overrides(cfg, args):
             setattr(dc, name, value)
     if args.data:
         dc.data_path = args.data
+    if args.val_data:
+        dc.val_data_path = args.val_data
     if args.output_dir:
         dc.output_dir = args.output_dir
     if args.run_name:
@@ -241,9 +260,26 @@ def main():
     verify_tokenizer(tokenizer)
 
     records = load_jsonl_records(dc.data_path)
-    train_records, val_records = split_records(records, dc.val_fraction, dc.seed)
+    if dc.val_data_path:
+        if os.path.normcase(os.path.abspath(dc.val_data_path)) == os.path.normcase(
+            os.path.abspath(dc.data_path)
+        ):
+            raise ValueError("--val_data must be a different file from --data")
+        if not os.path.exists(dc.val_data_path):
+            raise FileNotFoundError(
+                f"DPO validation data not found: {dc.val_data_path}"
+            )
+        train_records = records
+        val_records = load_jsonl_records(dc.val_data_path)
+        split_note = "explicit held-out file"
+    else:
+        train_records, val_records = split_records(records, dc.val_fraction, dc.seed)
+        split_note = f"{dc.val_fraction:.0%} deterministic split"
     section("Data")
-    info(f"DPO pairs: {len(records):,} ({len(train_records):,} train / {len(val_records):,} val)")
+    info(
+        f"DPO pairs: {len(train_records):,} train / {len(val_records):,} val "
+        f"({split_note})"
+    )
     train_ds = DPODataset(
         train_records, tokenizer, dc.max_length, dc.max_prompt_length
     )

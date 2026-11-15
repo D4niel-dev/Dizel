@@ -8,21 +8,26 @@ from inference.tui.commands.builtins.tools import AVAILABLE_TOOLS
 
 class ToolBridge:
     class ToolStarted(Message):
-        def __init__(self, tool_name: str, detail: str):
+        def __init__(self, tool_name: str, detail: str, key: int = 0):
             self.tool_name = tool_name
             self.detail = detail
+            self.key = key
             super().__init__()
 
     class ToolCompleted(Message):
-        def __init__(self, tool_name: str, detail: str):
+        def __init__(self, tool_name: str, detail: str, key: int = 0, details=None):
             self.tool_name = tool_name
             self.detail = detail
+            self.key = key
+            self.details = details or {}
             super().__init__()
 
     class ToolFailed(Message):
-        def __init__(self, tool_name: str, error_msg: str):
+        def __init__(self, tool_name: str, error_msg: str, key: int = 0, details=None):
             self.tool_name = tool_name
             self.error_msg = error_msg
+            self.key = key
+            self.details = details or {}
             super().__init__()
 
     def __init__(self, app: App):

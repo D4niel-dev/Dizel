@@ -249,6 +249,12 @@ export const setTools = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+export const resolveToolApproval = (approvalId: string, approved: boolean) =>
+  request<{ status: string; approved: boolean }>("/chat/tools/approve", {
+    method: "POST",
+    body: JSON.stringify({ approval_id: approvalId, approved }),
+  });
+
 export const usageWindow = () => request<UsageWindow>("/chat/usage");
 
 export const usageDebug = (action: string, value?: number) =>

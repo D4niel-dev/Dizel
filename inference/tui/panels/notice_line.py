@@ -13,15 +13,28 @@ from textual.widgets import Static
 
 from inference.tui.theme import TEXT_2, ACCENT, DANGER, TEXT_3
 
-_NOTICE_TTL = 20.0
+_NOTICE_TTL = 1.4
 
 
 class NoticeLine(Static):
     _timer = None
 
     def show(self, message: str, level: str = "info") -> None:
-        color = ACCENT if level == "ok" else DANGER if level == "error" else TEXT_3
-        self.update(Content.assemble((str(message), TEXT_2)))
+        if level == "ok":
+            glyph, color = "✓", ACCENT
+        elif level == "error":
+            glyph, color = "×", DANGER
+        else:
+            glyph, color = "~", TEXT_3
+        self.update(
+            Content.assemble(
+                (glyph, color),
+                (" ", TEXT_3),
+                (str(message), TEXT_2),
+            )
+        )
+        self.set_class(level == "ok", "-ok")
+        self.set_class(level == "error", "-error")
         self.add_class("-shown")
         if self._timer is not None:
             self._timer.stop()

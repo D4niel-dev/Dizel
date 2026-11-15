@@ -1,8 +1,10 @@
+import itertools
 import threading
 
 from textual.app import App
 from textual.message import Message
 
+from dizel_core import tools as tool_registry
 from dizel_core.chat_manager import ChatManager
 from dizel_core.token_budget import allocate_token_budget, classify_task
 
@@ -38,6 +40,7 @@ class ChatBridge:
         self._cost = 0.0
         self._tokens_uncounted = 0
         self._prev_max_tokens = None
+        self._tool_keys = itertools.count(1)
 
     # ── Thread marshalling ───────────────────────────────────────────
     def _ui(self, fn, *args) -> None:
@@ -73,6 +76,39 @@ class ChatBridge:
         # Usage is charged by the shared fixed rate at the point each side of the
         # turn is known, not accumulated per token here.
         self._cost = 0.0
+
+    def _approve_tool(self, change) -> bool:
+        """Block the tool thread until the user approves or rejects the diff."""
+        event = threading.Event()
+        holder: dict = {"modal": None, "approved": False}
+
+        def done(approved: bool | None) -> None:
+            holder["approved"] = bool(approved)
+            event.set()
+
+        def show() -> None:
+            from inference.tui.panels.modals.tool_approval import ToolApprovalModal
+
+            try:
+                modal = ToolApprovalModal(change)
+                holder["modal"] = modal
+                self.app.push_screen(modal, done)
+            except Exception:
+                event.set()
+
+        try:
+            self.app.call_from_thread(show)
+        except Exception:
+            return False
+        if not event.wait(180):
+            try:
+                modal = holder.get("modal")
+                if modal is not None:
+                    self.app.call_from_thread(modal.dismiss, False)
+            except Exception:
+                pass
+            return False
+        return bool(holder["approved"])
 
     # ── Generation ───────────────────────────────────────────────────
     def send(self, text: str) -> None:
@@ -125,17 +161,42 @@ class ChatBridge:
             else:
                 self._post(self.SystemLog("Reply discarded — the session changed while it generated."))
 
+        def on_tool_start(call: dict) -> None:
+            from inference.tui.bridge.tool_bridge import ToolBridge
+
+            key = next(self._tool_keys)
+            call["_tui_key"] = key
+            name = str(call.get("name") or "?")
+            self._post(
+                ToolBridge.ToolStarted(
+                    name, tool_registry.display_detail(call), key=key
+                )
+            )
+
         def on_tool(call: dict, outcome: str) -> None:
             try:
                 if hasattr(self.app, "usage_manager"):
                     self.app.usage_manager.charge_tool_calls(1)
             except Exception:
                 pass
-            name = call.get("name", "?")
-            args = ", ".join(f"{k}={v!r}" for k, v in (call.get("args") or {}).items())
-            first = (outcome or "").strip().splitlines()
-            preview = first[0][:70] if first else "(no output)"
-            self._post(self.SystemLog(f"tool {name}({args}) → {preview}"))
+            from inference.tui.bridge.tool_bridge import ToolBridge
+
+            name = str(call.get("name") or "?")
+            key = int(call.get("_tui_key") or 0)
+            details = tool_registry.ui_payload(call, outcome)
+            if tool_registry.outcome_failed(name, outcome):
+                first = (outcome or "").strip().splitlines()
+                preview = first[0][:90] if first else "failed"
+                prefix = f"[{name}] "
+                if preview.startswith(prefix):
+                    preview = preview[len(prefix) :]
+                self._post(ToolBridge.ToolFailed(name, preview, key=key, details=details))
+            else:
+                self._post(
+                    ToolBridge.ToolCompleted(
+                        name, tool_registry.display_detail(call), key=key, details=details
+                    )
+                )
 
         def on_error(error_msg: str) -> None:
             self._ui(self._settle)
@@ -148,6 +209,8 @@ class ChatBridge:
             on_done=on_done,
             on_error=on_error,
             on_tool=on_tool,
+            on_tool_start=on_tool_start,
+            approve_tool=self._approve_tool,
         )
 
     def _sync_provider_state(self) -> None:

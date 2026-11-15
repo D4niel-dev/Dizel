@@ -258,6 +258,7 @@ class DPOConfigV16Flash(PosttrainConfigV16Flash):
     """Experimental preference tuning on top of the v1.6 SFT checkpoint."""
 
     data_path: str = "data/v16/posttrain/dpo.jsonl"
+    val_data_path: str = ""
     output_dir: str = "checkpoints/dizel-1.6-preview-m1-dpo"
     run_name: str = "dizel-1.6-preview-m1-dpo"
     reference_checkpoint: str = ""

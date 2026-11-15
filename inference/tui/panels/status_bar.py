@@ -3,10 +3,20 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from inference.tui.theme import ACCENT, SPINNER_FRAMES, SUCCESS, TEXT_2, TEXT_3, WARN
+from inference.tui.theme import (
+    ACCENT,
+    ACCENT_INK,
+    SPINNER_FRAMES,
+    SUCCESS,
+    TEXT_2,
+    TEXT_3,
+    VIOLET,
+    WARN,
+)
 
 _DEFAULT_HINT = "ctrl+k commands   ctrl+t sessions   /help"
 _COMPACT_HINT = "^K commands   ^T sessions   /help"
+_TIGHT_HINT = "^K  ^T  /help"
 
 
 def _version() -> str:
@@ -41,6 +51,9 @@ class StatusBar(Container):
             "generation_state",
             "context_tokens",
             "budget_tokens",
+            "last_reply",
+            "debug_mode",
+            "update_ready",
         ):
             self.watch(self.app, prop, self.update_status)
 
@@ -72,6 +85,27 @@ class StatusBar(Container):
     def reset_hint(self) -> None:
         self.set_hint("")
 
+    def _reply_metrics(self, width: int) -> str:
+        reply = getattr(self.app, "last_reply", None)
+        if not reply:
+            return ""
+        seconds, chars, per_second = reply
+        if seconds <= 0 or chars <= 0:
+            return ""
+
+        from inference.tui.settings_apply import pref
+
+        speed = per_second > 0 and pref(self.app, "show_speed", True)
+        if width >= 116:
+            parts = [f"{seconds:.1f}s", f"{chars:,} chars"]
+            if speed:
+                parts.append(f"~{per_second} tok/s")
+        else:
+            parts = [f"{seconds:.1f}s", f"{chars:,}ch"]
+            if speed:
+                parts.append(f"~{per_second}t/s")
+        return f"[{TEXT_3}]◷[/] [{TEXT_2}]{' · '.join(parts)}[/]"
+
     def update_status(self, *_: object) -> None:
         state = self.app.generation_state
         if state == "STREAMING":
@@ -82,6 +116,9 @@ class StatusBar(Container):
             color, label, hint = WARN, "loading model", "wait"
         else:
             color, label, hint = SUCCESS, "ready", ""
+
+        width = self.size.width or 80
+        metrics = self._reply_metrics(width) if state == "IDLE" else ""
 
         used = int(self.app.context_tokens)
         context = f"{used:,} tokens"
@@ -95,15 +132,25 @@ class StatusBar(Container):
         left = f"[{color}]{glyph}[/] [{TEXT_2}]{label}[/]"
         if hint:
             left += f"   [{WARN}]{hint}[/]"
-        if pref(self.app, "show_tokens", True):
+        if metrics:
+            left += f"   [{TEXT_3}]·[/]   {metrics}"
+        show_context = pref(self.app, "show_tokens", True) and not (
+            metrics and width < 70
+        )
+        if show_context:
             left += f"   [{TEXT_3}]·[/]   [{TEXT_3}]{context}[/]"
         self.query_one("#status-left").update(left)
 
-        width = self.size.width or 80
+        tight = bool(metrics) and width < 90
         if self._hint:
             hints = self._hint
         elif pref(self.app, "show_hints", True):
-            hints = _DEFAULT_HINT if width >= 110 else _COMPACT_HINT
+            if width >= 110:
+                hints = _DEFAULT_HINT
+            elif tight:
+                hints = _TIGHT_HINT
+            else:
+                hints = _COMPACT_HINT
         else:
             hints = ""
         if width >= 110:
@@ -113,7 +160,23 @@ class StatusBar(Container):
                     hints += f"   [{TEXT_3}]·[/]   [{TEXT_3}]v{version}[/]"
                 else:
                     hints = f"[{TEXT_3}]v{version}[/]"
-        self.query_one("#status-right").update(f"[{TEXT_3}]{hints}[/]")
+        update = str(getattr(self.app, "update_ready", "") or "")
+        badge = ""
+        if update:
+            label = (
+                f"UPDATE v{update}"
+                if width >= 104
+                else f"↑ v{update}" if width >= 68 else "↑"
+            )
+            badge = f"[bold {ACCENT_INK} on {ACCENT}] {label} [/]   "
+        debug = (
+            f"[bold {VIOLET}]DEBUG[/]   "
+            if getattr(self.app, "debug_mode", False)
+            else ""
+        )
+        self.query_one("#status-right").update(
+            f"{badge}{debug}[{TEXT_3}]{hints}[/]"
+        )
 
     def on_resize(self, event: events.Resize) -> None:
         self.update_status()

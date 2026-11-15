@@ -20,11 +20,9 @@ CHAT_DEFAULTS: dict[str, Any] = {
     "show_timestamps": True,
     "clock_24h": True,
     "show_speed": True,
-    "show_model_tag": False,
     "syntax_highlighting": True,
     "separators": False,
     "message_spacing": "comfortable",
-    "message_width": "comfortable",
     "auto_scroll": True,
     "show_suggestions": True,
     "animations": True,
@@ -74,17 +72,10 @@ def apply_terminal_prefs(app: Any, cfg: dict | None = None) -> None:
 def _apply_chat_prefs(app: Any) -> None:
     """The shared prefs that need a push, not just a cached read."""
     try:
-        container = app.query_one("#workspace-container")
-        width = chat_pref(app, "message_width")
-        container.set_class(width == "wide", "-width-wide")
-        container.set_class(width == "full", "-width-full")
-    except Exception:
-        pass
-    try:
-        from inference.tui.rendering.empty_state import EmptyStateBlock
+        from inference.tui.rendering.empty_state import StarterShelf
 
-        for block in app.query(EmptyStateBlock):
-            block.apply_suggestions()
+        for shelf in app.query(StarterShelf):
+            shelf.apply_suggestions()
     except Exception:
         pass
 

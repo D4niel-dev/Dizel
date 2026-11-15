@@ -83,6 +83,80 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(info.tui.size, 500)
 
 
+class CommandLineTests(unittest.TestCase):
+    @staticmethod
+    def _info():
+        return updater.UpdateInfo(
+            version="2.1.0",
+            tag="v2.1.0",
+            name="Dizel 2.1.0",
+            notes="",
+            url="https://github.com/D4niel-dev/Dizel/releases/tag/v2.1.0",
+            tui=updater.UpdateAsset(
+                name="Dizel-TUI-2.1.0.zip",
+                url="https://github.com/D4niel-dev/Dizel/releases/download/v2.1.0/Dizel-TUI-2.1.0.zip",
+                size=500,
+                sha256="b" * 64,
+            ),
+        )
+
+    def test_update_command_downloads_and_stages(self):
+        result = updater.CheckResult(current="2.0.0", available=True, info=self._info())
+        with (
+            mock.patch.object(updater, "check_for_update", return_value=result),
+            mock.patch.object(updater, "download_tui_update") as download,
+            mock.patch("builtins.print"),
+        ):
+            code = updater.main(["update", "--quiet"])
+
+        self.assertEqual(code, 0)
+        download.assert_called_once()
+
+    def test_apply_command_skips_dirty_checkout_unless_forced(self):
+        with (
+            mock.patch.object(updater, "pending_update", return_value={"version": "2.1.0"}),
+            mock.patch.object(updater, "auto_apply_allowed", return_value=False),
+            mock.patch.object(updater, "apply_pending_update") as apply,
+            mock.patch("builtins.print"),
+        ):
+            self.assertEqual(updater.main(["apply", "--quiet"]), 0)
+            apply.assert_not_called()
+
+            self.assertEqual(updater.main(["apply", "--force", "--quiet"]), 0)
+            apply.assert_called_once()
+
+    def test_update_command_reports_release_without_tui(self):
+        info = updater.UpdateInfo(
+            version="2.1.0",
+            tag="v2.1.0",
+            name="Dizel 2.1.0",
+            notes="",
+            url="https://github.com/D4niel-dev/Dizel/releases/tag/v2.1.0",
+        )
+        result = updater.CheckResult(current="2.0.0", available=True, info=info)
+        with (
+            mock.patch.object(updater, "check_for_update", return_value=result),
+            mock.patch.object(updater, "download_tui_update") as download,
+            mock.patch("builtins.print"),
+        ):
+            code = updater.main(["update"])
+
+        self.assertEqual(code, 1)
+        download.assert_not_called()
+
+
+class LauncherCommandTests(unittest.TestCase):
+    def test_launcher_exposes_update_commands_and_keeps_crlf(self):
+        path = Path(__file__).resolve().parents[1] / "dizel.cmd"
+        data = path.read_bytes()
+        self.assertNotIn(b"\n", data.replace(b"\r\n", b""))
+        text = data.decode("utf-8")
+        self.assertIn('"update" goto update_cmd', text)
+        self.assertIn('"check-update" goto check_update_cmd', text)
+        self.assertIn("dizel_core.updater update", text)
+        self.assertIn("dizel_core.updater check", text)
+
+
 class ArchiveTests(unittest.TestCase):
     def _zip(self, path: Path, files: dict[str, str]) -> None:
         with zipfile.ZipFile(path, "w") as bundle:
@@ -164,6 +238,24 @@ class StateTests(unittest.TestCase):
             self.assertFalse(updater.should_auto_check(root, interval=3600))
             updater.write_state(root, last_check=0.0)
             self.assertTrue(updater.should_auto_check(root, interval=3600))
+
+    def test_auto_apply_is_allowed_outside_a_checkout(self):
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertTrue(updater.auto_apply_allowed(temp))
+
+    def test_auto_apply_skips_dirty_checkout(self):
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / ".git").mkdir()
+            status = mock.Mock(returncode=0, stdout=" M dizel_core/updater.py\n")
+            with mock.patch.object(updater.subprocess, "run", return_value=status):
+                self.assertFalse(updater.auto_apply_allowed(temp))
+
+    def test_auto_apply_allows_clean_checkout(self):
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / ".git").mkdir()
+            status = mock.Mock(returncode=0, stdout="")
+            with mock.patch.object(updater.subprocess, "run", return_value=status):
+                self.assertTrue(updater.auto_apply_allowed(temp))
 
     def test_stage_rejects_unsafe_version(self):
         info = updater.UpdateInfo(

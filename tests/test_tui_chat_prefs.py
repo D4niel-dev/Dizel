@@ -52,8 +52,6 @@ class PreferenceLayerTests(unittest.TestCase):
 
     def test_defaults_match_desktop(self):
         self.assertEqual(CHAT_DEFAULTS["typing_animation"], "smooth")
-        self.assertEqual(CHAT_DEFAULTS["message_width"], "comfortable")
-        self.assertFalse(CHAT_DEFAULTS["show_model_tag"])
         self.assertFalse(CHAT_DEFAULTS["escape_clears_draft"])
         self.assertTrue(CHAT_DEFAULTS["enter_to_send"])
         self.assertTrue(CHAT_DEFAULTS["auto_focus_composer"])
@@ -226,32 +224,6 @@ class ChatPreferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(protected, "typed draft")
         self.assertEqual(disabled, "")
 
-    def test_transcript_width_classes(self):
-        async def script(app, pilot):
-            container = app.query_one("#workspace-container")
-            workspace = app.query_one(WorkspacePanel)
-            row = app.query_one("#transcript-row")
-            return (
-                container.has_class("-width-wide"),
-                container.has_class("-width-full"),
-                workspace.region.width,
-                row.region.width,
-            )
-
-        wide, full, width, row_width = self._run(
-            (150, 42), script, cfg=_config(message_width="wide")
-        )
-        self.assertTrue(wide)
-        self.assertFalse(full)
-        self.assertEqual(width, min(120, row_width))
-
-        wide, full, width, row_width = self._run(
-            (150, 42), script, cfg=_config(message_width="full")
-        )
-        self.assertFalse(wide)
-        self.assertTrue(full)
-        self.assertEqual(width, row_width)
-
     def test_starter_suggestions_switch(self):
         async def script(app, pilot):
             return [bool(w.display) for w in app.query(".empty-suggestion")]
@@ -312,13 +284,11 @@ class ChatPreferenceRuntimeTests(unittest.TestCase):
                     "clock_24h",
                     "typing_animation",
                     "escape_clears_draft",
-                    "message_width",
                     "enter_to_send",
                 )
             }
             modal._fields["appearance.show_timestamps"].control.value = False
             modal._fields["appearance.typing_animation"].control.value = "cinematic"
-            modal._fields["appearance.message_width"].control.value = "wide"
             await pilot.pause()
             saved = {}
             with mock.patch.object(
@@ -332,18 +302,14 @@ class ChatPreferenceRuntimeTests(unittest.TestCase):
             ):
                 modal._save()
                 await pilot.pause()
-            width_applied = app.query_one("#workspace-container").has_class(
-                "-width-wide"
-            )
             return (
                 order,
                 defaults,
                 saved.get("appearance", {}),
                 dict(app._chat_prefs),
-                width_applied,
             )
 
-        order, defaults, saved, live, width_applied = self._run((150, 42), script)
+        order, defaults, saved, live = self._run((150, 42), script)
         self.assertIn("chat", order)
         self.assertIn("behaviour", order)
         self.assertLess(order.index("chat"), order.index("tools"))
@@ -351,14 +317,11 @@ class ChatPreferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(defaults["clock_24h"])
         self.assertEqual(defaults["typing_animation"], "smooth")
         self.assertFalse(defaults["escape_clears_draft"])
-        self.assertEqual(defaults["message_width"], "comfortable")
         self.assertTrue(defaults["enter_to_send"])
         self.assertFalse(saved["show_timestamps"])
         self.assertEqual(saved["typing_animation"], "cinematic")
-        self.assertEqual(saved["message_width"], "wide")
         self.assertFalse(live["show_timestamps"])
         self.assertEqual(live["typing_animation"], "cinematic")
-        self.assertTrue(width_applied)
 
 
 if __name__ == "__main__":

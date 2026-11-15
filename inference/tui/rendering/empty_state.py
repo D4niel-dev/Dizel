@@ -7,7 +7,6 @@ from textual.message import Message
 from textual.widgets import Input, Static
 from rich.markup import escape
 
-from inference.tui.labels import display_model
 from inference.tui.rendering.welcome_copy import (
     day_part,
     fill_welcome,
@@ -15,15 +14,16 @@ from inference.tui.rendering.welcome_copy import (
     sample_welcome,
 )
 from inference.tui.settings_apply import chat_pref
-from inference.tui.theme import ACCENT, SURFACE_HI, TEXT, TEXT_2, TEXT_3
+from inference.tui.theme import TEXT, TEXT_3
 
 
 # ── Wordmark ─────────────────────────────────────────────────────────────
-# OpenCode opens with a big wordmark; without one an empty chat is a void with
-# small text in it. pyfiglet renders the shape, then we add the light: a vertical
-# gradient and a highlight that drifts across it.
+# The pre-start launcher opens on the wordmark; the empty chat heads its welcome
+# with it. pyfiglet renders the shape, then we add the light: a vertical gradient
+# and a highlight that drifts across it.
 
 _FONT = "ansi_shadow"
+COMPACT_FONT = "digital"
 
 # Hand-drawn fallback for when pyfiglet is not installed.
 _GLYPHS = {
@@ -46,11 +46,11 @@ def _fallback(word: str) -> list[str]:
     return rows
 
 
-def _shape(word: str = "DIZEL") -> list[str]:
+def _shape(word: str = "DIZEL", font: str = _FONT) -> list[str]:
     try:
         import pyfiglet
 
-        rendered = pyfiglet.figlet_format(word, font=_FONT)
+        rendered = pyfiglet.figlet_format(word, font=font)
         rows = [line.rstrip() for line in rendered.splitlines()]
         while rows and not rows[-1].strip():
             rows.pop()
@@ -59,7 +59,7 @@ def _shape(word: str = "DIZEL") -> list[str]:
         return _fallback(word)
 
 
-_SHAPE = _shape()
+_SHAPES = {font: _shape(font=font) for font in (_FONT, COMPACT_FONT)}
 
 # Light from above: bright at the top row, deeper at the base.
 _TOP = (0x6F, 0xB4, 0xFF)
@@ -76,10 +76,10 @@ def _hex(rgb) -> str:
     return "#%02x%02x%02x" % rgb
 
 
-def _wordmark(phase: float = -1.0) -> str:
+def _wordmark(shape: list[str], phase: float = -1.0) -> str:
     """The wordmark as markup, with a gradient and an optional moving highlight."""
-    height = max(1, len(_SHAPE))
-    width = max(len(row) for row in _SHAPE)
+    height = max(1, len(shape))
+    width = max(len(row) for row in shape)
 
     # The sheen crosses the whole wordmark inside the active window (2.2 s of a
     # 6 s cycle). Deriving it from raw elapsed seconds meant it was still off the
@@ -92,7 +92,7 @@ def _wordmark(phase: float = -1.0) -> str:
         beam = -6.0 + progress * (width + 12)
 
     out = []
-    for y, row in enumerate(_SHAPE):
+    for y, row in enumerate(shape):
         base = _mix(_TOP, _BOTTOM, y / max(1, height - 1))
         # Group consecutive cells that share a colour into one span. Tagging
         # every character individually meant ~200 tags per frame, at 11 fps.
@@ -127,26 +127,41 @@ def _wordmark(phase: float = -1.0) -> str:
 class Wordmark(Static):
     """The logo, with a slow sheen drifting across it."""
 
+    def __init__(self, font: str = _FONT, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._font = font
+        self._shape = _SHAPES.get(font) or _shape(font=font)
+
+    def set_font(self, font: str) -> None:
+        if font == self._font:
+            return
+        self._font = font
+        self._shape = _SHAPES.get(font) or _shape(font=font)
+        self.update(_wordmark(self._shape, -1))
+
+    def set_compact(self, compact: bool) -> None:
+        self.set_font(COMPACT_FONT if compact else _FONT)
+
     def on_mount(self) -> None:
         self._phase = 0.0
         self._sheen_on = True
         self._timer = self.set_interval(0.09, self._tick)
-        self.update(_wordmark(-1))
+        self.update(_wordmark(self._shape, -1))
 
     def _tick(self) -> None:
         # The shared animations switch stills the sheen; the gradient stays.
         on = bool(chat_pref(self.app, "animations"))
         if on != self._sheen_on:
             self._sheen_on = on
-            self.update(_wordmark(self._phase if on else -1))
+            self.update(_wordmark(self._shape, self._phase if on else -1))
         if not on:
             return
         self._phase += 0.09
         # One pass every ~6s, then idle for the rest of the cycle.
         if self._phase % 6.0 < 2.2:
-            self.update(_wordmark(self._phase))
+            self.update(_wordmark(self._shape, self._phase))
         elif self._phase % 6.0 < 2.35:
-            self.update(_wordmark(-1))
+            self.update(_wordmark(self._shape, -1))
 
     def on_unmount(self) -> None:
         try:
@@ -221,11 +236,46 @@ def _configured_username() -> str:
         return "User"
 
 
-class EmptyStateBlock(Container):
-    """The welcome: greeting, prompt and three starters.
+class StarterShelf(Vertical):
+    """The three starter prompts, directly under the composer."""
 
-    No logo. The header already carries the wordmark, and the desktop welcome
-    opens with a greeting too — two wordmarks in one window read as a template.
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._suggestions = random.sample(SUGGESTION_POOL, k=SUGGESTION_COUNT)
+
+    def compose(self) -> ComposeResult:
+        for label, prompt in self._suggestions:
+            yield SuggestionRow(label, prompt, classes="empty-suggestion")
+
+    def on_mount(self) -> None:
+        self.apply_suggestions()
+
+    def apply_suggestions(self) -> None:
+        """The shared starter-suggestions switch, live while the shelf is up."""
+        show = bool(chat_pref(self.app, "show_suggestions"))
+        for row in self.query(".empty-suggestion"):
+            row.display = show
+
+    @on(SuggestionRow.Chosen)
+    def pick_suggestion(self, event: SuggestionRow.Chosen) -> None:
+        prompt = event.prompt
+        if not prompt:
+            return
+        try:
+            inp = self.app.query_one("#prompt-input", Input)
+        except Exception:
+            return
+        inp.value = prompt
+        inp.cursor_position = len(prompt)
+        inp.focus()
+
+
+class EmptyStateBlock(Container):
+    """The welcome: wordmark, greeting and one subline.
+
+    The three starters live in a shelf under the composer. The composer footer
+    carries model and mode, and the status bar carries shortcuts; neither is
+    repeated here.
     """
 
     def __init__(self, **kwargs) -> None:
@@ -233,25 +283,10 @@ class EmptyStateBlock(Container):
         self._part = day_part()
         self._headline, self._subline = sample_welcome(self._part)
         self._username = _configured_username()
-        self._suggestions = random.sample(SUGGESTION_POOL, k=SUGGESTION_COUNT)
 
     def on_mount(self) -> None:
-        # The model is usually resolved *after* this widget is composed, so the
-        # first paint says "no model". Watch it and rewrite the line.
-        try:
-            for prop in ("active_model", "active_tier", "active_mode"):
-                self.watch(self.app, prop, self._refresh_context_line)
-        except Exception:
-            pass
         self.set_interval(60, self._refresh_copy)
-        self.apply_suggestions()
         self.call_after_refresh(self._apply_density)
-
-    def apply_suggestions(self) -> None:
-        """The shared starter-suggestions switch, live even while the welcome is up."""
-        show = bool(chat_pref(self.app, "show_suggestions"))
-        for row in self.query(".empty-suggestion"):
-            row.display = show
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_density()
@@ -264,6 +299,10 @@ class EmptyStateBlock(Container):
         self.set_class(height < 40, "-compact")
         self.set_class(height < 32, "-tiny")
         self.set_class((self.size.width or 96) < 64, "-narrow")
+        try:
+            self.query_one("#empty-logo", Wordmark).set_compact(height < 32)
+        except Exception:
+            pass
 
     def _refresh_copy(self) -> None:
         part = day_part()
@@ -288,60 +327,21 @@ class EmptyStateBlock(Container):
             name=self._username,
         )
 
-    def _refresh_context_line(self, *_: object) -> None:
-        try:
-            self.query_one(".empty-meta", Static).update(
-                f"[{TEXT_3}]{self._context_line()}[/]"
-            )
-        except Exception:
-            pass
-
-    def _context_line(self) -> str:
-        """What is actually about to answer — the desktop puts this on the chip."""
-        try:
-            app = self.app
-            tier = getattr(app, "response_label", app.active_tier) or "Fast"
-            model = display_model(app.active_model or "no model", tier)
-            return f"{model} · {tier}"
-        except Exception:
-            return ""
-
     def compose(self) -> ComposeResult:
-        keycap = f"[{TEXT_2} on {SURFACE_HI}]"
+        compact = bool(self.app.size.height and self.app.size.height < 32)
         with Vertical(id="empty-content"):
             with Vertical(id="empty-column"):
-                yield Static(
-                    f"[bold {ACCENT}]◆[/] [{TEXT_3}]LOCAL WORKSPACE[/]",
-                    classes="empty-kicker",
-                )
-                yield Wordmark(classes="empty-logo")
+                with Horizontal(classes="empty-logo-row"):
+                    yield Wordmark(
+                        id="empty-logo",
+                        classes="empty-logo",
+                        font=COMPACT_FONT if compact else _FONT,
+                    )
                 yield Static(
                     f"[b {TEXT}]{escape(self._greeting_line())}[/]",
                     classes="empty-greeting",
                 )
-                yield Static(f"[{TEXT_3}]{self._context_line()}[/]", classes="empty-meta")
                 yield Static(
                     f"[{TEXT_3}]{escape(self._subline)}[/]",
                     classes="empty-prompt",
                 )
-                for label, prompt in self._suggestions:
-                    yield SuggestionRow(label, prompt, classes="empty-suggestion")
-                yield Static(
-                    f"{keycap} enter [/] [{TEXT_3}]send[/]   "
-                    f"{keycap} ctrl+k [/] [{TEXT_3}]palette[/]   "
-                    f"{keycap} ctrl+t [/] [{TEXT_3}]sessions[/]",
-                    classes="empty-hint",
-                )
-
-    @on(SuggestionRow.Chosen)
-    def pick_suggestion(self, event: SuggestionRow.Chosen) -> None:
-        prompt = event.prompt
-        if not prompt:
-            return
-        try:
-            inp = self.app.query_one("#prompt-input", Input)
-        except Exception:
-            return
-        inp.value = prompt
-        inp.cursor_position = len(prompt)
-        inp.focus()

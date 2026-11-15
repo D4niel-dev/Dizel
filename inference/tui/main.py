@@ -4,12 +4,11 @@ import faulthandler
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import time
 import traceback
-
-from inference.tui.app import DizelCMDApp
 
 
 def _headless(prompt: str, checkpoint: str, device: str) -> int:
@@ -417,6 +416,48 @@ def _preload_local_model(checkpoint_arg: str, device: str):
             spinner.close()
 
 
+def _apply_staged_update(repo_root: str, force: bool = False) -> dict | None:
+    try:
+        from dizel_core import updater
+
+        pending = updater.pending_update(repo_root)
+        if not pending:
+            return None
+        if not force and not updater.auto_apply_allowed(repo_root):
+            return None
+        _say("↻", f"Applying Dizel {pending.get('version', 'update')}…", "mark")
+        result = updater.apply_pending_update(root=repo_root)
+        if result:
+            _say("✓", f"Applied Dizel {result['applied']} update", "ok")
+        return result
+    except Exception as error:
+        _say("!", f"Update apply failed: {error}", "warn")
+        return None
+
+
+def _relaunch_tui(argv: list[str]) -> int:
+    """Run the updated client under this process so the terminal is restored first."""
+    executable = sys.executable
+    if not executable:
+        _say("!", "Could not restart Dizel: no Python executable.", "warn")
+        return 1
+    _say("↻", "Restarting Dizel…", "mark")
+    try:
+        process = subprocess.Popen(
+            [executable, "-m", "inference.tui.main", *argv],
+            cwd=os.getcwd(),
+        )
+    except OSError as error:
+        _say("!", f"Could not restart Dizel: {error}", "warn")
+        return 1
+    while True:
+        try:
+            return process.wait()
+        except KeyboardInterrupt:
+            # Ctrl+C belongs to the restarted client; keep this supervisor alive.
+            continue
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Dizel terminal client")
     parser.add_argument("--checkpoint", "-c", type=str, default="", help="Path to a checkpoint (.pt/.gguf/.safetensors)")
@@ -424,6 +465,7 @@ def main() -> int:
     parser.add_argument("--prompt", "-p", type=str, default="", help="Run one prompt headlessly and exit")
     parser.add_argument("--resume", action="store_true", help="Open the most recent saved chat")
     args = parser.parse_args()
+    argv = sys.argv[1:]
 
     piped = ""
     if not sys.stdin.isatty():
@@ -441,6 +483,12 @@ def main() -> int:
     # Interactive mode. ChatManager logs with print(); send those to a file so
     # they cannot paint over the screen. Textual renders via sys.__stdout__.
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    # dizel.cmd applies before Python starts, but direct and npm launches do not.
+    # Apply here, then relaunch so every module comes from the new tree.
+    if _apply_staged_update(repo_root):
+        return _relaunch_tui(argv)
+
     log_dir = os.path.join(repo_root, "logs")
     os.makedirs(log_dir, exist_ok=True)
     real_stdout = sys.stdout
@@ -452,6 +500,7 @@ def main() -> int:
         faulthandler.enable(file=crash_file, all_threads=True)
     except Exception:
         pass
+    restart_requested = False
     try:
         sys.stdout = log_file
         _warm_local_runtime(args.checkpoint, repo_root)
@@ -467,12 +516,16 @@ def main() -> int:
             except Exception:
                 pass
         try:
-            DizelCMDApp(
+            from inference.tui.app import DizelCMDApp
+
+            app = DizelCMDApp(
                 checkpoint=args.checkpoint,
                 device=args.device,
                 preloaded=preloaded,
                 resume_session=resume_session,
-            ).run()
+            )
+            app.run()
+            restart_requested = bool(getattr(app, "restart_requested", False))
         except Exception:
             crash_file.write(traceback.format_exc())
             crash_file.flush()
@@ -481,6 +534,16 @@ def main() -> int:
         sys.stdout = real_stdout
         log_file.close()
         crash_file.close()
+
+    # A background download that finished during the session is applied on the
+    # way out, so the next start picks up the new tree. /update install asks for
+    # a relaunch now instead.
+    applied = _apply_staged_update(repo_root, force=restart_requested)
+    if restart_requested:
+        if applied:
+            return _relaunch_tui(argv)
+        _say("!", "The staged update could not be applied; start Dizel again to retry.", "warn")
+        return 1
     return 0
 
 

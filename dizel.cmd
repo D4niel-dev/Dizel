@@ -1,13 +1,9 @@
 @echo off
-rem Dizel launcher - asks which UI unless you are already inside one.
+rem Dizel launcher - asks which UI unless you are already inside one, or runs an update command.
 chcp 65001 >nul
 setlocal
 set START=%CD%
 pushd "%~dp0"
-
-if /i "%START%"=="%CD%\inference\gui" goto gui
-if /i "%START%"=="%CD%\inference\tui" goto tui
-if /i "%START%"=="%CD%\inference" goto tui
 echo.
 rem Several Python installs may be on PATH; only one has the dependencies.
 rem Resolved before the menu: the chooser itself needs Textual.
@@ -18,6 +14,16 @@ if not defined PYEXE (
     python -c "import textual" >nul 2>nul
     if not errorlevel 1 set PYEXE=python
 )
+
+rem Manual update commands work without opening a surface.
+if /i "%~1"=="update" goto update_cmd
+if /i "%~1"=="upgrade" goto update_cmd
+if /i "%~1"=="check-update" goto check_update_cmd
+if /i "%~1"=="check" goto check_update_cmd
+
+if /i "%START%"=="%CD%\inference\gui" goto gui
+if /i "%START%"=="%CD%\inference\tui" goto tui
+if /i "%START%"=="%CD%\inference" goto tui
 
 if not defined PYEXE goto plain_choice
 
@@ -115,6 +121,16 @@ echo.
 ) else (
 echo   [38;5;78m✓[0m  window closed
 )
+goto done
+
+:update_cmd
+if not defined PYEXE goto no_python
+%PYEXE% -m dizel_core.updater update
+goto done
+
+:check_update_cmd
+if not defined PYEXE goto no_python
+%PYEXE% -m dizel_core.updater check
 goto done
 
 :no_python

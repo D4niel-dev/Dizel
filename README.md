@@ -1,41 +1,52 @@
 <div align="center">
-  <img src="docs/assets/app/Dizel_banner.png"
-    width="60%"
-    height="60%"/>
+  <img src="docs/assets/demo/Dizel.png" alt="Dizel logo" width="104" height="103">
 </div>
-<div align="center">
 
-![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-EE4C2C?logo=pytorch)
-![Textual](https://img.shields.io/badge/TUI-Textual-5A5AFF)
-![Electron](https://img.shields.io/badge/Desktop-Electron%20%2B%20React-47848F?logo=electron)
-![License: MIT](https://img.shields.io/badge/Code-MIT-yellow.svg)
+<h1 align="center">Dizel</h1>
 
-</div>
+<p align="center">
+  <strong>Dizel 1.5</strong> — a 454.78M-parameter language model built from scratch,<br>
+  with a desktop app and terminal client that run it locally.
+</p>
+
+<p align="center">
+  <a href="https://github.com/D4niel-dev/Dizel/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/D4niel-dev/Dizel?style=flat-square&label=release&color=4457D5"></a>
+  <a href="https://github.com/D4niel-dev/Dizel/blob/main/LICENSE"><img alt="Code license: MIT" src="https://img.shields.io/github/license/D4niel-dev/Dizel?style=flat-square&color=4457D5"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="PyTorch 2.1+" src="https://img.shields.io/badge/pytorch-2.1%2B-EE4C2C?style=flat-square&logo=pytorch&logoColor=white">
+  <img alt="Desktop: Electron + React" src="https://img.shields.io/badge/desktop-Electron%20%2B%20React-47848F?style=flat-square&logo=electron&logoColor=white">
+  <img alt="TUI: Textual" src="https://img.shields.io/badge/tui-Textual-5A5AFF?style=flat-square">
+</p>
+
+<p align="center">
+  <sub>2,048-token context · F16 GGUF · MIT code / Apache-2.0 weights · Windows, macOS, Linux</sub>
+</p>
+
+<p align="center">
+  <a href="#start-here">Start here</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="https://d4niel-dev.github.io/Dizel/model.html">Model card</a> ·
+  <a href="#training">Training</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="https://d4niel-dev.github.io/Dizel/">Docs</a> ·
+  <a href="https://d4niel-dev.github.io/Dizel/demo.html">Interface demo</a>
+</p>
 
 **Dizel** is a small language model built from scratch, plus the local software that runs it. The repository contains the model architecture, the training pipeline, a Textual terminal client, an Electron desktop app, and the FastAPI sidecar they share.
 
 The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in public; its weights are not published yet. The v1.5 dense model remains the control and the released artifact.
 
-> **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 5,000 of 45,777. Nothing from v1.6 is a release yet.
+> **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 10,500 of 45,777. Nothing from v1.6 is a release yet.
 
 ---
 
-## Contents
+## Start here
 
-- [Status](#status)
-- [What's new](#whats-new)
-- [What's coming](#whats-coming)
-- [Quick start](#quick-start)
-- [Using Dizel](#using-dizel)
-- [Repository layout](#repository-layout)
-- [Training](#training)
-- [Architecture](#architecture)
-- [Overfitting on small data](#overfitting-on-small-data)
-- [VRAM guide](#vram-guide)
-- [Extending Dizel](#extending-dizel)
-- [FAQ](#faq)
-- [References](#references)
+**Model** · [Status](#status) · [What's new](#whats-new) · [What's coming](#whats-coming) · [Architecture](#architecture) · [VRAM guide](#vram-guide)
+
+**Use** · [Quick start](#quick-start) · [Using Dizel](#using-dizel) · [Extending Dizel](#extending-dizel)
+
+**Train** · [Training](#training) · [Overfitting on small data](#overfitting-on-small-data) · [FAQ](#faq) · [References](#references)
 
 ---
 
@@ -53,11 +64,10 @@ The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in pub
 | Metric          | Value                                                       |
 | --------------- | ----------------------------------------------------------- |
 | Run             | `dizel-1.6-preview-m1-pretrain`                             |
-| Progress        | 5,000 / 45,777 steps (10.9%)                                |
-| Tokens          | 327.7M / 3B                                                 |
-| Bits per byte   | **1.2057** on the fixed 500-document holdout                |
-| Validation loss | 3.6998                                                      |
-| Train loss      | 2.7982                                                      |
+| Progress        | 10,500 / 45,777 steps (22.9%)                               |
+| Tokens          | 688.1M / 3B                                                 |
+| Bits per byte   | **1.1236** on the fixed 500-document holdout                |
+| Validation loss | 3.4479                                                      |
 | Throughput      | ~21 s/step on the current T4 run                            |
 | Checkpoint      | Best snapshot synced to Drive; local copy in `checkpoints/` |
 
@@ -66,6 +76,8 @@ The local `checkpoints/dizel-1.6-preview-m1-best.pt` is a **pretrain snapshot fo
 ---
 
 ## What's new
+
+**Current maintenance release:** v2.0.1 (2026-11-15) adds the terminal update lifecycle, inline tool-result drawers in both clients, the desktop write/edit approval card, and one-command version stamping. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ### 1. The desktop app is Electron now (v2.0.0)
 
@@ -82,18 +94,25 @@ What shipped in the rewrite:
 - Settings for checkpoint, device, sampling, system prompt, appearance, speech, and shortcuts, plus a separate profile dialog.
 - Voice dictation through Whisper, with automatic model download on first use.
 - Context warning at 80% of the window, edit-and-resend, and handoff to a new chat.
+- Inline tool rows carry their real output; click one to expand an in-place drawer with a file diff, written content, read output, grep hits, or the sources behind a web search.
 
-### 2. The TUI is a real client, not a demo
+### 2. The app installs with npm
+
+Windows users can install the launcher with `npm install -g @d4niel-dev/dizel@latest`. `dizel install` downloads the matching GitHub release, verifies its SHA-256, installs the terminal client, and opens the desktop installer. `dizel doctor` reports what is still missing. The launcher is small; Python and model weights remain separate.
+
+### 3. The TUI is a real client, not a demo
 
 `inference/tui/` is a Textual application with the same engine as the desktop app:
 
 - Single-column chat, `Ctrl+T` session drawer, `Ctrl+R` context rail, `Ctrl+A` artifacts, `Ctrl+K` command palette.
 - Slash commands for `/load`, `/model`, `/provider`, `/tier`, `/mode`, `/session`, `/context`, `/export`, `/settings`, and more.
 - **Flash** / **Pro** tiers for Dizel checkpoints, and **Fast** / **Planning** / **Coding** / **Thinking** / **Deep Think** modes.
+- Tool rows expand in place: edits show their diff, writes show the written content, and searches show hits or source URLs. Click a row to toggle its inline drawer; no separate window.
 - Local checkpoints and remote providers in the same surface.
+- The status line shows `UPDATE vX` while a release is waiting.
 - Headless mode for scripts: `python -m inference.tui.main --prompt "..."`.
 
-### 3. Checkpoint switching is serialized and observable
+### 4. Checkpoint switching is serialized and observable
 
 Both clients share `dizel_core/`:
 
@@ -104,13 +123,13 @@ Both clients share `dizel_core/`:
 - `.pt` checkpoints load memory-mapped on CPU and drop the training optimizer state, so a 5 GB pretrain checkpoint does not need 5 GB of resident RAM before the model is built.
 - A 20-second load watchdog writes a thread dump to `logs/tui_load_stacks.log`; normal load progress goes to `logs/tui_load.log`.
 
-### 4. v1.6 is a different model, not a bigger v1.5
+### 5. v1.6 is a different model, not a bigger v1.5
 
 v1.6 moves from a dense FFN to a **4-expert, top-2 dropless MoE**, switches to the **Qwen2.5 tokenizer**, and trains on **ChatML**. It keeps the same 2,048-token context and the same tied-embedding, RMSNorm, RoPE, GQA, SwiGLU backbone.
 
 The checkpoint format and loader understand both generations. New v1.6 checkpoints default to ChatML, the Qwen tokenizer, and system prompts even when an older save lacks the metadata flags. v1.5 checkpoints keep their raw `<|role|>` path and SentencePiece tokenizer.
 
-### 5. v1.5 is published as F16
+### 6. v1.5 is published as F16
 
 The released v1.5 artifact is the **F16 GGUF** (`~1.1 GB`), plus the source `.pt` checkpoint, which the native loader can also run:
 
@@ -120,9 +139,9 @@ ollama run D4niel-dev/Dizel-1.5
 
 Q4_K_M and Q8_0 conversions were evaluated and **rejected** for release. Do not present them as supported artifacts. The published tag is F16.
 
-### 6. The docs are product-led
+### 7. The docs are product-led
 
-`docs/index.html` is now a landing page for the model and the app, not a feature dump. It states the Preview status plainly and shows the live pretrain numbers. `docs/demo.html` is a scripted browser replica of the desktop interface; it is not the model.
+`docs/index.html` is now a landing page for the model and the app, not a feature dump. It states the Preview status plainly and shows the live pretrain numbers. The published site is [d4niel-dev.github.io/Dizel](https://d4niel-dev.github.io/Dizel/); `docs/demo.html` is a scripted browser replica of the desktop interface, not the model.
 
 ---
 
@@ -135,7 +154,7 @@ The remaining path is fixed:
 1. Finish Phase A pretraining: 45,777 steps / 3B tokens at 65,536 tokens per step.
 2. Run SFT: 3,000 steps on the ChatML assistant-only mix.
 3. Run token-level KD: 2,000 steps from `Qwen/Qwen2.5-0.5B-Instruct`, KL weight 0.5, temperature 2.0.
-4. Run optional DPO: 1,000 steps, experimental.
+4. Run optional DPO: 1,000 steps, experimental. The pairs are scored offline with the Skywork reward model before training.
 5. Validate every resume and Drive save from a fresh runtime.
 6. Run the fixed BPB, behavioral, safety, speed, and RAM checks.
 
@@ -170,11 +189,21 @@ There is no vision encoder. The model is text-only. The desktop app's image and 
 
 - **Python 3.10+**
 - **PyTorch 2.1+** (CUDA strongly recommended for local inference and required for realistic training)
-- **Node.js 18+** for the desktop app
+- **Node.js 18+** for the npm launcher and the desktop app
 - **Windows** for the `dizel.cmd` launcher; the Python modules run on macOS and Linux too
 - Optional: an NVIDIA GPU with a current CUDA build of `llama-cpp-python` for GGUF acceleration
 
-### Install
+### Install the app (Windows)
+
+```bash
+npm install -g @d4niel-dev/dizel@latest
+dizel install
+dizel doctor
+```
+
+The launcher downloads the release that matches its own version. It does not bundle Python or model weights.
+
+### From source
 
 ```bash
 git clone https://github.com/D4niel-dev/Dizel.git
@@ -213,6 +242,8 @@ HF_TOKEN=hf_your_token_here
 
 ### Launch
 
+From a source checkout, run the repository's Windows launcher:
+
 ```bat
 dizel
 ```
@@ -233,6 +264,8 @@ cd inference/gui
 npm install
 npm run dev
 ```
+
+If you installed with npm, `dizel tui` and `dizel gui` start the installed clients without a source checkout.
 
 The desktop app auto-detects a Python interpreter that can import FastAPI. Override it with `DIZEL_PYTHON` if needed:
 
@@ -400,7 +433,7 @@ Dizel/
 │   └── tutorial_manager.py
 │
 ├── api/
-│   ├── main.py                  # FastAPI sidecar, version 2.0.0
+│   ├── main.py                  # FastAPI sidecar, version 2.0.1
 │   ├── security.py              # loopback token auth, origin allowlist
 │   ├── routes/                  # chat, config, health, memory, models, nova, profile, providers, session
 │   └── services/                # chat, config, memory, session wrappers
@@ -422,7 +455,7 @@ Dizel/
 │       ├── electron/            # main process, preload, sidecar supervisor
 │       ├── src/                 # React renderer, components, store, services
 │       ├── public/              # icons and static assets
-│       └── package.json         # v2.0.0; npm run dev / build / dist
+│       └── package.json         # v2.0.1; npm run dev / build / dist
 │
 ├── tokenizer/
 │   ├── dizel_v15.model          # 100K SentencePiece BPE, byte fallback
@@ -436,6 +469,8 @@ Dizel/
 │   ├── convert_to_safetensors.py
 │   ├── eval_holdout_bpb.py      # fixed byte-level holdout BPB
 │   ├── smoke_test_v16.py        # architecture/router/checkpoint smoke tests
+│   ├── score_dpo_pairs_v16.py   # Skywork RM scoring + filtered DPO train/val split
+│   ├── test_reward_filter_v16.py
 │   ├── test_model_lifecycle.py  # load/swap/failure/unload regression tests
 │   ├── test_inference_backend.py
 │   ├── push_to_hub.py           # Hugging Face release helper
@@ -630,6 +665,32 @@ python training/dpo_v16.py \
 ```
 
 DPO is experimental. Beta 0.5, label smoothing 0.05, max length 1,536, max prompt 768, lr 5e-6. The reference checkpoint defaults to the base checkpoint, so this run freezes the KD result.
+
+**Reward model.** DPO's loss uses only the policy and frozen-reference log-probabilities; it does not load an external reward model. The v1.6 DPO phase uses [`Skywork/Skywork-Reward-V2-Qwen3-1.7B`](https://huggingface.co/Skywork/Skywork-Reward-V2-Qwen3-1.7B) offline to check the preference direction, filter noisy training pairs, and keep an unfiltered held-out set. The model is Apache-2.0, Qwen3-1.7B based, and exposes a scalar Bradley-Terry reward (`num_labels=1`).
+
+```bash
+python scripts/score_dpo_pairs_v16.py \
+  --input data/v16/posttrain/dpo.jsonl \
+  --scored_output data/v16/posttrain/dpo_rm_scored.jsonl \
+  --output data/v16/posttrain/dpo_rm_filtered.jsonl \
+  --val_output data/v16/posttrain/dpo_rm_val.jsonl \
+  --report data/v16/posttrain/dpo_rm_report.json \
+  --batch_size 2 --max_length 1536 --min_margin 0.0
+```
+
+Then train on the filtered split and validate on the unfiltered one:
+
+```bash
+python training/dpo_v16.py \
+  --base_checkpoint checkpoints/dizel-1.6-preview-m1-distill/dizel-1.6-preview-m1-distill-final.pt \
+  --data data/v16/posttrain/dpo_rm_filtered.jsonl \
+  --val_data data/v16/posttrain/dpo_rm_val.jsonl \
+  --max_steps 1000
+```
+
+The report records RM agreement, margin percentiles, per-source drops, and SHA-256 hashes. On the current v1.6 set, the 1.7B RM agrees with the labelled preference on 90.3% of 9,975 pairs; the default filter keeps 8,586 of 9,477 training pairs and reserves 498 unfiltered validation pairs. Margins are relative, not calibrated probabilities; `--min_margin 0.0` keeps pairs the RM ranks correctly, and a negative threshold keeps near-ties. On a T4 use `--dtype float16`; Ampere or newer defaults to bf16. The scorer strips Dizel's system prompt because the Skywork card says not to include system prompts. It requires `transformers>=4.51` for Qwen3. `--resume` continues a partial score file after verifying the input hash and settings.
+
+Do not describe DPO as "trained with the Skywork reward model": the RM is an offline data-quality and evaluation tool, not part of the DPO objective.
 
 ### Resume rules
 
@@ -894,9 +955,23 @@ The repository code is MIT. The published v1.5 model weights are Apache-2.0. Tra
 
 Both surfaces read stable builds from [GitHub Releases](https://github.com/D4niel-dev/Dizel/releases). A release is not installed unless its SHA-256 digest matches the release manifest.
 
-- **Desktop** checks in the background every six hours. Settings → About shows the state, downloads the NSIS installer, and offers **Restart & install**. The packaged app uses `electron-updater`; development builds open the release page instead.
-- **Terminal** checks in the background, verifies and extracts the TUI archive under `.dizel/updates/`, and applies it from `dizel.cmd` before the next launch. `/update` shows status and can check or download on demand. Run `/update auto off` to disable background checks.
+- **Desktop** checks in the background every six hours. Settings → About shows the state, downloads the NSIS installer, and offers **Restart & install**. A header and sidebar badge mark available, downloading, and ready states. The packaged app uses `electron-updater`; development builds open the release page instead.
+- **Terminal** checks in the background, verifies and extracts the TUI archive under `.dizel/updates/`, and applies it automatically when you quit or on the next launch. A source checkout with uncommitted changes skips the automatic apply so local work is not overwritten. `/update install` applies a staged update and restarts immediately, `/update` checks and can download on demand, and `/check-update` only checks. Run `/update auto off` to disable background checks. From the Windows launcher, `dizel update` does the check/download/stage step and `dizel check-update` only checks.
 - **No user data is replaced.** Chats, settings, model files, and checkpoints are never part of the TUI archive or its apply step. The packaged desktop app stores settings and history under Electron's user-data folder, outside the install directory, so an installer update leaves them intact.
+
+### Versioning
+
+`dizel_core/version.py` is the canonical application version. The TUI status line and launcher, the API facts, the GUI About card, and the npm launcher all report the stamped value. Do not edit the GUI or npm manifests by hand:
+
+```bash
+python scripts/set_version.py show                 # print the current version
+python scripts/set_version.py bump patch           # 2.0.0 -> 2.0.1
+python scripts/set_version.py bump minor           # 2.0.1 -> 2.1.0
+python scripts/set_version.py set 2.1.0
+python scripts/set_version.py check                # fail on manifest drift
+```
+
+The command updates `dizel_core/version.py`, `inference/gui/package.json`, the GUI lockfile, and `npm/package.json` together. The console banners are covered too: `◆ Dizel … · desktop` reads the GUI manifest, while the TUI pre-UI header, launcher, and status line read `dizel_core/version.py`. CI runs `check` so a partially bumped tree cannot merge. Restart the TUI and rebuild the GUI to see the new value; running processes keep the version they started with. Model versions in `model/dizel_info.py` are separate from the app version.
 
 ### Publishing a release
 
@@ -907,9 +982,13 @@ The `Release` workflow (`.github/workflows/release.yml`) runs on a `v*` tag or m
 - `dizel-gui-<version>.tgz` from `npm pack`.
 - `dizel-update.json`, the checksummed manifest the TUI updater reads.
 
+The same workflow publishes the `@d4niel-dev/dizel` launcher to npm in a separate job, using the `NPM_TOKEN` repository secret. Stable versions publish under `latest`; versions with a hyphen publish under `next`.
+
+The GitHub release body is the matching `CHANGELOG.md` section. `scripts/release_notes.py` extracts it and fails the release job if the section is missing, so a tag cannot ship without notes.
+
 The installer carries the Python application code, but local inference still uses the machine's Python environment. Run `pip install -r requirements.txt` once as documented above.
 
-Release tags are the unified app version and must increase monotonically. The historical `GUI v1.0.x` and `TUI v2.0.x` labels are component milestones, not updater tags. The first updater-capable release should therefore be `v2.0.1` or higher; tagging `v1.0.3` would look older than the installed `2.0.0` and would not be offered.
+Release tags are the unified app version and must increase monotonically. The historical `GUI v1.0.x` and `TUI v2.0.x` labels are component milestones, not updater tags. `v2.0.0` is the first updater-capable release; a `v1.0.3` tag would look older than the installed `2.0.0` and would not be offered.
 
 ---
 
@@ -944,5 +1023,11 @@ Release tags are the unified app version and must increase monotonically. The hi
 - **llama.cpp / llama-cpp-python** — [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) — GGUF inference.
 - **Ollama** — [ollama.com](https://ollama.com/) — local model packaging.
 - **Hugging Face** — [huggingface.co](https://huggingface.co/docs) — datasets, tokenizers, and model hosting.
+
+---
+
+<p align="center">
+  <sub>Built in public by <a href="https://github.com/D4niel-dev">D4niel-dev</a> · <a href="https://d4niel-dev.github.io/Dizel/">Docs</a> · <a href="https://github.com/D4niel-dev/Dizel/releases">Releases</a> · <a href="https://github.com/D4niel-dev/Dizel/issues">Issues</a></sub>
+</p>
 
 

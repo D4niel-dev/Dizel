@@ -61,6 +61,14 @@ def test_theme_init_precedes_stylesheet_and_covers_both_themes():
         assert token in css
 
 
+def test_scoped_resets_do_not_outrank_component_spacing():
+    css = read("styles/site.css")
+    assert ".site :where(p)" in css
+    assert ".site :where(a)" in css
+    assert ".site p {" not in css
+    assert ".site a {" not in css
+
+
 def test_nav_footer_and_theme_toggle_everywhere():
     for name in PAGES:
         text = read(name)
@@ -183,5 +191,5 @@ def test_404_is_noindex_and_not_in_sitemap():
 
 def test_theme_toggle_is_hidden_without_js():
     css = read("styles/site.css")
-    assert ".theme-toggle { display: none; }" in css
+    assert ".theme-toggle { display: none;" in css
     assert ".js .theme-toggle" in css

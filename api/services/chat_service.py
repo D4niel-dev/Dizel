@@ -10,9 +10,11 @@ load progress.
 """
 
 import asyncio
+import itertools
 import json
 import os
 import threading
+import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -37,6 +39,11 @@ class ChatService:
 
     _manager: Optional[ChatManager] = None
     _manager_lock = threading.Lock()
+
+    # File writes pause the tool thread until the GUI answers. The SSE stream
+    # keeps running, so the approval event and later tool events can arrive.
+    _approval_lock = threading.Lock()
+    _approvals: Dict[str, Dict[str, Any]] = {}
 
     # Model loading is slow enough (a 1.1 GB GGUF on CPU is 10–30s) that it
     # must not block the request. A polled status object keeps the UI honest.
@@ -194,7 +201,54 @@ class ChatService:
     def stop(cls) -> Dict[str, Any]:
         manager = cls.get_manager()
         manager.stop_generation()
+        cls.cancel_tool_approvals()
         return {"status": "stopping", "was_generating": manager.is_generating}
+
+    @classmethod
+    def _request_tool_approval(cls, change, emit, tool_id: int = 0) -> bool:
+        """Emit a diff and block the tool thread until the GUI answers."""
+        approval_id = uuid.uuid4().hex
+        waiting = threading.Event()
+        entry = {"event": waiting, "approved": False}
+        with cls._approval_lock:
+            cls._approvals[approval_id] = entry
+
+        emit(
+            {
+                "type": "approval",
+                "id": approval_id,
+                "tool_id": tool_id,
+                "tool": change.tool,
+                "path": change.path,
+                "action": change.action,
+                "diff": change.diff,
+                "additions": change.additions,
+                "deletions": change.deletions,
+            }
+        )
+
+        waiting.wait(300)
+        with cls._approval_lock:
+            entry = cls._approvals.pop(approval_id, entry)
+        return bool(entry.get("approved"))
+
+    @classmethod
+    def resolve_tool_approval(cls, approval_id: str, approved: bool) -> bool:
+        with cls._approval_lock:
+            entry = cls._approvals.get(approval_id)
+        if entry is None:
+            return False
+        entry["approved"] = bool(approved)
+        entry["event"].set()
+        return True
+
+    @classmethod
+    def cancel_tool_approvals(cls) -> None:
+        with cls._approval_lock:
+            entries = list(cls._approvals.values())
+        for entry in entries:
+            entry["approved"] = False
+            entry["event"].set()
 
     @classmethod
     async def stream_chat(
@@ -254,7 +308,12 @@ class ChatService:
         queue: "asyncio.Queue[Dict[str, Any]]" = asyncio.Queue()
 
         def _put(event: Dict[str, Any]) -> None:
-            loop.call_soon_threadsafe(queue.put_nowait, event)
+            try:
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+            except RuntimeError:
+                # The client disconnected and the loop is gone; the tool thread
+                # should unwind rather than raise on a dead delivery channel.
+                pass
 
         def on_token(token: str) -> None:
             _put({"type": "token", "text": token})
@@ -333,39 +392,81 @@ class ChatService:
             except Exception as exc:
                 print(f"[dizel-api] compaction failed: {exc}", flush=True)
 
-        def on_tool(call, outcome) -> None:
-            # Surfaced as a system line so the user can see what ran, and what it
-            # was asked to do, without it looking like part of the answer.
-            name = call.get("name", "?")
-            args = ", ".join(f"{k}={v!r}" for k, v in (call.get("args") or {}).items())
-            preview = (outcome or "").strip().splitlines()
-            first = preview[0][:90] if preview else "(no output)"
+        from dizel_core import tools as tool_registry
+
+        tool_keys = itertools.count(1)
+        tool_context = threading.local()
+
+        def on_tool_start(call: Dict[str, Any]) -> None:
+            key = next(tool_keys)
+            call["_gui_key"] = key
+            tool_context.key = key
+            _put(
+                {
+                    "type": "tool",
+                    "phase": "start",
+                    "id": key,
+                    "name": str(call.get("name") or "?"),
+                    "detail": tool_registry.display_detail(call),
+                }
+            )
+
+        def on_tool(call: Dict[str, Any], outcome: str) -> None:
             try:
                 get_usage_manager().charge_tool_calls(1)
             except Exception:
                 pass
-            _put({"type": "notice", "text": f"tool {name}({args}) → {first}"})
+            name = str(call.get("name") or "?")
+            key = int(call.get("_gui_key") or 0)
+            payload = tool_registry.ui_payload(call, outcome)
+            payload.update({"type": "tool", "id": key})
+            if tool_registry.outcome_failed(name, outcome):
+                first = (outcome or "").strip().splitlines()
+                preview = first[0][:90] if first else "failed"
+                prefix = f"[{name}] "
+                if preview.startswith(prefix):
+                    preview = preview[len(prefix) :]
+                payload.update({"phase": "failed", "detail": preview})
+            else:
+                payload["phase"] = "done"
+            _put(payload)
+
+        def run_send() -> None:
+            try:
+                manager.send_with_tools(
+                    user_text=user_text,
+                    attachments=attachments or [],
+                    on_token=on_token,
+                    on_done=on_done,
+                    on_error=on_error,
+                    on_tool=on_tool,
+                    on_tool_start=on_tool_start,
+                    approve_tool=lambda change: cls._request_tool_approval(
+                        change, _put, getattr(tool_context, "key", 0)
+                    ),
+                    on_thinking=on_thinking,
+                    continuation=continuation,
+                )
+            except Exception as exc:
+                _put({"type": "error", "message": str(exc)})
+            finally:
+                _put({"type": "__send_end__"})
+
+        threading.Thread(
+            target=run_send, name="dizel-chat-stream", daemon=True
+        ).start()
 
         terminal = False
         try:
-            manager.send_with_tools(
-                user_text=user_text,
-                attachments=attachments or [],
-                on_token=on_token,
-                on_done=on_done,
-                on_error=on_error,
-                on_tool=on_tool,
-                on_thinking=on_thinking,
-                continuation=continuation,
-            )
-
             # ── drain ────────────────────────────────────────────────────
-            # A hard ceiling stops a wedged backend from holding the socket open
-            # forever. The UI can always cancel client-side.
+            # The tool loop runs in its own thread so approval waits can emit
+            # events while the write is still blocked. A hard ceiling stops a
+            # wedged backend from holding the socket open forever.
             deadline = asyncio.get_running_loop().time() + 900
             while True:
                 timeout = deadline - asyncio.get_running_loop().time()
                 if timeout <= 0:
+                    terminal = True
                     yield _sse({"type": "error", "message": "Generation timed out."})
                     return
                 try:
@@ -375,6 +476,17 @@ class ChatService:
                     yield {"comment": "keepalive"}
                     continue
 
+                if event["type"] == "__send_end__":
+                    if not terminal:
+                        terminal = True
+                        yield _sse(
+                            {
+                                "type": "error",
+                                "message": "Generation ended without a reply.",
+                            }
+                        )
+                    return
+
                 yield _sse(event)
                 if event["type"] in ("done", "error"):
                     terminal = True
@@ -383,8 +495,10 @@ class ChatService:
             # A client that hangs up mid-reply must not leave the generation
             # slot claimed; otherwise the next prompt (or new chat) is refused
             # with "already being generated" until the provider finishes.
-            if not terminal and manager.is_generating:
-                manager.stop_generation()
+            if not terminal:
+                cls.cancel_tool_approvals()
+                if manager.is_generating:
+                    manager.stop_generation()
 
 
 __all__ = ["ChatService"]
