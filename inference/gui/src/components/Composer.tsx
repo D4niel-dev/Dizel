@@ -492,7 +492,7 @@ export function Composer() {
           rows={1}
           value={draft}
           spellCheck={spellcheck}
-          disabled={!ready}
+          disabled={!booted}
           placeholder={placeholder()}
           aria-autocomplete="list"
           aria-expanded={drawerOpen}

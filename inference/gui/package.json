@@ -1,6 +1,6 @@
 {
   "name": "dizel-gui",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "description": "Dizel \u2014 desktop application",
   "author": "D4niel-dev",
@@ -12,6 +12,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/run-smoke.cjs",
+    "test:preload": "node scripts/test-preload.cjs",
     "dist": "npm run build && electron-builder --win --x64 --publish never",
     "pack:tui": "python ../../scripts/package_tui.py"
   },

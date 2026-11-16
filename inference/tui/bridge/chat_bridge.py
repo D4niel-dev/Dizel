@@ -79,11 +79,37 @@ class ChatBridge:
 
     def _approve_tool(self, change) -> bool:
         """Block the tool thread until the user approves or rejects the diff."""
+        from dizel_core import tool_trust
+        from dizel_core.tools import _project_root
+
+        persistent = tool_trust.persistent_enabled()
+        if tool_trust.should_auto_approve(
+            change,
+            self._session_id,
+            session_grants=self.app._trusted_sessions,
+            persistent=persistent,
+            root=_project_root(),
+        ):
+            tier = "persistent" if persistent else "session"
+            self._post(
+                self.SystemLog(f"Auto-approved {change.tool} {change.path} ({tier})")
+            )
+            return True
+
         event = threading.Event()
         holder: dict = {"modal": None, "approved": False}
 
-        def done(approved: bool | None) -> None:
-            holder["approved"] = bool(approved)
+        def done(decision: str | None) -> None:
+            decision = decision if decision in tool_trust.DECISIONS else tool_trust.DENY
+            if decision == tool_trust.ALWAYS_SESSION:
+                tool_trust.record_session_grant(
+                    self.app._trusted_sessions, self._session_id
+                )
+                self.app.trust_revision += 1
+            elif decision == tool_trust.ALWAYS_PERSISTENT:
+                tool_trust.set_persistent(True)
+                self.app.trust_revision += 1
+            holder["approved"] = tool_trust.approved_for(decision)
             event.set()
 
         def show() -> None:
@@ -101,10 +127,16 @@ class ChatBridge:
         except Exception:
             return False
         if not event.wait(180):
-            try:
+            def _dismiss_if_open() -> None:
                 modal = holder.get("modal")
-                if modal is not None:
-                    self.app.call_from_thread(modal.dismiss, False)
+                try:
+                    if modal is not None and self.app.screen is modal:
+                        modal.dismiss(tool_trust.DENY)
+                except Exception:
+                    pass
+
+            try:
+                self.app.call_from_thread(_dismiss_if_open)
             except Exception:
                 pass
             return False

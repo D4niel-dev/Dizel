@@ -36,6 +36,9 @@ class StatusBar(Container):
         self._hint = ""
         self._frame = 0
         self._glyph = "●"
+        self._trust_tick = 0
+        self._trust_persistent = False
+        self._trust_revision_seen = -1
 
     def compose(self) -> ComposeResult:
         yield Static(id="status-left")
@@ -54,6 +57,8 @@ class StatusBar(Container):
             "last_reply",
             "debug_mode",
             "update_ready",
+            "trust_revision",
+            "session_id",
         ):
             self.watch(self.app, prop, self.update_status)
 
@@ -61,13 +66,17 @@ class StatusBar(Container):
         """One cell of motion while the app is working — the terminal's spinner."""
         from inference.tui.settings_apply import chat_pref
 
+        self._trust_tick += 1
+        trust_due = self._trust_tick % 16 == 0
+        if trust_due:
+            self._refresh_trust()
         if self.app.generation_state not in ("STREAMING", "THINKING", "LOADING"):
-            if self._glyph != "●":
+            if self._glyph != "●" or trust_due:
                 self._glyph = "●"
                 self.update_status()
             return
         if not chat_pref(self.app, "animations", True):
-            if self._glyph != "●":
+            if self._glyph != "●" or trust_due:
                 self._glyph = "●"
                 self.update_status()
             return
@@ -84,6 +93,18 @@ class StatusBar(Container):
 
     def reset_hint(self) -> None:
         self.set_hint("")
+
+    def _refresh_trust(self) -> None:
+        from dizel_core import tool_trust
+
+        self._trust_persistent = tool_trust.persistent_enabled()
+
+    def _trust_marker(self) -> str:
+        active = self._trust_persistent or (
+            bool(self.app.session_id)
+            and self.app.session_id in self.app._trusted_sessions
+        )
+        return f"[bold {WARN}]writes:auto[/]   " if active else ""
 
     def _reply_metrics(self, width: int) -> str:
         reply = getattr(self.app, "last_reply", None)
@@ -107,6 +128,12 @@ class StatusBar(Container):
         return f"[{TEXT_3}]◷[/] [{TEXT_2}]{' · '.join(parts)}[/]"
 
     def update_status(self, *_: object) -> None:
+        # Disk reads stay off the repaint hot path: refresh only on a trust
+        # revision bump or the ~2s poll, never on every spinner tick.
+        revision = int(self.app.trust_revision)
+        if revision != self._trust_revision_seen:
+            self._trust_revision_seen = revision
+            self._refresh_trust()
         state = self.app.generation_state
         if state == "STREAMING":
             color, label, hint = ACCENT, "generating", "esc stop"
@@ -175,7 +202,7 @@ class StatusBar(Container):
             else ""
         )
         self.query_one("#status-right").update(
-            f"{badge}{debug}[{TEXT_3}]{hints}[/]"
+            f"{badge}{debug}{self._trust_marker()}[{TEXT_3}]{hints}[/]"
         )
 
     def on_resize(self, event: events.Resize) -> None:

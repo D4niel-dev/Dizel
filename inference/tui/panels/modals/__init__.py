@@ -22,6 +22,7 @@ from inference.tui.panels.modals.pickers import (
 )
 from inference.tui.panels.modals.session_manager import SessionManagerModal
 from inference.tui.panels.modals.settings_modal import SettingsModal
+from inference.tui.panels.modals.release_notes import ReleaseNotesModal
 from inference.tui.panels.modals.tool_approval import ToolApprovalModal
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "PickerItem",
     "PickerModal",
     "ProviderPickerModal",
+    "ReleaseNotesModal",
     "SessionManagerModal",
     "SettingsModal",
     "TextPromptModal",

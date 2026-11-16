@@ -8,6 +8,8 @@ import threading
 import unittest
 from unittest import mock
 
+from textual.widgets import Button
+
 from dizel_core.config_manager import ConfigManager
 from dizel_core.tools import FileChange
 from dizel_core.usage_manager import UsageManager
@@ -189,7 +191,7 @@ class ToolFlowTests(unittest.TestCase):
 
         opened, results = self._run((120, 36), script)
         self.assertTrue(opened)
-        self.assertEqual(results, [True])
+        self.assertEqual(results, ["allow_once"])
 
     def test_write_approval_modal_defaults_to_reject(self):
         change = FileChange("edit_file", "notes.txt", "edit", "", 0, 0)
@@ -202,7 +204,17 @@ class ToolFlowTests(unittest.TestCase):
             await pilot.pause()
             return results
 
-        self.assertEqual(self._run((120, 36), script), [False])
+        self.assertEqual(self._run((120, 36), script), ["deny"])
+
+    def test_write_approval_modal_renders_markup_path_literally(self):
+        change = FileChange("write_file", "report[final].md", "create", "", 0, 0)
+
+        async def script(app, pilot):
+            app.push_screen(ToolApprovalModal(change))
+            await pilot.pause()
+            return app.screen.query_one(".approval-path").render().plain
+
+        self.assertEqual(self._run((120, 36), script), "report[final].md")
 
     def test_chat_bridge_blocks_the_tool_thread_until_approval(self):
         change = FileChange(
@@ -237,6 +249,41 @@ class ToolFlowTests(unittest.TestCase):
         self.assertTrue(opened)
         self.assertTrue(approved)
         self.assertFalse(alive)
+
+    def test_delete_approval_modal_is_a_destructive_always_manual_gate(self):
+        change = FileChange("delete_file", "notes.txt", "delete", "-one\n-two", 0, 2)
+
+        async def script(app, pilot):
+            results = []
+            app.push_screen(ToolApprovalModal(change), results.append)
+            await pilot.pause()
+            title = app.screen.query_one(".modal-title").render().plain
+            warning = app.screen.query_one(".approval-warning").render().plain
+            buttons = [b.id for b in app.screen.query(Button)]
+            await pilot.press("y")
+            await pilot.pause()
+            return title, warning, buttons, results
+
+        title, warning, buttons, results = self._run((120, 36), script)
+        self.assertEqual(title, "Delete file")
+        self.assertIn("recycle bin", warning.lower())
+        self.assertIn("approval", warning.lower())
+        # Delete never offers a standing "always allow" — only reject/approve.
+        self.assertEqual(buttons, ["approval-reject", "approval-ok"])
+        self.assertEqual(results, ["allow_once"])
+
+    def test_delete_approval_modal_defaults_to_reject(self):
+        change = FileChange("delete_file", "notes.txt", "delete", "", 0, 0)
+
+        async def script(app, pilot):
+            results = []
+            app.push_screen(ToolApprovalModal(change), results.append)
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+            return results
+
+        self.assertEqual(self._run((120, 36), script), ["deny"])
 
 
 if __name__ == "__main__":

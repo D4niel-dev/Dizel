@@ -40,7 +40,7 @@ declare global {
         defaultName: string,
         json: string,
       ): Promise<string | { error: string } | null>;
-      onNewChat(callback: () => void): void;
+      onNewChat(callback: () => void): () => void;
       pathForFile(file: File): string;
       readDataUrl(
         path: string,

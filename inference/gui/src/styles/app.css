@@ -1554,6 +1554,156 @@ textarea {
   }
 }
 
+/* ── Ctrl+K command palette ────────────────────────────────────────────
+   A global overlay above the settings/debug layers but below the blocking
+   write-approval gate (z-index 240). Reuses the command-item row styles. */
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: grid;
+  place-items: start center;
+  padding: 12vh 24px 24px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: palette-fade 130ms var(--ease) both;
+}
+
+.command-palette {
+  width: min(600px, 100%);
+  max-height: min(64vh, 560px);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 12px;
+  text-align: left;
+  background: color-mix(in srgb, var(--bg-panel) 96%, var(--bg-chat));
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, var(--border));
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  animation: palette-rise 160ms var(--ease) both;
+}
+
+.command-palette-input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+}
+
+.command-palette-input::placeholder {
+  color: var(--text-dim);
+}
+
+.command-palette-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.command-palette-list {
+  margin-top: 8px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  scrollbar-color: color-mix(in srgb, var(--text-primary) 22%, transparent) transparent;
+}
+
+.command-palette-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.command-palette-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.command-palette-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-primary) 20%, transparent);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.command-palette .command-name {
+  flex-basis: 210px;
+}
+
+.command-palette-empty {
+  padding: 18px 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.command-palette-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 4px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.command-palette-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.command-palette-foot kbd {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+@keyframes palette-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes palette-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .command-palette-backdrop {
+    padding: 8vh 12px 12px;
+  }
+  .command-palette .command-name {
+    flex-basis: 130px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-palette-backdrop,
+  .command-palette {
+    animation: none;
+  }
+}
+
 /* ── Markdown ──────────────────────────────────────────────────────────── */
 
 .md {
@@ -2471,6 +2621,51 @@ textarea {
   padding: 28px 0;
   font-size: 13px;
   color: var(--text-dim);
+}
+
+/* In-app release notes: the bundled changelog, read offline. Sits above the
+   settings dialog (100) but below the blocking write-approval gate (240). */
+.release-notes-backdrop {
+  z-index: 230;
+}
+.release-notes-modal {
+  width: 680px;
+}
+.release-notes-version {
+  flex-shrink: 0;
+  margin-right: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.release-notes-body {
+  padding: 8px 22px 22px;
+}
+.release-notes-new {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.set-nav-dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 
 .field {
@@ -8759,11 +8954,31 @@ body.is-resizing-panel {
   font-size: 12px;
 }
 
+.tool-approval-trust-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.trust-chip {
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .tool-approval-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding: 14px 20px 20px;
+}
+
+.tool-approval.is-delete {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.tool-approval.is-delete .tool-approval-head h2,
+.tool-approval.is-delete .tool-approval-warning {
+  color: var(--danger);
 }
 
 @media (prefers-reduced-motion: reduce) {

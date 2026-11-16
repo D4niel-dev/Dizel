@@ -79,7 +79,9 @@ contextBridge.exposeInMainWorld("dizel", {
     ipcRenderer.invoke("dialog:save-json", { defaultName, json }),
 
   onNewChat: (callback) => {
-    ipcRenderer.on("app:new-chat", () => callback());
+    const handler = () => callback();
+    ipcRenderer.on("app:new-chat", handler);
+    return () => ipcRenderer.removeListener("app:new-chat", handler);
   },
 
   /** Electron 32+ removed File.path; this is the supported replacement. */

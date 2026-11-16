@@ -15,6 +15,15 @@ export function StatusBar() {
   const booted = useChat((s) => s.booted);
   const sessionId = useChat((s) => s.sessionId);
   const budgetOverride = useChat((s) => s.budgetOverride);
+  const trust = useChat((s) => s.trust);
+  const approval = useChat((s) => s.approval);
+  const trustActive = Boolean(trust && (trust.persistent || trust.session_trusted));
+
+  // Trust can change from Settings, from a gate decision, or from another
+  // surface entirely — refresh on session/approval changes and with the poll.
+  useEffect(() => {
+    void useChat.getState().refreshTrust();
+  }, [sessionId, approval]);
   const [usage, setUsage] = useState<ContextUsage | null>(null);
 
   // Debounced so a streaming reply doesn't fire a request per token.
@@ -39,6 +48,7 @@ export function StatusBar() {
           if (alive) setWindow(next);
         })
         .catch(() => undefined);
+      void useChat.getState().refreshTrust();
     };
     poll();
     const timer = window.setInterval(poll, 30_000);
@@ -103,6 +113,18 @@ export function StatusBar() {
 
       <span className="sep">·</span>
       <span>{device}</span>
+
+      {trustActive && (
+        <>
+          <span className="sep">·</span>
+          <span
+            className="trust-chip"
+            title="Writes and edits are auto-approved. Revoke in Settings → Chat → File writes."
+          >
+            Auto-approving writes
+          </span>
+        </>
+      )}
 
       <span className="spacer" />
 

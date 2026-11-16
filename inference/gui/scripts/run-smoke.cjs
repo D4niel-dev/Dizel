@@ -43,6 +43,12 @@ env.DIZEL_SHOT_DELAY = argOf("delay", "12000");
 env.DIZEL_SHOT_SIZE = argOf("size", "1280x900");
 env.DIZEL_SHOT_JS_FILE = path.join(__dirname, "smoke.js");
 
+// The sidecar inherits this env (electron/main.cjs spreads process.env), so
+// trust writes during smoke land in a throwaway config dir, never the user's
+// real settings. Dev builds pass DIZEL_CONFIG_DIR straight through.
+const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "dizel-smoke-config-"));
+env.DIZEL_CONFIG_DIR = configDir;
+
 const TIMEOUT_MS = Number(argOf("timeout", "360000"));
 
 console.log("smoke: booting the app…");
@@ -61,6 +67,12 @@ const timer = setTimeout(() => {
 
 child.on("close", (code) => {
   clearTimeout(timer);
+
+  try {
+    fs.rmSync(configDir, { recursive: true, force: true });
+  } catch {
+    /* temp dir cleanup is best-effort */
+  }
 
   const line = stdout.split("\n").find((l) => l.includes("[dizel] shot js → "));
   if (!line) {

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { ChatView } from "./components/ChatView";
 import { PluginsDialog } from "./components/PluginsDialog";
 import { ToolsSheet } from "./components/ToolsSheet";
+import { CommandPalette } from "./components/CommandPalette";
+import { ReleaseNotesModal } from "./components/ReleaseNotesModal";
 import { Composer } from "./components/Composer";
 import { AttachmentPreview } from "./components/AttachmentPreview";
 import { exportName, transcriptToMarkdown } from "./lib/transcript";
@@ -160,7 +162,8 @@ export default function App() {
 
   // The tray's "New chat" entry talks to the renderer over IPC.
   useEffect(() => {
-    window.dizel?.onNewChat?.(() => newChat());
+    const off = window.dizel?.onNewChat?.(() => newChat());
+    return () => off?.();
   }, [newChat]);
 
   // Global shortcuts. Listed in Settings → Shortcuts.
@@ -192,7 +195,8 @@ export default function App() {
         newChat();
       } else if (key === "k") {
         event.preventDefault();
-        document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+        if (state.paletteOpen) state.closePalette();
+        else state.openPalette();
       } else if (key === "b") {
         event.preventDefault();
         toggleSidebar();
@@ -272,6 +276,8 @@ export default function App() {
     <div className="app">
       <TitleBar />
       <ToolsSheet />
+      <CommandPalette />
+      <ReleaseNotesModal />
 
       <div className="app-body">
         <Sidebar />

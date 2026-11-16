@@ -130,6 +130,7 @@ class DizelCMDApp(App):
     context_tokens = reactive(0)
     budget_tokens = reactive(0)
     tools_revision = reactive(0)
+    trust_revision = reactive(0)
     debug_mode = reactive(False)
     # Version of an available or staged update; empty when there is none.
     update_ready = reactive("")
@@ -161,6 +162,7 @@ class DizelCMDApp(App):
         self.restart_requested = False
         self.usage_manager = UsageManager()
         self._tool_states = {name: False for name in AVAILABLE_TOOLS}
+        self._trusted_sessions: set[str] = set()
         register_builtins()
         self.chat_bridge = ChatBridge(self, manager=preloaded)
         from inference.tui.bridge.tool_bridge import ToolBridge
@@ -716,6 +718,9 @@ class DizelCMDApp(App):
         if session_id in self.open_tabs:
             self.open_tabs.remove(session_id)
         self._tab_messages.pop(session_id, None)
+        if session_id in self._trusted_sessions:
+            self._trusted_sessions.discard(session_id)
+            self.trust_revision += 1
         self.refresh_tabs()
 
     def refresh_context(self) -> None:

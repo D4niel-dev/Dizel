@@ -6,7 +6,9 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: "./",
   plugins: [react()],
-  server: { port: 5173, strictPort: true },
+  // The bundled changelog lives at the repo root (../../../../CHANGELOG.md?raw);
+  // the dev server must be allowed to read above the gui package.
+  server: { port: 5173, strictPort: true, fs: { allow: ["../.."] } },
   build: {
     outDir: "dist",
     emptyOutDir: true,

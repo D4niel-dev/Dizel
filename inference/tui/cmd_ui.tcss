@@ -658,6 +658,7 @@ ModalScreen {
 }
 .approval-diff-text { height: auto; padding: 0 1; }
 .approval-warning { height: auto; color: $warn; margin-top: 1; }
+.approval-trust-hint { height: auto; color: $text-3; margin-top: 1; }
 
 .tool-line { height: auto; }
 .tool-line:hover { background: $surface; }
@@ -676,6 +677,20 @@ ModalScreen {
 }
 .debug-body { height: auto; color: $text-2; padding: 0 1; }
 .debug-footer { height: 1; color: $text-3; margin-top: 1; }
+
+/* Bundled release notes: the full changelog, read offline as markdown. */
+.release-notes-card { width: 94; max-width: 96%; height: 82%; }
+.release-notes-scroll {
+    height: 1fr;
+    background: $bg;
+    border: solid $border;
+    margin-top: 1;
+    padding: 0 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $border-hi;
+    scrollbar-background: $bg;
+}
+#release-notes-text { height: auto; color: $text-2; padding-top: 1; }
 
 .modal-head { height: 1; layout: horizontal; }
 .modal-title { width: 1fr; height: 1; color: $text; text-style: bold; }

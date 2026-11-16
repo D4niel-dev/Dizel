@@ -9,6 +9,7 @@ import { Segmented } from "./Segmented";
 import { Row, Section, Switch } from "./settingsUi";
 import { useUpdates } from "../hooks/useUpdates";
 import * as api from "../services/api";
+import { LATEST_VERSION } from "../services/releaseNotes";
 import { prefsFromConfig, useChat } from "../store/chatStore";
 import type { ThemeName } from "../store/chatStore";
 import type {
@@ -172,6 +173,9 @@ function Select({
 
 export function SettingsDialog() {
   const open = useChat((s) => s.settingsOpen);
+  const trust = useChat((s) => s.trust);
+  const setPersistentTrust = useChat((s) => s.setPersistentTrust);
+  const revokeSessionTrust = useChat((s) => s.revokeSessionTrust);
   const settingsTab = useChat((s) => s.settingsTab);
   const close = useChat((s) => s.closeSettings);
   const save = useChat((s) => s.saveSettings);
@@ -183,6 +187,9 @@ export function SettingsDialog() {
   const sessionCount = useChat((s) => s.sessions.length);
   const runningDevice = useChat((s) => s.status?.model_info?.device);
   const refreshStatus = useChat((s) => s.refreshStatus);
+  const releaseNotesSeen = useChat((s) => s.releaseNotesSeen);
+  const openReleaseNotes = useChat((s) => s.openReleaseNotes);
+  const releaseNotesNew = Boolean(LATEST_VERSION) && releaseNotesSeen !== LATEST_VERSION;
 
   const [tab, setTab] = useState<Tab>("Chat");
   const [loading, setLoading] = useState(true);
@@ -971,6 +978,9 @@ export function SettingsDialog() {
               >
                 <Icon name={TAB_ICONS[name]} size={16} filled={name === tab} />
                 <span>{name}</span>
+                {name === "About" && releaseNotesNew && (
+                  <span className="set-nav-dot" aria-label="New release notes" />
+                )}
               </button>
             ))}
           </nav>
@@ -1325,6 +1335,38 @@ export function SettingsDialog() {
                           ))}
                         </div>
                       </div>
+                    </Section>
+
+                    <Section
+                      title="File writes"
+                      hint="Standing trust for the diff gate. Deletes always ask."
+                    >
+                      <Row
+                        label="Always allow writes and edits"
+                        hint="Skips the diff gate for files inside the project root. Stays on until you turn it off. Applies to every project you open."
+                      >
+                        <Switch
+                          checked={Boolean(trust?.persistent)}
+                          label="Always allow writes and edits"
+                          onChange={() => void setPersistentTrust(!trust?.persistent)}
+                        />
+                      </Row>
+                      <Row
+                        label="This session"
+                        hint={
+                          trust?.session_trusted
+                            ? "Writes in this chat are auto-approved until revoked."
+                            : "No standing trust for this chat."
+                        }
+                      >
+                        <button
+                          className="btn ghost"
+                          disabled={!trust?.session_trusted}
+                          onClick={() => void revokeSessionTrust()}
+                        >
+                          Revoke this session
+                        </button>
+                      </Row>
                     </Section>
 
                     <Section title="Usage window" hint="A 12-hour budget that resets on its own.">
@@ -1980,7 +2022,7 @@ export function SettingsDialog() {
                           <kbd>N</kbd>
                         </span>
                       </Row>
-                      <Row label="Focus the composer">
+                      <Row label="Command palette">
                         <span className="keys">
                           <kbd>Ctrl</kbd>
                           <kbd>K</kbd>
@@ -2055,6 +2097,24 @@ export function SettingsDialog() {
                         {facts?.build ? ` · Build ${facts.build}` : ""}
                       </p>
                     </div>
+
+                    <Section
+                      title="What's new"
+                      hint="The changelog bundled with this build — read offline."
+                    >
+                      <button className="set-row as-button" onClick={openReleaseNotes}>
+                        <span className="set-row-text">
+                          <span>
+                            View release notes
+                            {releaseNotesNew && <span className="release-notes-new">New</span>}
+                          </span>
+                          <small>
+                            {LATEST_VERSION ? `Latest: v${LATEST_VERSION}` : "Bundled changelog"}
+                          </small>
+                        </span>
+                        <Icon name="info" size={14} />
+                      </button>
+                    </Section>
 
                     <Section
                       title="Updates"
@@ -2144,7 +2204,7 @@ export function SettingsDialog() {
                                   className="btn small ghost"
                                   onClick={() => void window.dizel?.updates?.openRelease()}
                                 >
-                                  Release notes
+                                  GitHub release
                                 </button>
                               )}
                             </div>

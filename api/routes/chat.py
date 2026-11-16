@@ -52,15 +52,47 @@ def tools_toggle(req: ToolsRequest) -> Dict[str, Any]:
 
 class ToolApprovalRequest(BaseModel):
     approval_id: str
-    approved: bool
+    decision: str
 
 
 @router.post("/tools/approve")
 def tools_approve(req: ToolApprovalRequest) -> Dict[str, Any]:
     """Resolve one pending diff approval from the SSE tool loop."""
-    if not ChatService.resolve_tool_approval(req.approval_id, req.approved):
+    from dizel_core import tool_trust
+
+    if req.decision not in tool_trust.DECISIONS:
+        raise HTTPException(status_code=400, detail="Unknown approval decision.")
+    if not ChatService.resolve_tool_approval(req.approval_id, req.decision):
         raise HTTPException(status_code=404, detail="Approval request is no longer pending.")
-    return {"status": "ok", "approved": req.approved}
+    return {"status": "ok", "approved": tool_trust.approved_for(req.decision)}
+
+
+class TrustUpdateRequest(BaseModel):
+    persistent: bool
+
+
+class TrustRevokeRequest(BaseModel):
+    session_id: str
+
+
+@router.get("/tools/trust")
+def tools_trust(session_id: Optional[str] = None) -> Dict[str, Any]:
+    """Standing write trust: the persistent flag plus this session's grant."""
+    return ChatService.trust_state(session_id)
+
+
+@router.put("/tools/trust")
+def tools_trust_update(req: TrustUpdateRequest) -> Dict[str, Any]:
+    from dizel_core import tool_trust
+
+    tool_trust.set_persistent(req.persistent)
+    return ChatService.trust_state(None)
+
+
+@router.post("/tools/trust/revoke-session")
+def tools_trust_revoke(req: TrustRevokeRequest) -> Dict[str, Any]:
+    ChatService.revoke_session_trust(req.session_id)
+    return ChatService.trust_state(req.session_id)
 
 
 class UsageDebugRequest(BaseModel):

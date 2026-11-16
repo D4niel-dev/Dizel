@@ -249,10 +249,32 @@ export const setTools = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
-export const resolveToolApproval = (approvalId: string, approved: boolean) =>
+export interface TrustState {
+  persistent: boolean;
+  session_trusted: boolean;
+}
+
+export const resolveToolApproval = (approvalId: string, decision: string) =>
   request<{ status: string; approved: boolean }>("/chat/tools/approve", {
     method: "POST",
-    body: JSON.stringify({ approval_id: approvalId, approved }),
+    body: JSON.stringify({ approval_id: approvalId, decision }),
+  });
+
+export const trustState = (sessionId?: string | null) =>
+  request<TrustState>(
+    `/chat/tools/trust${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
+  );
+
+export const setTrustPersistent = (persistent: boolean) =>
+  request<TrustState>("/chat/tools/trust", {
+    method: "PUT",
+    body: JSON.stringify({ persistent }),
+  });
+
+export const revokeSessionTrust = (sessionId: string) =>
+  request<TrustState>("/chat/tools/trust/revoke-session", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
   });
 
 export const usageWindow = () => request<UsageWindow>("/chat/usage");

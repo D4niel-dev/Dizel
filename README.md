@@ -36,6 +36,8 @@
 
 The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in public; its weights are not published yet. The v1.5 dense model remains the control and the released artifact.
 
+> **Release tags version the app, not the model.** A `v2.x.x` release is the desktop and terminal inference clients plus their shared sidecar — not a model release. The model stays **Dizel 1.5** (with **1.6 Flash Preview** training); model versions live in `model/dizel_info.py` and are tracked separately from the app version.
+
 > **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 10,500 of 45,777. Nothing from v1.6 is a release yet.
 
 ---
@@ -971,7 +973,7 @@ python scripts/set_version.py set 2.1.0
 python scripts/set_version.py check                # fail on manifest drift
 ```
 
-The command updates `dizel_core/version.py`, `inference/gui/package.json`, the GUI lockfile, and `npm/package.json` together. The console banners are covered too: `◆ Dizel … · desktop` reads the GUI manifest, while the TUI pre-UI header, launcher, and status line read `dizel_core/version.py`. CI runs `check` so a partially bumped tree cannot merge. Restart the TUI and rebuild the GUI to see the new value; running processes keep the version they started with. Model versions in `model/dizel_info.py` are separate from the app version.
+The command updates `dizel_core/version.py`, `inference/gui/package.json`, the GUI lockfile, and `npm/package.json` together. The console banners are covered too: `◆ Dizel … · desktop` reads the GUI manifest, while the TUI pre-UI header, launcher, and status line read `dizel_core/version.py`. CI runs `check` so a partially bumped tree cannot merge. Restart the TUI and rebuild the GUI to see the new value; running processes keep the version they started with. The app version (`v2.x.x`) is the inference clients' version, not the model's: model versions in `model/dizel_info.py` (Dizel 1.5, 1.6 Flash Preview) are separate and do not follow the release tags.
 
 ### Publishing a release
 

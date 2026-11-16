@@ -18,7 +18,11 @@ def list_sessions() -> List[Dict]:
 @router.post("/clear-all")
 def clear_all_sessions() -> Dict[str, int]:
     """Delete every saved session."""
-    return {"deleted": SessionService.delete_all()}
+    from api.services.chat_service import ChatService
+
+    deleted = SessionService.delete_all()
+    ChatService.clear_trusted_sessions()
+    return {"deleted": deleted}
 
 
 @router.get("/{session_id}")
@@ -38,9 +42,12 @@ def create_or_update_session(req: SessionCreateRequest) -> Dict[str, str]:
 @router.delete("/{session_id}")
 def delete_session(session_id: str) -> Dict[str, str]:
     """Delete a session"""
+    from api.services.chat_service import ChatService
+
     success = SessionService.delete_session(session_id)
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
+    ChatService.revoke_session_trust(session_id)
     return {"status": "success"}
 
 @router.post("/{session_id}/pin")

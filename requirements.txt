@@ -51,6 +51,8 @@ soundfile>=0.12.1
 
 # ── Tools the model can call ─────────────────────────────────────────────
 requests>=2.31.0
+# delete_file moves approved deletions to the OS recycle bin (recoverable).
+send2trash>=1.8.0
 
 # Optional: web search. Imported lazily inside core/tools/web_search.py, which
 # degrades to "not installed" rather than crashing, so it is not required.

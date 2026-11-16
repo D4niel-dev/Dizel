@@ -21,6 +21,7 @@ APP_FILES = (
     "capabilities.json",
     "requirements.txt",
     "README.md",
+    "CHANGELOG.md",
     "dizel.cmd",
     "inference/__init__.py",
 )

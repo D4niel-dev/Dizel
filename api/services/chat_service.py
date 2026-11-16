@@ -45,6 +45,10 @@ class ChatService:
     _approval_lock = threading.Lock()
     _approvals: Dict[str, Dict[str, Any]] = {}
 
+    # Sessions granted "always this session" write trust. Guarded by the same
+    # lock as _approvals; cleared per session by the revoke endpoint.
+    _trusted_sessions: set[str] = set()
+
     # Model loading is slow enough (a 1.1 GB GGUF on CPU is 10–30s) that it
     # must not block the request. A polled status object keeps the UI honest.
     _load_lock = threading.Lock()
@@ -205,11 +209,37 @@ class ChatService:
         return {"status": "stopping", "was_generating": manager.is_generating}
 
     @classmethod
-    def _request_tool_approval(cls, change, emit, tool_id: int = 0) -> bool:
+    def _request_tool_approval(cls, change, emit, tool_id: int = 0, session_id: str = "") -> bool:
         """Emit a diff and block the tool thread until the GUI answers."""
+        from dizel_core import tool_trust
+        from dizel_core.tools import _project_root
+
+        persistent = tool_trust.persistent_enabled()
+        if tool_trust.should_auto_approve(
+            change,
+            session_id,
+            session_grants=cls._trusted_sessions,
+            persistent=persistent,
+            root=_project_root(),
+        ):
+            tier = "persistent" if persistent else "session"
+            emit(
+                {
+                    "type": "notice",
+                    "text": f"Auto-approved {change.tool} {change.path} ({tier})",
+                }
+            )
+            return True
+
         approval_id = uuid.uuid4().hex
         waiting = threading.Event()
-        entry = {"event": waiting, "approved": False}
+        entry = {
+            "event": waiting,
+            "approved": False,
+            "session_id": session_id,
+            "tool": change.tool,
+            "claimed": False,
+        }
         with cls._approval_lock:
             cls._approvals[approval_id] = entry
 
@@ -227,28 +257,69 @@ class ChatService:
             }
         )
 
-        waiting.wait(300)
+        signalled = waiting.wait(300)
         with cls._approval_lock:
             entry = cls._approvals.pop(approval_id, entry)
-        return bool(entry.get("approved"))
+            if not signalled or not entry.get("claimed"):
+                # Timed out (or woke without a claimed decision): deny, and
+                # claim it so a late resolve cannot flip the outcome.
+                entry["claimed"] = True
+                entry["approved"] = False
+            return bool(entry.get("approved"))
 
     @classmethod
-    def resolve_tool_approval(cls, approval_id: str, approved: bool) -> bool:
+    def resolve_tool_approval(cls, approval_id: str, decision: str) -> bool:
+        from dizel_core import tool_trust
+
         with cls._approval_lock:
             entry = cls._approvals.get(approval_id)
-        if entry is None:
-            return False
-        entry["approved"] = bool(approved)
-        entry["event"].set()
+            if entry is None or entry.get("claimed"):
+                return False
+            entry["claimed"] = True
+            # A delete gate must never grant standing write trust, even via a
+            # crafted request: downgrade standing decisions to a single allow.
+            if (
+                decision in (tool_trust.ALWAYS_SESSION, tool_trust.ALWAYS_PERSISTENT)
+                and entry.get("tool") not in tool_trust.WRITE_TOOLS
+            ):
+                decision = tool_trust.ALLOW_ONCE
+            if decision == tool_trust.ALWAYS_SESSION:
+                tool_trust.record_session_grant(
+                    cls._trusted_sessions, entry.get("session_id", "")
+                )
+            if decision == tool_trust.ALWAYS_PERSISTENT:
+                tool_trust.set_persistent(True)
+            entry["approved"] = tool_trust.approved_for(decision)
+            entry["event"].set()
         return True
 
     @classmethod
     def cancel_tool_approvals(cls) -> None:
         with cls._approval_lock:
-            entries = list(cls._approvals.values())
-        for entry in entries:
-            entry["approved"] = False
-            entry["event"].set()
+            for entry in cls._approvals.values():
+                if not entry.get("claimed"):
+                    entry["claimed"] = True
+                    entry["approved"] = False
+                    entry["event"].set()
+
+    @classmethod
+    def trust_state(cls, session_id: Optional[str] = None) -> Dict[str, Any]:
+        from dizel_core import tool_trust
+
+        return {
+            "persistent": tool_trust.persistent_enabled(),
+            "session_trusted": bool(session_id) and session_id in cls._trusted_sessions,
+        }
+
+    @classmethod
+    def revoke_session_trust(cls, session_id: str) -> None:
+        with cls._approval_lock:
+            cls._trusted_sessions.discard(session_id)
+
+    @classmethod
+    def clear_trusted_sessions(cls) -> None:
+        with cls._approval_lock:
+            cls._trusted_sessions.clear()
 
     @classmethod
     async def stream_chat(
@@ -442,7 +513,7 @@ class ChatService:
                     on_tool=on_tool,
                     on_tool_start=on_tool_start,
                     approve_tool=lambda change: cls._request_tool_approval(
-                        change, _put, getattr(tool_context, "key", 0)
+                        change, _put, getattr(tool_context, "key", 0), session_id or ""
                     ),
                     on_thinking=on_thinking,
                     continuation=continuation,

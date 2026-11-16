@@ -23,7 +23,7 @@ import {
   loadVariants,
   saveVariants,
 } from "../lib/variants";
-import type { RecentChat, DictationState, ContextUsage } from "../services/api";
+import type { RecentChat, DictationState, ContextUsage, TrustState } from "../services/api";
 import { resetSidecar } from "../services/sidecar";
 import * as api from "../services/api";
 import { resetApi } from "../services/api";
@@ -31,6 +31,7 @@ import { startRecording } from "../services/audio";
 import { modelName } from "../services/model";
 import type { Recorder } from "../services/audio";
 import { CATEGORY_ORDER, DEBUG_COMMAND_NAMES } from "../services/commands";
+import { LATEST_VERSION } from "../services/releaseNotes";
 
 export type ThemeName = "dark" | "light" | "dark-blue";
 export type MicState = "idle" | "recording" | "transcribing";
@@ -83,6 +84,16 @@ function persistPrompts(prompts: SavedPrompt[]): void {
 
 const MAX_ATTACHMENTS = 4;
 const MAX_ATTACHMENT_CHARS = 6000;
+
+const RELEASE_NOTES_SEEN_KEY = "dizel.releaseNotesSeen";
+
+function loadReleaseNotesSeen(): string {
+  try {
+    return localStorage.getItem(RELEASE_NOTES_SEEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 function initialTheme(): ThemeName {
   const stored = localStorage.getItem(THEME_KEY) as ThemeName | null;
@@ -509,7 +520,11 @@ interface ChatState {
   debugPanel: { title: string; body: string } | null;
   toast: string | null;
   approval: ToolApproval | null;
-  resolveApproval: (approved: boolean) => Promise<void>;
+  resolveApproval: (decision: string) => Promise<void>;
+  trust: TrustState | null;
+  refreshTrust: () => Promise<void>;
+  setPersistentTrust: (enabled: boolean) => Promise<void>;
+  revokeSessionTrust: () => Promise<void>;
   /** Prompt templates available without debug mode, invoked as /name. */
   skills: SkillInfo[];
   skillsDir: string;
@@ -528,6 +543,14 @@ interface ChatState {
   toolsOpen: boolean;
   openTools: () => void;
   closeTools: () => void;
+  paletteOpen: boolean;
+  openPalette: () => void;
+  closePalette: () => void;
+  releaseNotesOpen: boolean;
+  releaseNotesSeen: string;
+  openReleaseNotes: () => void;
+  closeReleaseNotes: () => void;
+  markReleaseNotesSeen: (version: string) => void;
   pluginsOpen: boolean;
   openPlugins: () => void;
   closePlugins: () => void;
@@ -634,6 +657,7 @@ export const useChat = create<ChatState>((set, get) => ({
   debugPanel: null,
   toast: null,
   approval: null,
+  trust: null,
   skills: [],
   skillsDir: "",
   skillsProjectDir: "",
@@ -641,6 +665,9 @@ export const useChat = create<ChatState>((set, get) => ({
   serverUsage: null,
   sidecarDown: null,
   toolsOpen: false,
+  paletteOpen: false,
+  releaseNotesOpen: false,
+  releaseNotesSeen: loadReleaseNotesSeen(),
   pluginsOpen: false,
   providers: [],
   providerModels: [],
@@ -922,9 +949,10 @@ export const useChat = create<ChatState>((set, get) => ({
 
   closeDebugPanel: () => set({ debugPanel: null }),
 
-  resolveApproval: async (approved) => {
+  resolveApproval: async (decision) => {
     const approval = get().approval;
     if (!approval) return;
+    const approved = decision !== "deny";
 
     if (approval.synthetic) {
       const rowId = String(approval.toolId ?? "debug-write");
@@ -956,8 +984,36 @@ export const useChat = create<ChatState>((set, get) => ({
     }
 
     try {
-      await api.resolveToolApproval(approval.id, approved);
+      await api.resolveToolApproval(approval.id, decision);
       set({ approval: null });
+      void get().refreshTrust();
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  refreshTrust: async () => {
+    try {
+      set({ trust: await api.trustState(get().sessionId) });
+    } catch {
+      /* sidecar may be down; the indicator simply stays hidden */
+    }
+  },
+
+  setPersistentTrust: async (enabled) => {
+    try {
+      await api.setTrustPersistent(enabled);
+      // The PUT response is not session-scoped; re-read so the chip and the
+      // Revoke button reflect any live session grant immediately.
+      await get().refreshTrust();
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  revokeSessionTrust: async () => {
+    try {
+      set({ trust: await api.revokeSessionTrust(get().sessionId || "") });
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -2247,6 +2303,21 @@ export const useChat = create<ChatState>((set, get) => ({
 
   openTools: () => set({ toolsOpen: true }),
   closeTools: () => set({ toolsOpen: false }),
+  openPalette: () => set({ paletteOpen: true }),
+  closePalette: () => set({ paletteOpen: false }),
+  openReleaseNotes: () => {
+    get().markReleaseNotesSeen(LATEST_VERSION);
+    set({ releaseNotesOpen: true });
+  },
+  closeReleaseNotes: () => set({ releaseNotesOpen: false }),
+  markReleaseNotesSeen: (version) => {
+    try {
+      localStorage.setItem(RELEASE_NOTES_SEEN_KEY, version);
+    } catch {
+      /* quota — the badge is a convenience */
+    }
+    set({ releaseNotesSeen: version });
+  },
   openPlugins: () => set({ pluginsOpen: true }),
   closePlugins: () => set({ pluginsOpen: false }),
 

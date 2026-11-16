@@ -24,6 +24,7 @@ from .diff import DiffCommand
 from .macro import MacroCommand
 from .update_cmd import CheckUpdateCommand, UpdateCommand
 from .debug import DebugCommand
+from .release_notes import ReleaseNotesCommand
 from .skills import SkillsCommand, register_skills
 
 def register_builtins():
@@ -53,5 +54,6 @@ def register_builtins():
     registry.register(UpdateCommand())
     registry.register(CheckUpdateCommand())
     registry.register(DebugCommand())
+    registry.register(ReleaseNotesCommand())
     registry.register(SkillsCommand())
     register_skills()

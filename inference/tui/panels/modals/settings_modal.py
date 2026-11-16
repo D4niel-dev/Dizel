@@ -539,6 +539,18 @@ class SettingsModal(ModalScreen[bool]):
                 "Read files, search, calculate. Costs ~330 prompt tokens per request.",
                 pane="tools",
             ),
+            FieldSpec(
+                "tools", "always_allow_writes", "Always allow writes and edits", "bool",
+                "Skips the diff gate for files inside the project. Deletes still ask every time. Applies to every project you open.",
+                pane="tools",
+                group="File writes",
+            ),
+            FieldSpec(
+                "@trust", "revoke_session", "Revoke this session's write trust", "bool",
+                'Momentary: clears any "Always this session" grant for the current tab.',
+                pane="tools",
+                group="File writes",
+            ),
         ]
 
         sections = [
@@ -696,6 +708,8 @@ class SettingsModal(ModalScreen[bool]):
         if spec.section == "@runtime":
             return self.app.active_mode
         if spec.section == "@ui":
+            return False
+        if spec.section == "@trust":
             return False
         if spec.section == "@tools":
             try:
@@ -1003,7 +1017,7 @@ class SettingsModal(ModalScreen[bool]):
             return
 
         for key, value in values.items():
-            if key in ("@runtime.mode", "@ui.reset_tutorial", "@tools.enabled", "api_router.api_key"):
+            if key in ("@runtime.mode", "@ui.reset_tutorial", "@tools.enabled", "@trust.revoke_session", "api_router.api_key"):
                 continue
             spec = self._fields[key].spec
             if spec.section == "":
@@ -1047,6 +1061,18 @@ class SettingsModal(ModalScreen[bool]):
         ConfigManager.save(cfg)
 
         notes = ["Settings saved"]
+        if values.get("@trust.revoke_session"):
+            self.app._trusted_sessions.discard(self.app.session_id)
+            self.app.trust_revision += 1
+            notes.append("session write trust revoked")
+        original_tools = original.get("tools")
+        original_persistent = bool(
+            original_tools.get("always_allow_writes", False)
+            if isinstance(original_tools, dict)
+            else False
+        )
+        if bool(values.get("tools.always_allow_writes", False)) != original_persistent:
+            self.app.trust_revision += 1
         try:
             manager.reload_sampling()
             notes.append("sampling applied")

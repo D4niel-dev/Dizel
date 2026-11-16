@@ -6,8 +6,18 @@ import asyncio
 import json
 from unittest import mock
 
+import pytest
+
 from api.services.chat_service import ChatService
+from dizel_core import config_manager
 from dizel_core.tools import FileChange
+
+
+@pytest.fixture(autouse=True)
+def _isolated_trust(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_manager, "_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config_manager, "SETTINGS_FILE", str(tmp_path / "settings.json"))
+    ChatService._trusted_sessions.clear()
 
 
 class FakeUsage:
@@ -109,7 +119,7 @@ def test_stream_emits_tool_and_waits_for_approval():
                 data = json.loads(frame["data"])
                 frames.append(data)
                 if data["type"] == "approval":
-                    assert ChatService.resolve_tool_approval(data["id"], True)
+                    assert ChatService.resolve_tool_approval(data["id"], "allow_once")
                 if data["type"] in ("done", "error"):
                     break
 

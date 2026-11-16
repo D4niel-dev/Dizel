@@ -130,6 +130,9 @@ class ConfigManager:
             "retry_failed_calls": True,
             "auto_connect": True,
         },
+        "tools": {
+            "always_allow_writes": False,
+        },
         "nova": {
             "model_size": "base",
             "language": "auto",
@@ -176,7 +179,7 @@ class ConfigManager:
     def load(cls) -> Dict[str, Any]:
         """Load settings from disk, falling back to defaults if missing/corrupt."""
         if not os.path.exists(SETTINGS_FILE):
-            return cls._DEFAULTS.copy()
+            return cls._deep_copy_defaults()
 
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:

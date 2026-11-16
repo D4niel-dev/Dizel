@@ -10,9 +10,10 @@ The harness finds those, runs them, and feeds the result back for another round.
 Design rules, all of which exist to keep a 1.6B model from making a mess:
 
 * **Reviewed writes.** `write_file` and `edit_file` change files only after the
-  calling surface shows a diff and the user approves it. Nothing deletes or
-  executes a shell command; a model with arbitrary command execution is a
-  vulnerability with a chat interface.
+  calling surface shows a diff and the user approves it. `delete_file` moves a
+  file to the recycle bin, but only after an explicit per-call approval — it is
+  never auto-approved by any trust setting. Nothing executes a shell command; a
+  model with arbitrary command execution is a vulnerability with a chat interface.
 * **Bounded.** Every tool caps its output. An unbounded result would blow the
   2,048-token window in one call and take the conversation with it.
 * **Off by default.** The prompt block costs tokens on every request, so tools are
@@ -310,15 +311,19 @@ def _diff_change(before: str, after: str, display: str) -> tuple[str | None, int
     return diff, additions, deletions, ""
 
 
-def _approved(change: FileChange, approve: Callable[[FileChange], bool] | None) -> tuple[bool, str]:
+def _approved(
+    change: FileChange,
+    approve: Callable[[FileChange], bool] | None,
+    verb: str = "Write",
+) -> tuple[bool, str]:
     if approve is None:
-        return False, "Write refused: this surface cannot approve file changes."
+        return False, f"{verb} refused: this surface cannot approve file changes."
     try:
         if approve(change):
             return True, ""
     except Exception as error:
-        return False, f"Write refused: approval failed ({error})."
-    return False, "Write cancelled."
+        return False, f"{verb} refused: approval failed ({error})."
+    return False, f"{verb} cancelled."
 
 
 def _atomic_write(target: Path, text: str) -> None:
@@ -452,6 +457,65 @@ def _edit_file(
     return f"[edit_file] Edited {display} (+{additions}/-{deletions})"
 
 
+# ── Reviewed delete ──────────────────────────────────────────────────────────
+def _resolve_delete(path: str) -> tuple[Path | None, str]:
+    raw = str(path or "").strip().strip("\"'")
+    if not raw:
+        return None, "No path given."
+    root = _project_root()
+    target = Path(raw).expanduser()
+    if not target.is_absolute():
+        target = root / target
+    try:
+        target = target.resolve(strict=False)
+    except OSError as error:
+        return None, f"Invalid path: {error}"
+    try:
+        relative = target.relative_to(root)
+    except ValueError:
+        return None, "File changes are limited to the current project directory."
+    if any(part in BLOCKED_PARTS for part in relative.parts):
+        return None, "Refusing to delete VCS or generated internals."
+    if not target.exists():
+        return None, f"No such file: {raw}"
+    if not target.is_file():
+        return None, "Not a regular file."
+    return target, ""
+
+
+def _delete_file(
+    path: str,
+    approve: Callable[[FileChange], bool] | None = None,
+) -> str:
+    target, error = _resolve_delete(path)
+    if target is None:
+        return f"[delete_file] {error}"
+
+    display = target.relative_to(_project_root()).as_posix()
+    before, _read_error = _read_for_edit(target)
+    if before is None:
+        before = ""
+    diff, _additions, deletions, _diff_error = _diff_change(before, "", display)
+    # A removal diff of a binary is replacement-character noise; show none.
+    if diff is None or target.suffix.lower() in BLOCKED_SUFFIXES:
+        diff = ""
+    change = FileChange("delete_file", display, "delete", diff, 0, deletions)
+    _ui_record(action="delete", diff=diff, additions=0, deletions=deletions)
+    # Delete is always a per-call decision; no trust tier may short-circuit it.
+    allowed, reason = _approved(change, approve, verb="Delete")
+    if not allowed:
+        return f"[delete_file] {reason}"
+    try:
+        from send2trash import send2trash
+    except ImportError:
+        return "[delete_file] Failed: send2trash is not installed."
+    try:
+        send2trash(str(target))
+    except Exception as error:
+        return f"[delete_file] Failed: {error}"
+    return f"[delete_file] Deleted {display} (recycle bin)"
+
+
 # ── Web ──────────────────────────────────────────────────────────────────────
 def _web_search(query: str, max_results: int = 4) -> str:
     try:
@@ -580,6 +644,13 @@ REGISTRY: Dict[str, Tool] = {
             _edit_file,
             requires_approval=True,
         ),
+        Tool(
+            "delete_file",
+            "delete a project file (moved to the recycle bin); the user must approve every deletion",
+            {"path": "string"},
+            _delete_file,
+            requires_approval=True,
+        ),
         Tool("web_search", "search the web and return the top results",
              {"query": "string"}, _web_search),
         Tool("fetch_url", "fetch a web page and return its text",
@@ -674,7 +745,7 @@ def display_detail(call: Dict[str, Any]) -> str:
         return str(args.get("url") or "")
     if name == "calc":
         return str(args.get("expression") or "")
-    if name in ("write_file", "edit_file"):
+    if name in ("write_file", "edit_file", "delete_file"):
         return path
     return ", ".join(f"{key}={value}" for key, value in args.items())
 
@@ -762,6 +833,8 @@ def outcome_failed(name: str, outcome: str) -> bool:
             "Only http",
             "Write cancelled",
             "Write refused",
+            "Delete cancelled",
+            "Delete refused",
             "Failed:",
             "Old snippet",
             "File is too large",

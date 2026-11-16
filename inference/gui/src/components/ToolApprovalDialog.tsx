@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useChat } from "../store/chatStore";
 import { Icon } from "./Icon";
@@ -20,14 +20,28 @@ export function ToolApprovalDialog() {
   const approval = useChat((s) => s.approval);
   const resolve = useChat((s) => s.resolveApproval);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+
+  const decide = async (decision: string) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await resolve(decision);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!approval) return;
+    busyRef.current = false;
     setBusy(false);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        void resolve(false);
+        void decide("deny");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -40,18 +54,19 @@ export function ToolApprovalDialog() {
     create: "Create file",
     overwrite: "Overwrite file",
     edit: "Edit file",
+    delete: "Delete file",
   }[approval.action] ?? "Write file";
-
-  const decide = async (approved: boolean) => {
-    if (busy) return;
-    setBusy(true);
-    await resolve(approved);
-  };
+  // Delete is always a per-call decision: this gate never offers a standing
+  // "Always allow", and no trust tier may auto-approve it.
+  const isDelete = approval.action === "delete";
+  const warning = isDelete
+    ? "This moves the file to the recycle bin. Every deletion needs your explicit approval — it can never be auto-approved."
+    : "This changes the file on disk. Review the diff before approving.";
 
   return (
     <div className="modal-backdrop tool-approval-backdrop">
       <div
-        className="modal tool-approval"
+        className={isDelete ? "modal tool-approval is-delete" : "modal tool-approval"}
         role="dialog"
         aria-modal="true"
         aria-label={action}
@@ -79,16 +94,35 @@ export function ToolApprovalDialog() {
             ))}
           </pre>
           <p className="tool-approval-warning">
-            This changes the file on disk. Review the diff before approving.
+            {warning}
           </p>
+          {!isDelete && (
+            <p className="tool-approval-trust-hint">
+              "Always allow" stays on until you revoke it in Settings → Chat → File writes.
+            </p>
+          )}
         </div>
         <div className="tool-approval-actions">
-          <button className="btn ghost" disabled={busy} onClick={() => void decide(false)} autoFocus>
+          <button className="btn ghost" disabled={busy} onClick={() => void decide("deny")} autoFocus>
             Reject
           </button>
-          <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
-            Approve
-          </button>
+          {isDelete ? (
+            <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
+              Approve
+            </button>
+          ) : (
+            <>
+              <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
+                Allow once
+              </button>
+              <button className="btn ghost" disabled={busy} onClick={() => void decide("always_session")}>
+                Always this session
+              </button>
+              <button className="btn ghost" disabled={busy} onClick={() => void decide("always_persistent")}>
+                Always allow
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

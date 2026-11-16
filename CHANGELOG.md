@@ -3,6 +3,47 @@
 All notable changes to the Dizel app are recorded here. Release tags use the
 app version from `dizel_core/version.py`.
 
+## [2.0.2] - 2026-11-17
+
+### Added
+
+- Desktop command palette on Ctrl+K: a searchable, keyboard-driven launcher for
+  chats, settings, and actions.
+- In-app release notes in both clients. The desktop About card gains a "What's
+  new" entry with a NEW badge and a markdown modal; the terminal adds
+  `/release-notes`. Both read the bundled `CHANGELOG.md` through a shared
+  `dizel_core/release_notes.py` reader.
+- Write-approval trust tiers. A shared `dizel_core/tool_trust.py` policy backs
+  four-option gates (Reject, Allow once, Always this session, Always allow) in
+  both clients, with sidecar and TUI decision APIs. Persistent "Always allow"
+  and per-session trust are revocable, and every standing decision is audited.
+  The desktop shows an "Auto-approving writes" status chip and a Settings → Chat
+  → File writes section; the terminal shows a `writes:auto` marker and matching
+  settings rows.
+- `delete_file` tool in both clients. Approved deletions move to the OS recycle
+  bin via `send2trash` (recoverable), are confined to the project root, and are
+  always approved per call — no setting or trust tier can auto-approve a delete.
+
+### Changed
+
+- All built-in writes and edits are confined to the project root and share the
+  trust policy; deletes are structurally excluded from auto-approval.
+- `send2trash>=1.8` is now a runtime and test dependency for recoverable deletes.
+- The README clarifies that `v2.x.x` release tags version the desktop and
+  terminal inference app, not the model. Model versions (Dizel 1.5, 1.6 Flash
+  Preview) live in `model/dizel_info.py` and are tracked separately.
+
+### Fixed
+
+- Desktop composer accepts input, including slash commands, once the app has
+  booted; sending stays gated on model readiness.
+- Desktop write-approval dialog ignores Escape while a decision is in flight,
+  resets its busy state in `finally`, and ignores stale approval ids.
+- Terminal approval modal renders file paths as literal text instead of letting
+  Rich interpret path characters as markup.
+- Desktop new-chat IPC listener returns an unsubscribe function and is cleaned
+  up on effect teardown, so listeners no longer accumulate across re-renders.
+
 ## [2.0.1] - 2026-11-15
 
 ### Added
