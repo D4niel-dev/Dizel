@@ -334,6 +334,12 @@ class ChatManager:
                 self._backend = backend
                 self._device = device
                 self._checkpoint_path = checkpoint_path
+            try:
+                from . import checkpoint_history
+
+                checkpoint_history.record(checkpoint_path)
+            except Exception:
+                pass  # history is a convenience; a load must never fail for it
             if previous is not None and previous is not backend:
                 # Release after the swap: a failure here cannot lose the new
                 # model, and the old one is no longer reachable by generation.
@@ -426,20 +432,17 @@ class ChatManager:
         Context window for whatever is actually answering.
 
         A local checkpoint reports its own `ctx_len`. Provider models carry no
-        metadata at all, so the window comes from `api_router.context_length` in
-        settings — without it the UI assumed 2048 for every provider, which is
-        wrong by orders of magnitude for something like gpt-4o.
+        metadata, so their window comes from the per-provider limit table and
+        the user's overrides in `api_router.provider_limits` — one shared
+        number for every provider made a 128k model look like 2k.
         """
-        info = self.model_info or {}
-        if info.get("ctx_len"):
-            return int(info["ctx_len"])
+        from . import provider_limits
 
-        configured = (self._cfg.get("api_router") or {}).get("context_length") or 0
-        try:
-            configured = int(configured)
-        except (TypeError, ValueError):
-            configured = 0
-        return configured if configured > 0 else 2048
+        if self._provider_slug == "local":
+            info = self.model_info or {}
+            return provider_limits.resolve("local", int(info.get("ctx_len") or 0) or None)
+        overrides = (self._cfg.get("api_router") or {}).get(provider_limits.KEY)
+        return provider_limits.resolve(self._provider_slug, None, overrides)
 
     @property
     def checkpoint_path(self) -> str:

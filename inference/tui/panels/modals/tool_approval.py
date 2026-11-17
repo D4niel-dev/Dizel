@@ -19,6 +19,7 @@ from inference.tui.theme import (
     DIFF_HUNK,
     TEXT_2,
     TEXT_3,
+    WARN,
 )
 
 _BUTTON_DECISIONS = {
@@ -34,7 +35,7 @@ class ToolApprovalModal(ModalScreen[str]):
     """Review one file diff, then choose how far the approval reaches."""
 
     BINDINGS = [
-        Binding("escape", "reject", "Reject"),
+        Binding("escape", "back", "Back"),
         Binding("n", "reject", "Reject", show=False),
         Binding("y", "allow_once", "Allow once", show=False),
         Binding("s", "allow_session", "Always this session", show=False),
@@ -44,6 +45,7 @@ class ToolApprovalModal(ModalScreen[str]):
     def __init__(self, change: FileChange, **kwargs) -> None:
         super().__init__(**kwargs)
         self.change = change
+        self._armed: str | None = None
 
     def compose(self) -> ComposeResult:
         action = {
@@ -89,6 +91,7 @@ class ToolApprovalModal(ModalScreen[str]):
                     ),
                     classes="approval-trust-hint",
                 )
+            yield Static("", id="approval-confirm", classes="approval-confirm")
             with Horizontal(classes="modal-actions"):
                 yield Button("Reject", id="approval-reject")
                 if is_delete:
@@ -99,6 +102,7 @@ class ToolApprovalModal(ModalScreen[str]):
                     yield Button("Always allow", id="approval-persistent")
 
     def on_mount(self) -> None:
+        self.query_one("#approval-confirm", Static).display = False
         self.query_one("#approval-reject", Button).focus()
 
     def _diff_text(self) -> Text:
@@ -121,17 +125,56 @@ class ToolApprovalModal(ModalScreen[str]):
     def action_reject(self) -> None:
         self.dismiss(tool_trust.DENY)
 
+    def action_back(self) -> None:
+        if self._armed:
+            self._disarm()
+            return
+        self.dismiss(tool_trust.DENY)
+
     def action_allow_once(self) -> None:
         self.dismiss(tool_trust.ALLOW_ONCE)
 
     def action_allow_session(self) -> None:
-        if self.change.action != "delete":
-            self.dismiss(tool_trust.ALWAYS_SESSION)
+        self._arm_or_confirm(tool_trust.ALWAYS_SESSION, "s")
 
     def action_allow_persistent(self) -> None:
-        if self.change.action != "delete":
-            self.dismiss(tool_trust.ALWAYS_PERSISTENT)
+        self._arm_or_confirm(tool_trust.ALWAYS_PERSISTENT, "a")
+
+    def _disarm(self) -> None:
+        self._armed = None
+        confirm = self.query_one("#approval-confirm", Static)
+        confirm.update("")
+        confirm.display = False
+
+    def _arm_or_confirm(self, decision: str, key: str) -> None:
+        if self.change.action == "delete":
+            return
+        if self._armed == decision:
+            self.dismiss(decision)
+            return
+        self._armed = decision
+        confirm = self.query_one("#approval-confirm", Static)
+        if decision == tool_trust.ALWAYS_PERSISTENT:
+            copy = (
+                "Every write in every project will apply without asking until you "
+                f"revoke it in Settings → Chat → File writes. Press {key} again to "
+                "confirm — esc goes back."
+            )
+            style = WARN
+        else:
+            copy = (
+                "Every write in this chat will apply without asking until you close "
+                f"it. Press {key} again to confirm — esc goes back."
+            )
+            style = TEXT_2
+        confirm.update(Text(copy, style=style))
+        confirm.display = True
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         event.stop()
-        self.dismiss(_BUTTON_DECISIONS[event.button.id])
+        decision = _BUTTON_DECISIONS[event.button.id]
+        if decision in (tool_trust.ALWAYS_SESSION, tool_trust.ALWAYS_PERSISTENT):
+            key = "s" if decision == tool_trust.ALWAYS_SESSION else "a"
+            self._arm_or_confirm(decision, key)
+            return
+        self.dismiss(decision)

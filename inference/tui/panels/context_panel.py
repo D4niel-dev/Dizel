@@ -63,7 +63,10 @@ class ContextPanel(VerticalScroll):
 
     def update_panel(self, *args) -> None:
         app = self.app
-        cap = int(getattr(app.usage_manager, "max_capacity", 0) or 0)
+        manager = getattr(getattr(app, "chat_bridge", None), "manager", None)
+        cap = int(getattr(manager, "effective_ctx_len", 0) or 0)
+        if not cap:
+            cap = int(getattr(app.usage_manager, "max_capacity", 0) or 0)
         used = int(app.context_tokens)
         pct = (used / cap * 100) if cap else 0.0
         self.query_one("#ctx-tokens").update(

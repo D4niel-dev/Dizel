@@ -33,6 +33,12 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+VERSION_SOURCE = DOCS.parent / "dizel_core" / "version.py"
+APP_VERSION = re.search(
+    r'__version__\s*=\s*"([^"]+)"', read(VERSION_SOURCE)
+).group(1)
+
+
 def parse_page(path: Path) -> Tuple[Dict[str, Any], str]:
     text = read(path)
     match = META_RE.search(text)
@@ -110,7 +116,9 @@ def build() -> int:
         )
 
         nav_html = mark_nav(nav, str(meta.get("nav", ""))).replace("{{base}}", base)
-        footer_html = footer.replace("{{base}}", base)
+        footer_html = footer.replace("{{base}}", base).replace(
+            "{{app_version}}", APP_VERSION
+        )
         sidebar_html = mark_sidebar(
             sidebar, str(meta.get("docs_active", ""))
         ).replace("{{base}}", base)

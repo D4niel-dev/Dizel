@@ -49,6 +49,8 @@ def _api_router_config() -> Dict[str, Any]:
 
 @router.get("/")
 def list_providers() -> List[Dict[str, Any]]:
+    from dizel_core import provider_limits
+
     api_cfg = _api_router_config()
     active = api_cfg.get("provider", "local")
 
@@ -61,6 +63,10 @@ def list_providers() -> List[Dict[str, Any]]:
             "active": slug == active,
             "configured": bool(api_cfg.get("api_key")) if slug == active else False,
             "model": api_cfg.get("model", "") if slug == active else "",
+            "context_limit": (
+                None if slug == "local" else provider_limits.default_for(slug)
+            ),
+            "context_limit_override": provider_limits.get_override(api_cfg, slug),
         }
         for slug, name, avatar, requires_key in _PROVIDERS
     ]

@@ -1,4 +1,5 @@
 import re
+import time
 
 from rich.console import Group, RenderableType
 from rich.padding import Padding
@@ -177,6 +178,8 @@ class ToolBlock:
         frame: str | None = None,
         expandable: bool = False,
         expanded: bool = False,
+        hot: int | None = None,
+        elapsed: str | None = None,
     ):
         self.tool_name = tool_name
         self.status = status
@@ -184,6 +187,8 @@ class ToolBlock:
         self.frame = frame
         self.expandable = expandable
         self.expanded = expanded
+        self.hot = hot
+        self.elapsed = elapsed
 
     def __rich__(self) -> RenderableType:
         status = self.status.upper()
@@ -192,13 +197,27 @@ class ToolBlock:
         color = WARN if status == "RUNNING" else DANGER if status == "FAILED" else TEXT_3
 
         name = self.tool_name.replace("_", " ")
-        line = Text.assemble(
-            (f"{_glyph(name, status, self.frame)} ", color),
-            (name, f"bold {TEXT}"),
-        )
+        line = Text.assemble((f"{_glyph(name, status, self.frame)} ", color))
+        if status == "RUNNING" and self.hot is not None:
+            # A three-letter bright head travels across the name; the rest
+            # stays at normal weight so the row still reads as a status line.
+            cycle = len(name) + 6
+            head = self.hot % cycle
+            for index, char in enumerate(name):
+                distance = head - index
+                if distance == 0:
+                    line.append(char, style=f"bold {ACCENT}")
+                elif 0 < distance <= 2:
+                    line.append(char, style=ACCENT)
+                else:
+                    line.append(char, style=f"bold {TEXT}")
+        else:
+            line.append(name, style=f"bold {TEXT}")
         detail = _preview(self.detail)
         if detail:
             line.append(f"  {detail}", style=TEXT_2)
+        if status == "RUNNING" and self.elapsed:
+            line.append(f" · {self.elapsed}", style=TEXT_3)
         if self.expandable:
             line.append("  ▾" if self.expanded else "  ▸", style=TEXT_3)
         return line
@@ -230,17 +249,29 @@ class ToolLine(Static):
         self.details = details or {}
         self.expanded = False
         self._frame = 0
+        self._hot = 0
+        self._started = time.monotonic()
+        self._animate = True
         self._timer = None
 
     def on_mount(self) -> None:
         self._render_row()
-        if self.status == "RUNNING" and chat_pref(self.app, "animations", True):
-            self._timer = self.set_interval(0.12, self._tick)
+        if self.status == "RUNNING":
+            self._animate = chat_pref(self.app, "animations", True)
+            # Elapsed time is information, not decoration: keep ticking even
+            # when animations are off, just slower and without the sweep.
+            self._timer = self.set_interval(0.12 if self._animate else 0.5, self._tick)
 
     def on_unmount(self) -> None:
         if self._timer is not None:
             self._timer.stop()
             self._timer = None
+
+    def _elapsed(self) -> str:
+        seconds = max(0.0, time.monotonic() - self._started)
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        return f"{int(seconds // 60)}m {int(seconds % 60)}s"
 
     def _has_details(self) -> bool:
         return any(
@@ -249,7 +280,8 @@ class ToolLine(Static):
         )
 
     def _render_row(self) -> None:
-        frame = SPINNER_FRAMES[self._frame] if self.status == "RUNNING" else None
+        running = self.status == "RUNNING"
+        frame = SPINNER_FRAMES[self._frame] if running else None
         expandable = self._has_details()
         lines = [
             ToolBlock(
@@ -259,6 +291,8 @@ class ToolLine(Static):
                 frame,
                 expandable=expandable,
                 expanded=self.expanded,
+                hot=self._hot if running else None,
+                elapsed=self._elapsed() if running else None,
             )
         ]
         if self.expanded:
@@ -267,7 +301,9 @@ class ToolLine(Static):
         self.update(Group(*lines))
 
     def _tick(self) -> None:
-        self._frame = (self._frame + 1) % len(SPINNER_FRAMES)
+        if self._animate:
+            self._frame = (self._frame + 1) % len(SPINNER_FRAMES)
+            self._hot += 1
         self._render_row()
 
     def finish(self, status: str, detail: str | None = None, details: dict | None = None) -> None:

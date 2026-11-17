@@ -72,6 +72,7 @@ class ConfigManager:
 
     _DEFAULTS = {
         "checkpoint": "",
+        "checkpoint_history": [],
         "device": "cpu",
         "system_prompt": (
             "You are Dizel, a highly capable, intelligent, and helpful AI assistant. "
@@ -117,6 +118,7 @@ class ConfigManager:
             "provider": "local",
             "api_key": "",
             "model": "",
+            "provider_limits": {},
             "ollama_url": "http://localhost:11434",
             "azure_resource": "",
             "azure_deployment": "",

@@ -422,10 +422,7 @@ class ChatService:
         # window, then refuse. Done here rather than in the renderer so it holds
         # for every client and cannot be skipped.
         usage = get_usage_manager()
-        try:
-            usage.set_capacity(int(manager.effective_ctx_len))
-        except Exception:
-            pass
+        usage.activate(manager.active_provider_slug, int(manager.effective_ctx_len))
 
         if usage.is_exhausted:
             note = (
@@ -503,13 +500,28 @@ class ChatService:
             _put(payload)
 
         def run_send() -> None:
+            # send_with_tools only starts the generation thread and returns;
+            # the turn ends when a terminal callback fires, so the sentinel
+            # must trail it or it always beats the first token.
+            def finish_done(full_text: str) -> None:
+                try:
+                    on_done(full_text)
+                finally:
+                    _put({"type": "__send_end__"})
+
+            def finish_error(message: str) -> None:
+                try:
+                    on_error(message)
+                finally:
+                    _put({"type": "__send_end__"})
+
             try:
                 manager.send_with_tools(
                     user_text=user_text,
                     attachments=attachments or [],
                     on_token=on_token,
-                    on_done=on_done,
-                    on_error=on_error,
+                    on_done=finish_done,
+                    on_error=finish_error,
                     on_tool=on_tool,
                     on_tool_start=on_tool_start,
                     approve_tool=lambda change: cls._request_tool_approval(
@@ -520,7 +532,6 @@ class ChatService:
                 )
             except Exception as exc:
                 _put({"type": "error", "message": str(exc)})
-            finally:
                 _put({"type": "__send_end__"})
 
         threading.Thread(
@@ -591,18 +602,20 @@ def get_usage_manager():
 
 
 def usage_snapshot() -> Dict[str, Any]:
-    manager = get_usage_manager()
+    usage = get_usage_manager()
     try:
-        manager.set_capacity(int(get_manager().effective_ctx_len))
+        live = ChatService.get_manager()
+        usage.activate(live.active_provider_slug, int(live.effective_ctx_len))
     except Exception:
         pass
     return {
-        "used": int(manager.usage),
-        "capacity": int(manager.max_capacity),
-        "percent": manager.percentage,
-        "exhausted": manager.is_exhausted,
-        "resets_in": manager.time_until_reset(),
-        "compactions_used": manager.compaction_count,
-        "compactions_remaining": manager.compactions_remaining,
-        "can_compact": manager.can_compact(),
+        "provider": usage.active_provider,
+        "used": int(usage.usage),
+        "capacity": int(usage.max_capacity),
+        "percent": usage.percentage,
+        "exhausted": usage.is_exhausted,
+        "resets_in": usage.time_until_reset(),
+        "compactions_used": usage.compaction_count,
+        "compactions_remaining": usage.compactions_remaining,
+        "can_compact": usage.can_compact(),
     }

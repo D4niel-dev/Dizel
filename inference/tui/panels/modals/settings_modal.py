@@ -56,6 +56,9 @@ class FieldSpec:
     # A labelled cluster inside a pane ("Replies", "Transcript", …). Empty for
     # panes short enough to read as one list.
     group: str = ""
+    # Reads and writes the active provider's entry in a nested map
+    # (api_router.provider_limits) instead of a flat section key.
+    provider_scoped: bool = False
 
 
 @dataclass
@@ -447,6 +450,13 @@ class SettingsModal(ModalScreen[bool]):
                 pane="api", group="Provider",
             ),
             FieldSpec(
+                "api_router", "provider_limits", "Usage limit", "int",
+                "Tokens in the 12-hour usage window for this provider. "
+                "Blank uses the provider's default window.",
+                minimum=512, maximum=2_000_000, pane="api", group="Provider",
+                provider_scoped=True,
+            ),
+            FieldSpec(
                 "api_router", "api_key", "API key", "secret",
                 "Stored encrypted. Leave blank to keep the current key."
                 if stored_key
@@ -684,9 +694,17 @@ class SettingsModal(ModalScreen[bool]):
                 classes="form-textarea",
             )
         if spec.kind == "int":
+            placeholder = ""
+            if spec.provider_scoped:
+                from dizel_core import provider_limits
+
+                slug = str((cfg.get("api_router") or {}).get("provider", "local"))
+                if slug != "local":
+                    placeholder = str(provider_limits.default_for(slug))
             return Input(
                 str(current if current is not None else ""),
                 type="integer",
+                placeholder=placeholder,
                 id=control_id,
                 classes="form-input",
             )
@@ -725,6 +743,13 @@ class SettingsModal(ModalScreen[bool]):
         section = cfg.get(spec.section, {})
         if not isinstance(section, dict):
             return ""
+        if spec.provider_scoped:
+            from dizel_core import provider_limits
+
+            slug = str(section.get("provider", "local"))
+            if slug == "local":
+                return int(self.app.chat_bridge.manager.effective_ctx_len)
+            return provider_limits.get_override(section, slug)
         if spec.section == "appearance":
             defaults = {
                 "color_mode": "System",
@@ -825,6 +850,8 @@ class SettingsModal(ModalScreen[bool]):
         if spec.kind in ("text", "secret", "path"):
             return raw
         if raw == "":
+            if spec.provider_scoped:
+                return 0
             raise ValueError("Required.")
 
         try:
@@ -1017,7 +1044,7 @@ class SettingsModal(ModalScreen[bool]):
             return
 
         for key, value in values.items():
-            if key in ("@runtime.mode", "@ui.reset_tutorial", "@tools.enabled", "@trust.revoke_session", "api_router.api_key"):
+            if key in ("@runtime.mode", "@ui.reset_tutorial", "@tools.enabled", "@trust.revoke_session", "api_router.api_key", "api_router.provider_limits"):
                 continue
             spec = self._fields[key].spec
             if spec.section == "":
@@ -1044,6 +1071,13 @@ class SettingsModal(ModalScreen[bool]):
         api_cfg["model"] = model
         if new_key:
             api_cfg["api_key"] = encrypt_key(new_key)
+
+        if "api_router.provider_limits" in values:
+            from dizel_core import provider_limits
+
+            provider_limits.set_override(
+                api_cfg, provider, values["api_router.provider_limits"]
+            )
 
         if "@tools.enabled" in values:
             try:
@@ -1086,6 +1120,7 @@ class SettingsModal(ModalScreen[bool]):
             notes.append(f"provider apply failed: {error}")
 
         self.app.active_provider = manager.active_provider_slug
+        self.app.sync_usage_provider()
         if self.app.active_provider == "local":
             from model.naming import model_display_name
 

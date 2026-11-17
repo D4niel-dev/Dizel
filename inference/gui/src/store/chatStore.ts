@@ -9,6 +9,7 @@ import type {
   Prefs,
   ProfileDetails,
   ProviderInfo,
+  RecentModelEntry,
   SavedPrompt,
   SessionSummary,
   SkillInfo,
@@ -456,6 +457,7 @@ interface ChatState {
   username: string;
 
   models: ModelEntry[];
+  recentModels: RecentModelEntry[];
   profiles: Record<string, string[]>;
   variant: string;
   mode: string;
@@ -501,6 +503,7 @@ interface ChatState {
   refreshStatus: () => Promise<void>;
   loadSessions: () => Promise<void>;
   loadModels: () => Promise<void>;
+  loadRecentModels: () => Promise<void>;
   openSession: (id: string) => Promise<void>;
   togglePin: (id: string) => Promise<void>;
   archiveSession: (id: string) => Promise<void>;
@@ -627,6 +630,7 @@ export const useChat = create<ChatState>((set, get) => ({
   username: "You",
 
   models: [],
+  recentModels: [],
   profiles: {},
   variant: "Dizel",
   mode: "Fast",
@@ -710,6 +714,7 @@ export const useChat = create<ChatState>((set, get) => ({
 
       void get().loadSessions();
       void get().loadModels();
+      void get().loadRecentModels();
       void get().loadProviderModels();
       void get().loadRecent();
       void get().loadSkills();
@@ -816,6 +821,14 @@ export const useChat = create<ChatState>((set, get) => ({
       set({ models: await api.listModels() });
     } catch {
       /* the picker falls back to the configured checkpoint */
+    }
+  },
+
+  loadRecentModels: async () => {
+    try {
+      set({ recentModels: await api.listRecentModels() });
+    } catch {
+      /* history is a convenience; the picker still lists detected files */
     }
   },
 
@@ -2378,6 +2391,7 @@ export const useChat = create<ChatState>((set, get) => ({
       await api.saveConfig({ checkpoint: path });
       set({ status: await api.getStatus() });
       startPolling(set);
+      void get().loadRecentModels();
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -2507,6 +2521,7 @@ export const useChat = create<ChatState>((set, get) => ({
         await api.loadModel(nextPath, nextDevice || undefined);
         set({ status: await api.getStatus() });
         startPolling(set);
+        void get().loadRecentModels();
       }
     } catch (error) {
       // Keep the dialog open — a failed save behind a closing modal is invisible.

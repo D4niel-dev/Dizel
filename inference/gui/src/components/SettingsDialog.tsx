@@ -274,7 +274,7 @@ export function SettingsDialog() {
   const [copyLastReplyHotkey, setCopyLastReplyHotkey] = useState(true);
   const [stopGenerationHotkey, setStopGenerationHotkey] = useState(true);
   const toggleDebug = useChat((s) => s.toggleDebug);
-  const [ctxLength, setCtxLength] = useState("2048");
+  const [providerLimits, setProviderLimits] = useState<Record<string, number>>({});
   const [routerBlock, setRouterBlock] = useState<Record<string, unknown>>({});
   const familyClicks = useRef(0);
   const familyTimer = useRef<number | null>(null);
@@ -459,8 +459,16 @@ export function SettingsDialog() {
         setKeyStatus(null);
 
         const router = ((cfg as Record<string, unknown>).api_router ?? {}) as Record<string, unknown>;
-        setRouterBlock(router);
-        setCtxLength(String(router.context_length ?? 2048));
+        const routerRest = { ...router };
+        delete routerRest.context_length;
+        setRouterBlock(routerRest);
+        const savedLimits = (router.provider_limits ?? {}) as Record<string, unknown>;
+        const limits: Record<string, number> = {};
+        for (const [slug, value] of Object.entries(savedLimits)) {
+          const number = Number(value);
+          if (Number.isFinite(number) && number > 0) limits[slug] = number;
+        }
+        setProviderLimits(limits);
         setOllamaUrl((router.ollama_url as string) || "http://localhost:11434");
         setCustomName((router.custom_name as string) ?? "");
         setCustomUrl((router.custom_url as string) ?? "");
@@ -546,7 +554,9 @@ export function SettingsDialog() {
       },
       api_router: {
         ...routerBlock,
-        context_length: Number(ctxLength) || 2048,
+        provider_limits: Object.fromEntries(
+          Object.entries(providerLimits).filter(([, value]) => Number(value) > 0),
+        ),
         ollama_url: ollamaUrl.trim() || "http://localhost:11434",
       },
       nova: {
@@ -1235,21 +1245,51 @@ export function SettingsDialog() {
                       )}
                     </Section>
 
-                    <Section title="Context window">
-                      <Row
-                        label="Provider context length"
-                        hint="Used when a provider model answers — they don't report their own"
-                      >
-                        <input
-                          className="set-number"
-                          type="number"
-                          min={512}
-                          max={1000000}
-                          step={512}
-                          value={ctxLength}
-                          onChange={(event) => setCtxLength(event.target.value)}
-                        />
-                      </Row>
+                    <Section
+                      title={
+                        selected && selected.slug !== "local"
+                          ? `Usage limit · ${selected.name}`
+                          : "Usage limit"
+                      }
+                      hint="Context window used for the usage meter and reply budget. Providers don't report their own — each vendor starts at its typical window."
+                    >
+                      {!selected || selected.slug === "local" ? (
+                        <Row
+                          label="Local models"
+                          hint="A checkpoint reports its own context window."
+                        >
+                          <b>Checkpoint</b>
+                        </Row>
+                      ) : (
+                        <Row
+                          label={`${selected.name} limit`}
+                          hint={
+                            selected.context_limit
+                              ? `Default ${selected.context_limit.toLocaleString()} tokens`
+                              : undefined
+                          }
+                        >
+                          <input
+                            className="set-number"
+                            type="number"
+                            min={512}
+                            max={2000000}
+                            step={512}
+                            value={providerLimits[selected.slug] ?? ""}
+                            placeholder={
+                              selected.context_limit
+                                ? String(selected.context_limit)
+                                : "32768"
+                            }
+                            onChange={(event) =>
+                              setProviderLimits((prev) => ({
+                                ...prev,
+                                [selected.slug]: Number(event.target.value) || 0,
+                              }))
+                            }
+                          />
+                        </Row>
+                      )}
                     </Section>
 
                     <Section

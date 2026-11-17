@@ -156,6 +156,113 @@ new Promise((resolve) => {
       detail: emptyPop,
     }));
 
+    // ── 4b. model switcher: recents + all checkpoints ───────────────────
+    // run-smoke seeds checkpoint_history with one real and one missing file.
+    const modelChip = document.querySelector('.composer-bar .bar-chip[title="Model"]');
+    if (modelChip) modelChip.click();
+    const recentLabel = await waitFor(() => {
+      const labels = Array.from(document.querySelectorAll(".popover .popover-label"));
+      return labels.find((l) => /Recently loaded/i.test(l.textContent)) || null;
+    }, 20);
+    await sleep(350);
+
+    check("model switcher: recently loaded rows render history", () => {
+      const rows = Array.from(document.querySelectorAll(".popover .model-row"));
+      const missing = rows.filter((r) => r.classList.contains("is-missing"));
+      const text = rows.map((r) => r.textContent).join(" | ");
+      return {
+        ok:
+          Boolean(recentLabel) &&
+          rows.length >= 2 &&
+          missing.length === 1 &&
+          missing[0].disabled === true &&
+          /Missing file/.test(text) &&
+          /GGUF/.test(text),
+        rows: rows.length,
+        missing: missing.length,
+        text: text.slice(0, 160),
+      };
+    });
+
+    const collapse = document.querySelector(".popover .popover-collapse");
+    if (collapse) collapse.click();
+    await sleep(300);
+    check("model switcher: all checkpoints expands", () => {
+      const count = collapse
+        ? Number(
+            (collapse.querySelector(".popover-collapse-count") || {}).textContent || 0,
+          )
+        : 0;
+      const rows = document.querySelectorAll(".popover .model-row").length;
+      return {
+        ok:
+          Boolean(collapse) &&
+          collapse.getAttribute("aria-expanded") === "true" &&
+          count >= 1 &&
+          rows >= 3,
+        count,
+        rows,
+      };
+    });
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    document.body.click();
+    await sleep(250);
+
+    // ── 4c. running tool name carries the per-letter sweep ──────────────
+    store.setState({
+      messages: [
+        {
+          id: "tool-sweep",
+          role: "assistant",
+          content: "",
+          createdAt: Date.now(),
+          tools: [
+            {
+              id: "t-sweep",
+              name: "read_file",
+              detail: "src/App.tsx",
+              status: "running",
+            },
+          ],
+        },
+      ],
+      streaming: true,
+    });
+    await sleep(350);
+    check("tool row: running name renders a per-letter sweep", () => {
+      const name = document.querySelector(".tool-row.is-running .tool-name");
+      const letters = name ? Array.from(name.querySelectorAll("span")) : [];
+      const delays = letters.map((s) => s.style.animationDelay);
+      return {
+        ok:
+          Boolean(name) &&
+          letters.length === "read file".length &&
+          delays.every(Boolean) &&
+          new Set(delays).size > 1,
+        found: Boolean(name),
+        letters: letters.length,
+        delays: delays.slice(0, 3),
+      };
+    });
+
+    store.setState((state) => ({
+      messages: state.messages.map((message) => ({
+        ...message,
+        tools: message.tools?.map((tool) => ({ ...tool, status: "done" })),
+      })),
+      streaming: false,
+    }));
+    await sleep(300);
+    check("tool row: finished name is plain text", () => {
+      const name = document.querySelector(".tool-row.is-done .tool-name");
+      return {
+        ok: Boolean(name) && name.querySelectorAll("span").length === 0,
+        found: Boolean(name),
+      };
+    });
+    store.setState({ messages: [], streaming: false });
+    await sleep(200);
+
     // ── 5. chat state: export, placement, transcript ────────────────────
     const now = Date.now();
     store.setState({
@@ -398,8 +505,82 @@ new Promise((resolve) => {
     const sessionBtn = Array.from(document.querySelectorAll(".tool-approval-actions button"))
       .find((b) => b.textContent.trim() === "Always this session");
     if (sessionBtn) sessionBtn.click();
+    await sleep(250);
+    check("trust: standing decision asks for confirmation first", () => {
+      const panel = document.querySelector(".tool-approval-confirm");
+      const text = panel ? panel.textContent : "";
+      return {
+        ok:
+          Boolean(panel) &&
+          store.getState().approval !== null &&
+          /without asking/i.test(text),
+        text: text.slice(0, 120),
+      };
+    });
+    const confirmSession = Array.from(
+      document.querySelectorAll(".tool-approval-actions button"),
+    ).find((b) => b.textContent.trim() === "Allow for session");
+    if (confirmSession) confirmSession.click();
     await waitFor(() => store.getState().approval === null, 20);
-    check("trust: always-this-session resolves the synthetic gate", () => ({
+    check("trust: confirming 'for session' resolves the synthetic gate", () => ({
+      ok: store.getState().approval === null,
+    }));
+    await sleep(200);
+
+    // Always allow is the dangerous tier: the warning must name the scope and
+    // the way out, and Escape must back out without deciding.
+    store.setState({
+      approval: {
+        id: "smoke-trust-persist",
+        action: "edit",
+        tool: "edit_file",
+        path: "smoke-trust.txt",
+        diff: "--- a/smoke-trust.txt\n+++ b/smoke-trust.txt\n@@ -1 +1 @@\n-old\n+new",
+        additions: 1,
+        deletions: 1,
+        synthetic: true,
+      },
+    });
+    await waitFor(() => document.querySelector(".tool-approval"), 20);
+    await sleep(250);
+    const persistBtn = await waitFor(
+      () =>
+        Array.from(document.querySelectorAll(".tool-approval-actions button")).find(
+          (b) => b.textContent.trim() === "Always allow",
+        ) || null,
+      20,
+    );
+    if (persistBtn) persistBtn.click();
+    await sleep(250);
+    check("trust: always-allow names scope and revocation", () => {
+      const panel = document.querySelector(".tool-approval-confirm");
+      const text = panel ? panel.textContent : "";
+      return {
+        ok:
+          Boolean(panel) &&
+          panel.classList.contains("is-danger") &&
+          /every project/i.test(text) &&
+          /Settings/.test(text),
+        text: text.slice(0, 160),
+      };
+    });
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await sleep(250);
+    check("trust: Escape backs out of the warning, gate stays open", () => {
+      const labels = Array.from(document.querySelectorAll(".tool-approval-actions button")).map(
+        (b) => b.textContent.trim(),
+      );
+      return {
+        ok:
+          !document.querySelector(".tool-approval-confirm") &&
+          store.getState().approval !== null &&
+          labels.length === 4,
+        labels,
+      };
+    });
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await waitFor(() => store.getState().approval === null, 20);
+    check("trust: second Escape denies the write gate", () => ({
       ok: store.getState().approval === null,
     }));
     await sleep(200);
@@ -481,6 +662,46 @@ new Promise((resolve) => {
     store.getState().closeSettings();
     await sleep(200);
 
+    // ── 9i. Per-provider usage limits ───────────────────────────────────
+    check("limits: provider defaults reach the renderer", () => {
+      const providers = store.getState().providers || [];
+      const openai = providers.find((p) => p.slug === "openai");
+      const local = providers.find((p) => p.slug === "local");
+      return {
+        ok:
+          Boolean(openai) &&
+          openai.context_limit === 131072 &&
+          Boolean(local) &&
+          local.context_limit === null,
+        openai: openai ? openai.context_limit : null,
+        local: local ? local.context_limit : null,
+      };
+    });
+
+    check("status: usage tooltip names the provider", () => {
+      const el = Array.from(document.querySelectorAll(".statusbar span")).find((s) =>
+        /usage window/i.test(s.title || ""),
+      );
+      return {
+        ok: Boolean(el) && /^local /i.test(el.title),
+        title: el ? el.title : null,
+      };
+    });
+
+    store.getState().openSettings("Chat");
+    await sleep(600);
+    check("limits: Settings shows the usage-limit row", () => {
+      const content = document.querySelector(".set-content") || document.body;
+      const text = content.textContent || "";
+      return {
+        ok:
+          /Usage limit/.test(text) &&
+          /checkpoint reports its own context window/i.test(text),
+      };
+    });
+    store.getState().closeSettings();
+    await sleep(200);
+
     // ── 9d. Ctrl+K command palette ──────────────────────────────────────
     // A global palette jumps to commands and recent chats. It must open on
     // Ctrl+K, list both kinds, fuzzy-filter, route a pick to runSlash /
@@ -499,6 +720,17 @@ new Promise((resolve) => {
       open: store.getState().paletteOpen,
     }));
     if (palInput) {
+      check("palette: dialog is horizontally centered", () => {
+        const pal = document.querySelector(".command-palette");
+        const rect = pal.getBoundingClientRect();
+        const offset = Math.abs(rect.x + rect.width / 2 - window.innerWidth / 2);
+        return {
+          ok: offset <= 2,
+          offset: Math.round(offset),
+          width: Math.round(rect.width),
+        };
+      });
+
       check("palette: lists commands and chats", () => {
         const items = Array.from(document.querySelectorAll(".command-palette .command-item"));
         const text = items.map((i) => i.textContent).join(" ");

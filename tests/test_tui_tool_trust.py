@@ -78,14 +78,20 @@ class TuiTrustTests(unittest.TestCase):
             hint = app.screen.query_one(".approval-trust-hint").render().plain
             await pilot.press("s")
             await pilot.pause()
-            return buttons, hint, results
+            armed = app.screen.query_one("#approval-confirm").render().plain
+            still_open = isinstance(app.screen, ToolApprovalModal)
+            await pilot.press("s")
+            await pilot.pause()
+            return buttons, hint, armed, still_open, results
 
-        buttons, hint, results = self._run((120, 36), script)
+        buttons, hint, armed, still_open, results = self._run((120, 36), script)
         self.assertEqual(
             buttons,
             ["approval-reject", "approval-once", "approval-session", "approval-persistent"],
         )
         self.assertIn("revoke", hint.lower())
+        self.assertIn("again", armed.lower())
+        self.assertTrue(still_open)
         self.assertEqual(results, ["always_session"])
 
     def test_write_gate_persistent_key(self):
@@ -95,9 +101,40 @@ class TuiTrustTests(unittest.TestCase):
             await pilot.pause()
             await pilot.press("a")
             await pilot.pause()
-            return results
+            armed = app.screen.query_one("#approval-confirm").render().plain
+            await pilot.press("a")
+            await pilot.pause()
+            return armed, results
 
-        self.assertEqual(self._run((120, 36), script), ["always_persistent"])
+        armed, results = self._run((120, 36), script)
+        self.assertIn("every project", armed.lower())
+        self.assertEqual(results, ["always_persistent"])
+
+    def test_escape_backs_out_of_the_standing_warning(self):
+        async def script(app, pilot):
+            results = []
+            app.push_screen(ToolApprovalModal(_write_change()), results.append)
+            await pilot.pause()
+            await pilot.press("a")
+            await pilot.pause()
+            armed_visible = app.screen.query_one("#approval-confirm").display
+            await pilot.press("escape")
+            await pilot.pause()
+            still_open = isinstance(app.screen, ToolApprovalModal)
+            confirm_hidden = not app.screen.query_one("#approval-confirm").display
+            buttons = [b.id for b in app.screen.query(Button)]
+            await pilot.press("escape")
+            await pilot.pause()
+            return armed_visible, still_open, confirm_hidden, buttons, results
+
+        armed_visible, still_open, confirm_hidden, buttons, results = self._run(
+            (120, 36), script
+        )
+        self.assertTrue(armed_visible)
+        self.assertTrue(still_open)
+        self.assertTrue(confirm_hidden)
+        self.assertEqual(len(buttons), 4)
+        self.assertEqual(results, ["deny"])
 
     def test_delete_gate_ignores_trust_keys(self):
         async def script(app, pilot):
@@ -192,17 +229,22 @@ class TuiTrustTests(unittest.TestCase):
                     break
             await pilot.press("s")
             await pilot.pause()
+            armed_open = isinstance(app.screen, ToolApprovalModal)
+            await pilot.press("s")
+            await pilot.pause()
             thread.join(timeout=2)
             return (
                 result.get("approved"),
                 "s-tab" in app._trusted_sessions,
                 app.trust_revision > before,
+                armed_open,
             )
 
-        approved, granted, bumped = self._run((120, 36), script)
+        approved, granted, bumped, armed_open = self._run((120, 36), script)
         self.assertTrue(approved)
         self.assertTrue(granted)
         self.assertTrue(bumped)
+        self.assertTrue(armed_open)
 
     def test_forget_tab_revokes_session_trust(self):
         async def script(app, pilot):
@@ -352,17 +394,22 @@ class TuiTrustTests(unittest.TestCase):
                         break
                 await pilot.press("a")
                 await pilot.pause()
+                armed_open = isinstance(app.screen, ToolApprovalModal)
+                await pilot.press("a")
+                await pilot.pause()
                 thread.join(timeout=2)
             return (
                 result.get("approved"),
                 saved.get("tools", {}).get("always_allow_writes"),
                 app.trust_revision > before,
+                armed_open,
             )
 
-        approved, persisted, bumped = self._run((120, 36), script)
+        approved, persisted, bumped, armed_open = self._run((120, 36), script)
         self.assertTrue(approved)
         self.assertIs(persisted, True)
         self.assertTrue(bumped)
+        self.assertTrue(armed_open)
 
     def test_bridge_session_auto_approval_notes_the_session_tier(self):
         async def script(app, pilot):

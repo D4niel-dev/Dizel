@@ -1,91 +1,159 @@
-import time
 import json
 import os
-from .config_manager import SETTINGS_FILE
+import time
+
+from . import config_manager
+
 
 class UsageManager:
-    """Manages AI compute usage, complexity scoring, and 12-hour reset windows."""
-    
+    """Manages AI compute usage per provider, with 12-hour reset windows.
+
+    Every provider (local checkpoints included) keeps its own bucket: its own
+    spent amount, window start, and compaction count. Switching providers
+    switches the meter; switching back restores that provider's window.
+    """
+
     RESET_WINDOW = 12 * 3600  # 12 hours in seconds
 
     COMPACTION_THRESHOLD = 84        # % of capacity that triggers auto-compaction
     MAX_COMPACTIONS = 5              # compactions allowed per 12h window
+    STATE_VERSION = 2
+    DEFAULT_CAPACITY = 1024.0
 
     def __init__(self):
-        self._current_usage = 0.0
-        self._last_reset = time.time()
-        self._max_capacity = 1024.0  # Default base capacity
-        self._compaction_count  = 0
+        self._active = "local"
+        self._providers: dict[str, dict] = {}
+        self._capacities: dict[str, float] = {}
 
         self.load_state()
+        self._bucket()
         self.check_reset()
 
-    def set_capacity(self, capacity: float):
-        """Dynamic capacity based on model checkpoint (e.g. 1024 or 4096).
+    # ── Provider buckets ────────────────────────────────────────────────
+    @staticmethod
+    def _slug(provider: str | None) -> str:
+        return str(provider or "").strip().lower() or "local"
+
+    def _bucket(self, provider: str | None = None) -> dict:
+        slug = self._slug(provider) if provider is not None else self._active
+        return self._providers.setdefault(
+            slug,
+            {"usage": 0.0, "last_reset": time.time(), "compaction_count": 0},
+        )
+
+    @property
+    def active_provider(self) -> str:
+        return self._active
+
+    def activate(self, provider: str, capacity: float | None = None) -> None:
+        """Switch the active bucket (and optionally its capacity)."""
+        slug = self._slug(provider)
+        changed = slug != self._active
+        self._active = slug
+        self._bucket()
+        self.check_reset()
+        if capacity is not None:
+            self.set_capacity(capacity)
+        if changed:
+            self.save_state()
+
+    def set_capacity(self, capacity: float) -> None:
+        """Dynamic capacity for the active provider (its context window).
 
         Note the unit: capacity is expressed in the same "tokens" the cost model
         charges. At WORDS_PER_TOKEN = 10, a 2,048 capacity is ~20,480 words —
-        roughly 400 ordinary messages — with compaction at ~17,000 words. Generous
-        but reachable. Raise WORDS_PER_TOKEN to stretch it, lower it to tighten.
+        roughly 400 ordinary messages — with compaction at ~17,000 words.
         """
-        if capacity > 0:
-            self._max_capacity = float(capacity)
+        if capacity and capacity > 0:
+            self._capacities[self._active] = float(capacity)
 
-    def load_state(self):
+    def load_state(self) -> None:
         try:
-            # We store usage in the same dir as settings for simplicity
-            path = SETTINGS_FILE.replace("settings.json", "usage_state.json")
-            if os.path.exists(path):
-                with open(path, "r") as f:
-                    data = json.load(f)
-                    self._current_usage = data.get("usage", 0.0)
-                    self._last_reset = data.get("last_reset", time.time())
-                    self._compaction_count  = data.get("compaction_count", 0)
-        except:
+            path = config_manager.SETTINGS_FILE.replace("settings.json", "usage_state.json")
+            if not os.path.exists(path):
+                return
+            with open(path, "r") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return
+
+            providers = data.get("providers")
+            if isinstance(providers, dict):
+                loaded: dict[str, dict] = {}
+                for slug, bucket in providers.items():
+                    if not isinstance(bucket, dict):
+                        continue
+                    loaded[str(slug)] = {
+                        "usage": float(bucket.get("usage", 0.0) or 0.0),
+                        "last_reset": float(bucket.get("last_reset", time.time()) or time.time()),
+                        "compaction_count": int(bucket.get("compaction_count", 0) or 0),
+                    }
+                if loaded:
+                    self._providers = loaded
+                    active = self._slug(data.get("active"))
+                    self._active = active if active in loaded else "local"
+                return
+
+            # v1: one flat window, effectively the local model's usage.
+            if "usage" in data or "last_reset" in data:
+                self._providers = {
+                    "local": {
+                        "usage": float(data.get("usage", 0.0) or 0.0),
+                        "last_reset": float(data.get("last_reset", time.time()) or time.time()),
+                        "compaction_count": int(data.get("compaction_count", 0) or 0),
+                    }
+                }
+                self._active = "local"
+        except Exception:
             pass
 
-    def save_state(self):
+    def save_state(self) -> None:
         try:
-            path = SETTINGS_FILE.replace("settings.json", "usage_state.json")
+            path = config_manager.SETTINGS_FILE.replace("settings.json", "usage_state.json")
             with open(path, "w") as f:
-                json.dump({
-                    "usage": self._current_usage,
-                    "last_reset": self._last_reset,
-                    "compaction_count": self._compaction_count,
-                }, f)
-        except:
+                json.dump(
+                    {
+                        "version": self.STATE_VERSION,
+                        "active": self._active,
+                        "providers": self._providers,
+                    },
+                    f,
+                )
+        except Exception:
             pass
 
-    def check_reset(self):
+    def check_reset(self) -> None:
         now = time.time()
-        if now - self._last_reset > self.RESET_WINDOW:
-            self._current_usage = 0.0
-            self._compaction_count = 0
-            self._last_reset = now
+        bucket = self._bucket()
+        if now - float(bucket.get("last_reset", now)) > self.RESET_WINDOW:
+            bucket["usage"] = 0.0
+            bucket["compaction_count"] = 0
+            bucket["last_reset"] = now
             self.save_state()
 
-    def add_usage(self, amount: float):
+    def add_usage(self, amount: float) -> None:
         self.check_reset()
-        self._current_usage = min(self._current_usage + amount, self._max_capacity)
+        bucket = self._bucket()
+        bucket["usage"] = min(float(bucket.get("usage", 0.0)) + amount, self.max_capacity)
         self.save_state()
 
     @property
     def usage(self) -> float:
         self.check_reset()
-        return self._current_usage
+        return float(self._bucket().get("usage", 0.0))
 
     @property
     def percentage(self) -> int:
-        return min(100, int((self._current_usage / max(self._max_capacity, 1)) * 100))
+        return min(100, int((self.usage / max(self.max_capacity, 1)) * 100))
 
     @property
     def max_capacity(self) -> float:
-        return self._max_capacity
+        return self._capacities.get(self._active, self.DEFAULT_CAPACITY)
 
     @property
     def is_exhausted(self) -> bool:
         """True if current usage meets or exceeds max capacity."""
-        return self._current_usage >= self._max_capacity
+        return self.usage >= self.max_capacity
 
     @property
     def needs_compaction(self) -> bool:
@@ -94,15 +162,15 @@ class UsageManager:
 
     @property
     def compaction_count(self) -> int:
-        return self._compaction_count
+        return int(self._bucket().get("compaction_count", 0))
 
     @property
     def compactions_remaining(self) -> int:
-        return max(0, self.MAX_COMPACTIONS - self._compaction_count)
+        return max(0, self.MAX_COMPACTIONS - self.compaction_count)
 
     def can_compact(self) -> bool:
         """Compaction allowed until 5 have been used in this window."""
-        return self._compaction_count < self.MAX_COMPACTIONS
+        return self.compaction_count < self.MAX_COMPACTIONS
 
     # ── Cost model ──────────────────────────────────────────────────────
     # The window is a *policy* number, not a physical one — it exists to stop a
@@ -119,6 +187,7 @@ class UsageManager:
     # The context meter is a different thing and keeps real counting: that one is
     # a hard limit the model enforces, and a generous number there would only hide
     # truncation rather than prevent it.
+
     WORDS_PER_TOKEN = 10.0
     TOKENS_PER_TOOL_CALL = 0.5
 
@@ -141,35 +210,37 @@ class UsageManager:
 
     # ── Debug levers ────────────────────────────────────────────────────
     # Named entry points so tests and debug commands do not reach into
-    # `_current_usage` directly. Each one persists, exactly like real usage.
+    # bucket internals directly. Each one persists, exactly like real usage.
     def force_usage(self, amount: float) -> None:
-        self._current_usage = max(0.0, min(float(amount), self._max_capacity))
+        self._bucket()["usage"] = max(0.0, min(float(amount), self.max_capacity))
         self.save_state()
 
     def force_percent(self, percent: float) -> None:
-        self.force_usage(self._max_capacity * max(0.0, min(100.0, percent)) / 100.0)
+        self.force_usage(self.max_capacity * max(0.0, min(100.0, percent)) / 100.0)
 
     def force_reset(self) -> None:
-        self._current_usage = 0.0
-        self._compaction_count = 0
-        self._last_reset = time.time()
+        bucket = self._bucket()
+        bucket["usage"] = 0.0
+        bucket["compaction_count"] = 0
+        bucket["last_reset"] = time.time()
         self.save_state()
 
     def expire_window(self) -> None:
         """Pretend the 12-hour window has elapsed, so reset logic can be seen."""
-        self._last_reset = time.time() - self.RESET_WINDOW - 1
+        self._bucket()["last_reset"] = time.time() - self.RESET_WINDOW - 1
         self.save_state()
 
     def run_compaction(self) -> None:
         """Count the compaction and reset usage back to 0%."""
-        self._compaction_count += 1
-        self._current_usage = 0.0
+        bucket = self._bucket()
+        bucket["compaction_count"] = int(bucket.get("compaction_count", 0)) + 1
+        bucket["usage"] = 0.0
         self.check_reset()
         self.save_state()
 
     def time_until_reset(self) -> str:
         """Return human-readable time until the 12-hour usage window resets."""
-        remaining = self.RESET_WINDOW - (time.time() - self._last_reset)
+        remaining = self.RESET_WINDOW - (time.time() - float(self._bucket().get("last_reset", time.time())))
         if remaining <= 0:
             return "any moment"
         hours = int(remaining // 3600)

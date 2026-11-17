@@ -542,6 +542,13 @@ class DizelCMDApp(App):
             except Exception:
                 pass
 
+    def sync_usage_provider(self) -> None:
+        """Point the usage window at whatever provider answers next."""
+        manager = self.chat_bridge.manager
+        self.usage_manager.activate(
+            manager.active_provider_slug, int(manager.effective_ctx_len)
+        )
+
     def _on_model_ready(self) -> None:
         self.generation_state = "IDLE"
         info = self.chat_bridge.manager.model_info or {}
@@ -565,7 +572,7 @@ class DizelCMDApp(App):
         ctx_len = int(info.get("ctx_len", 2048) or 2048)
         self.context_tokens = 0
         self.budget_tokens = 0
-        self.usage_manager.set_capacity(ctx_len)
+        self.sync_usage_provider()
         # The new checkpoint may belong to a different family (Dizel, Mila or
         # a generic model), so re-resolve the tier/mode profile now.
         self._apply_profile()

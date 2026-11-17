@@ -20,6 +20,7 @@ export function ToolApprovalDialog() {
   const approval = useChat((s) => s.approval);
   const resolve = useChat((s) => s.resolveApproval);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState<null | "session" | "persistent">(null);
   const busyRef = useRef(false);
 
   const decide = async (decision: string) => {
@@ -38,15 +39,23 @@ export function ToolApprovalDialog() {
     if (!approval) return;
     busyRef.current = false;
     setBusy(false);
+    setConfirming(null);
+  }, [approval]);
+
+  useEffect(() => {
+    if (!approval) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        void decide("deny");
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      if (confirming) {
+        setConfirming(null);
+        return;
       }
+      void decide("deny");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [approval, resolve]);
+  }, [approval, resolve, confirming]);
 
   if (!approval) return null;
 
@@ -98,29 +107,84 @@ export function ToolApprovalDialog() {
           </p>
           {!isDelete && (
             <p className="tool-approval-trust-hint">
-              "Always allow" stays on until you revoke it in Settings → Chat → File writes.
+              Standing permissions stay on until you revoke them in Settings → Chat →
+              File writes.
             </p>
           )}
         </div>
         <div className="tool-approval-actions">
-          <button className="btn ghost" disabled={busy} onClick={() => void decide("deny")} autoFocus>
-            Reject
-          </button>
-          {isDelete ? (
-            <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
-              Approve
-            </button>
+          {confirming ? (
+            <>
+              <div
+                className={`tool-approval-confirm${confirming === "persistent" ? " is-danger" : ""}`}
+                role="alert"
+              >
+                {confirming === "persistent" ? (
+                  <>
+                    <strong>Stop asking before every write?</strong> Writes in{" "}
+                    <b>every project</b> will be applied without asking — until you revoke
+                    it in Settings → Chat → File writes.
+                  </>
+                ) : (
+                  <>
+                    <strong>Skip the prompt for this chat?</strong> Every write in this
+                    chat will apply without asking, until you close it.
+                  </>
+                )}
+              </div>
+              <button
+                className="btn ghost"
+                disabled={busy}
+                onClick={() => setConfirming(null)}
+                autoFocus
+              >
+                Cancel
+              </button>
+              <button
+                className={confirming === "persistent" ? "btn danger" : "btn primary"}
+                disabled={busy}
+                onClick={() =>
+                  void decide(
+                    confirming === "persistent" ? "always_persistent" : "always_session",
+                  )
+                }
+              >
+                {confirming === "persistent" ? "Enable anyway" : "Allow for session"}
+              </button>
+            </>
           ) : (
             <>
-              <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
-                Allow once
+              <button className="btn ghost" disabled={busy} onClick={() => void decide("deny")} autoFocus>
+                Reject
               </button>
-              <button className="btn ghost" disabled={busy} onClick={() => void decide("always_session")}>
-                Always this session
-              </button>
-              <button className="btn ghost" disabled={busy} onClick={() => void decide("always_persistent")}>
-                Always allow
-              </button>
+              {isDelete ? (
+                <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
+                  Approve
+                </button>
+              ) : (
+                <>
+                  <button className="btn primary" disabled={busy} onClick={() => void decide("allow_once")}>
+                    Allow once
+                  </button>
+                  <div className="tool-approval-standing">
+                    <span className="tool-approval-standing-label">Standing decisions</span>
+                    <button
+                      className="btn ghost"
+                      disabled={busy}
+                      onClick={() => setConfirming("session")}
+                    >
+                      Always this session
+                    </button>
+                    <button
+                      className="btn ghost is-warning"
+                      disabled={busy}
+                      onClick={() => setConfirming("persistent")}
+                    >
+                      Always allow
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

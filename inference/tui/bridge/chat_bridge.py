@@ -142,6 +142,43 @@ class ChatBridge:
             return False
         return bool(holder["approved"])
 
+    def enforce_usage(self) -> str | None:
+        """Apply the active provider's usage policy before a turn.
+
+        Returns a message when the turn must not run, None when it may proceed.
+        Compaction happens here so the trimmed history and the notice are in
+        place before the model is called.
+        """
+        usage = getattr(self.app, "usage_manager", None)
+        if usage is None:
+            return None
+        usage.activate(self.app.active_provider, int(self.manager.effective_ctx_len))
+        if usage.is_exhausted:
+            return (
+                f"Usage window spent for {usage.active_provider} — resets in "
+                f"{usage.time_until_reset()}. Start a new chat or wait for the reset."
+            )
+        if usage.needs_compaction:
+            if not usage.can_compact():
+                return (
+                    "Context limit reached — this chat already used all "
+                    f"{usage.MAX_COMPACTIONS} compactions in this window. "
+                    "Start a new chat or wait for the reset."
+                )
+            try:
+                self.manager.compact_context()
+                usage.run_compaction()
+                self._post(
+                    self.SystemLog(
+                        f"Context compacted at {usage.COMPACTION_THRESHOLD}% — earlier "
+                        f"turns were summarised. {usage.compaction_count}/"
+                        f"{usage.MAX_COMPACTIONS} compactions used."
+                    )
+                )
+            except Exception:
+                pass
+        return None
+
     # ── Generation ───────────────────────────────────────────────────
     def send(self, text: str) -> None:
         self._sync_provider_state()

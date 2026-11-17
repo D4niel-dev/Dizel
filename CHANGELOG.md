@@ -3,6 +3,62 @@
 All notable changes to the Dizel app are recorded here. Release tags use the
 app version from `dizel_core/version.py`.
 
+## [2.0.3] - 2026-11-17
+
+### Added
+
+- Provider-specific usage limits. Every API provider resolves to its own context
+  window (OpenAI, Groq, Mistral, xAI, Cohere, Azure and Meta default to 128k;
+  Anthropic 200k; Google 1M; AI21 256k; Ollama and custom endpoints 32k), and the
+  window can be overridden per provider in Settings → Chat → Usage limit (GUI)
+  or Settings → API → Usage limit (TUI). Local checkpoints keep the window they
+  report.
+- Per-provider usage windows. Each provider keeps its own 12-hour usage counter,
+  reset time and compaction count; switching providers switches the meter, and
+  switching back restores it. Existing saved usage migrates into the local
+  bucket.
+- The terminal client now enforces the usage window like the desktop: a spent
+  window refuses the turn with a reset notice, 84% triggers automatic
+  compaction, and the five-compaction cap is respected.
+- The composer's model menu remembers loaded checkpoints. "Recently loaded"
+  lists the last eight (one click to reload, missing files greyed) above a
+  collapsible "All checkpoints" list. The history is shared, so models loaded in
+  the terminal appear too.
+- Running tool rows animate their names. The desktop sweeps a highlight across
+  the letters of every running tool; the terminal advances the same highlight
+  and adds elapsed seconds to the row.
+- Standing write decisions ask twice. "Always this session" and "Always allow"
+  open an inline confirmation, with the persistent one warning in amber that
+  writes in every project will apply until revoked; Escape backs out. The
+  terminal requires a second press of `s` or `a`.
+
+### Changed
+
+- The desktop usage tooltip names the provider whose window it shows, and the
+  terminal context rail follows the active provider's context window instead of
+  the last loaded checkpoint's.
+- The single "Provider context length" setting became a per-provider usage
+  limit. The docs site's releases page, app screenshot and hover motion were
+  refreshed for 2.0.3.
+
+### Fixed
+
+- Desktop generations could end with "Generation ended without a reply." even
+  when the model replied: the sidecar signalled the end of the turn when the
+  worker started instead of when generation finished. This affected every local
+  checkpoint, not just 1.6.
+- The Ctrl+K command palette drifted right inside its grid track; it is centered
+  again, and a smoke check pins the geometry.
+- The Windows taskbar icon could start blank on a restored-maximized window: the
+  AppUserModelID is set before any window exists and the icon is re-applied
+  after the window is shown.
+- The reported usage capacity stayed frozen at 1,024 because the usage snapshot
+  endpoint swallowed a NameError; it now reports the active provider's real
+  window.
+- The site's edition badge no longer wraps at tablet widths, hover arrows can
+  actually animate (inline spans ignore transforms), and lifted cards stay above
+  their neighbours.
+
 ## [2.0.2] - 2026-11-17
 
 ### Added

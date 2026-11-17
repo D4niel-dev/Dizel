@@ -15,6 +15,10 @@ export interface ProviderInfo {
   active: boolean;
   configured: boolean;
   model: string;
+  /** Typical context window for this vendor; local models report their own. */
+  context_limit?: number | null;
+  /** Saved per-provider override, when one exists. */
+  context_limit_override?: number | null;
 }
 
 export interface ModelFacts {
@@ -188,6 +192,10 @@ export interface ModelEntry {
   size: number;
   modified: number;
   kind: string;
+}
+
+export interface RecentModelEntry extends ModelEntry {
+  exists: boolean;
 }
 
 export interface AppConfig {

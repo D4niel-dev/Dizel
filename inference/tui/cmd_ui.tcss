@@ -659,6 +659,7 @@ ModalScreen {
 .approval-diff-text { height: auto; padding: 0 1; }
 .approval-warning { height: auto; color: $warn; margin-top: 1; }
 .approval-trust-hint { height: auto; color: $text-3; margin-top: 1; }
+.approval-confirm { height: auto; color: $warn; margin-top: 1; }
 
 .tool-line { height: auto; }
 .tool-line:hover { background: $surface; }

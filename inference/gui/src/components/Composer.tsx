@@ -34,6 +34,14 @@ const formatSize = (bytes: number) => {
   return `${bytes} B`;
 };
 
+type LocalEntry = {
+  path: string;
+  display_name: string;
+  kind: string;
+  size: number;
+  exists?: boolean;
+};
+
 export function Composer() {
   const draft = useChat((s) => s.draft);
   const setDraft = useChat((s) => s.setDraft);
@@ -83,6 +91,7 @@ export function Composer() {
 
   const [variantOpen, setVariantOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [allModelsOpen, setAllModelsOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   // The chip and the side panel share one selection, so the panel highlights the
   // file whose chip is open.
@@ -95,6 +104,10 @@ export function Composer() {
   const providerModelsError = useChat((s) => s.providerModelsError);
   const selectModel = useChat((s) => s.selectModel);
   const loadProviderModels = useChat((s) => s.loadProviderModels);
+  const recentModels = useChat((s) => s.recentModels);
+  const localModels = useChat((s) => s.models);
+  const loadRecentModels = useChat((s) => s.loadRecentModels);
+  const switchModel = useChat((s) => s.switchModel);
   const openSettings = useChat((s) => s.openSettings);
   const editingId = useChat((s) => s.editingId);
   const cancelEdit = useChat((s) => s.cancelEdit);
@@ -121,6 +134,52 @@ export function Composer() {
   const modelLabel = isLocal
     ? localName
     : status?.api_model || activeProvider?.name || activeSlug;
+
+  const loadedPath = status?.load?.checkpoint ?? "";
+  const normalizedPath = (path: string) => path.replace(/\\/g, "/").toLowerCase();
+  const samePath = (a: string, b: string) => {
+    const left = normalizedPath(a);
+    const right = normalizedPath(b);
+    return (
+      Boolean(left && right) &&
+      (left === right || left.endsWith(`/${right}`) || right.endsWith(`/${left}`))
+    );
+  };
+  const recentKeys = new Set(recentModels.map((entry) => normalizedPath(entry.path)));
+  const otherModels = localModels.filter(
+    (entry) => !recentKeys.has(normalizedPath(entry.path)),
+  );
+
+  const pickLocal = async (path: string) => {
+    if (!isLocal) await selectModel("local", "");
+    await switchModel(path);
+  };
+
+  const renderLocalEntry = (entry: LocalEntry, active: boolean) => (
+    <button
+      key={entry.path}
+      className={`model-row${active ? " active" : ""}${entry.exists ? "" : " is-missing"}`}
+      disabled={!entry.exists}
+      title={entry.exists ? entry.path : "This checkpoint file is no longer on disk."}
+      onClick={() => {
+        setModelOpen(false);
+        void pickLocal(entry.path);
+      }}
+    >
+      <span className="model-row-icon">
+        <ModelIcon variant="dizel" size={22} />
+      </span>
+      <span className="model-row-text">
+        <b>{entry.display_name}</b>
+        <small>
+          {entry.exists
+            ? `${formatSize(entry.size)} · ${entry.kind.toUpperCase()}`
+            : "Missing file"}
+        </small>
+      </span>
+      {active && <Icon name="check" size={13} />}
+    </button>
+  );
 
 
 
@@ -202,6 +261,10 @@ export function Composer() {
   useEffect(() => {
     if (toolsOpen || modelOpen || variantOpen) setDrawerDismissed(true);
   }, [toolsOpen, modelOpen, variantOpen]);
+
+  useEffect(() => {
+    if (modelOpen) void loadRecentModels();
+  }, [modelOpen, loadRecentModels]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -813,6 +876,37 @@ export function Composer() {
               </span>
               {isLocal && <Icon name="check" size={13} />}
             </button>
+
+            {recentModels.length > 0 && (
+              <>
+                <div className="popover-label">Recently loaded</div>
+                {recentModels.map((entry) =>
+                  renderLocalEntry(entry, samePath(entry.path, loadedPath)),
+                )}
+              </>
+            )}
+
+            {otherModels.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  className="popover-collapse"
+                  aria-expanded={allModelsOpen}
+                  onClick={() => setAllModelsOpen((open) => !open)}
+                >
+                  <span>All checkpoints</span>
+                  <span className="popover-collapse-count">{otherModels.length}</span>
+                  <Icon name="chevronDown" size={11} />
+                </button>
+                {allModelsOpen &&
+                  otherModels.map((entry) =>
+                    renderLocalEntry(
+                      { ...entry, exists: true },
+                      samePath(entry.path, loadedPath),
+                    ),
+                  )}
+              </>
+            )}
 
             {!isLocal && (
               <>

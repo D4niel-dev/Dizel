@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
+import time
 from unittest import mock
 
 import pytest
@@ -32,6 +34,9 @@ class FakeUsage:
     def set_capacity(self, value):
         pass
 
+    def activate(self, provider, capacity=None):
+        pass
+
     def charge_text(self, text):
         pass
 
@@ -47,6 +52,7 @@ class FakeManager:
     is_generating = False
     is_stopping = False
     effective_ctx_len = 1024
+    active_provider_slug = "local"
     system_prompt = ""
     model_info = {}
     session_id = ""
@@ -102,6 +108,50 @@ class FakeManager:
                 else "[edit_file] Write cancelled.",
             )
         on_done("approved" if approved else "cancelled")
+
+
+class ThreadedFakeManager(FakeManager):
+    """Streams from a worker thread, the way the real manager does.
+
+    The real ChatManager.send_with_tools starts a generation thread and
+    returns immediately; FakeManager calls back synchronously, which hid
+    the fact that the stream's end sentinel must be tied to the terminal
+    callback rather than to send_with_tools returning.
+    """
+
+    def send_with_tools(
+        self, user_text, attachments, on_token, on_done, on_error, **kwargs
+    ):
+        def worker():
+            time.sleep(0.05)
+            on_token("Hello")
+            on_done("Hello world")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+
+def test_stream_delivers_threaded_generation_reply():
+    manager = ThreadedFakeManager()
+    frames = []
+
+    with mock.patch.object(ChatService, "get_manager", return_value=manager), mock.patch(
+        "api.services.chat_service.get_usage_manager", return_value=FakeUsage()
+    ), mock.patch(
+        "api.services.session_service.SessionService.create_or_update_session",
+        return_value=None,
+    ):
+        async def collect():
+            async for frame in ChatService.stream_chat("hello"):
+                data = json.loads(frame["data"])
+                frames.append(data)
+                if data["type"] in ("done", "error"):
+                    break
+
+        asyncio.run(collect())
+
+    types = [frame["type"] for frame in frames]
+    assert types == ["start", "token", "done"]
+    assert frames[-1]["text"] == "Hello world"
 
 
 def test_stream_emits_tool_and_waits_for_approval():

@@ -11,6 +11,7 @@ import type {
   ModelEntry,
   ModelFacts,
   ProviderInfo,
+  RecentModelEntry,
   SessionSummary,
   SkillInfo,
   StreamEvent,
@@ -213,6 +214,8 @@ export interface ContextUsage {
 }
 
 export interface UsageWindow {
+  /** Provider whose bucket this window belongs to. */
+  provider: string;
   used: number;
   capacity: number;
   percent: number;
@@ -309,6 +312,8 @@ export const resetPreferences = () =>
 // ── Models & profiles ───────────────────────────────────────────────────────
 
 export const listModels = () => request<ModelEntry[]>("/models/");
+
+export const listRecentModels = () => request<RecentModelEntry[]>("/models/recent");
 
 export const listProfiles = () => request<Record<string, string[]>>("/models/profiles");
 

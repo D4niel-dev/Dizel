@@ -1572,6 +1572,10 @@ textarea {
 
 .command-palette {
   width: min(600px, 100%);
+  /* The backdrop is a grid; a grid item's automatic minimum is min-content,
+     and the nowrap rows push it past the viewport. Without this the track
+     grows and the dialog centers inside the oversized track, off-screen-right. */
+  min-width: 0;
   max-height: min(64vh, 560px);
   display: flex;
   flex-direction: column;
@@ -5449,6 +5453,45 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--accent);
 }
 
+.model-row:disabled {
+  cursor: default;
+}
+.model-row.is-missing {
+  opacity: 0.55;
+}
+.model-row.is-missing:hover {
+  background: transparent;
+}
+
+.popover-collapse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 9px 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: left;
+  transition: color var(--dur) var(--ease);
+}
+.popover-collapse:hover {
+  color: var(--text-secondary);
+}
+.popover-collapse-count {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.popover-collapse svg {
+  margin-left: auto;
+  transition: transform var(--dur) var(--ease);
+}
+.popover-collapse[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
 .provider-initial {
   display: grid;
   place-items: center;
@@ -8494,6 +8537,28 @@ body.is-resizing-panel {
   flex-shrink: 0;
 }
 
+.tool-name.is-sweeping span {
+  display: inline-block;
+  color: var(--text-secondary);
+  animation: tool-name-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes tool-name-sweep {
+  0%,
+  100% {
+    color: var(--text-secondary);
+    text-shadow: none;
+  }
+  18% {
+    color: var(--accent);
+    text-shadow: 0 0 7px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  40% {
+    color: var(--text-secondary);
+    text-shadow: none;
+  }
+}
+
 .tool-detail {
   min-width: 0;
   overflow: hidden;
@@ -8968,9 +9033,58 @@ body.is-resizing-panel {
 .tool-approval-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   padding: 14px 20px 20px;
+}
+
+.tool-approval-standing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.tool-approval-standing-label {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.btn.is-warning {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 42%, var(--border));
+}
+.btn.is-warning:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border-color: var(--warn);
+}
+
+.tool-approval-confirm {
+  flex: 1;
+  min-width: 240px;
+  margin-right: auto;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.tool-approval-confirm strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.tool-approval-confirm.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.tool-approval-confirm.is-danger strong {
+  color: var(--danger);
 }
 
 .tool-approval.is-delete {
@@ -8987,6 +9101,11 @@ body.is-resizing-panel {
   .tool-drawer-wrap,
   .update-badge.is-downloading svg {
     animation: none;
+  }
+  .tool-name.is-sweeping span {
+    animation: none;
+    color: var(--accent);
+    text-shadow: none;
   }
   .tool-open,
   .tool-open svg {

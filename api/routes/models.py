@@ -52,6 +52,36 @@ def list_models() -> List[Dict[str, Any]]:
     return items
 
 
+@router.get("/recent")
+def recent_models() -> List[Dict[str, Any]]:
+    """Checkpoints loaded most recently, newest first, shared by both clients."""
+    from dizel_core import checkpoint_history
+
+    items: List[Dict[str, Any]] = []
+    for path in checkpoint_history.recent():
+        kind = Path(path).suffix.lower().lstrip(".")
+        entry: Dict[str, Any] = {
+            "name": os.path.basename(path),
+            "stem": Path(path).stem,
+            "display_name": model_display_name(path),
+            "path": path,
+            "kind": kind,
+            "exists": False,
+            "size": 0,
+            "modified": 0,
+        }
+        try:
+            stat = os.stat(path)
+        except OSError:
+            pass
+        else:
+            entry["exists"] = True
+            entry["size"] = stat.st_size
+            entry["modified"] = int(stat.st_mtime)
+        items.append(entry)
+    return items
+
+
 @router.get("/profiles")
 def list_profiles() -> Dict[str, List[str]]:
     """Model variants and their available modes, for the composer pickers."""

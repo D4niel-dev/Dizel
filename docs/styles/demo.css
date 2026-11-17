@@ -1257,6 +1257,7 @@ img { display: block; }
 .action-pill:nth-child(2) { animation-delay: 165ms; }
 .action-pill:nth-child(3) { animation-delay: 210ms; }
 .action-pill:hover {
+  z-index: 1;
   background: color-mix(in srgb, var(--bg-hover) 88%, transparent);
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
   box-shadow:

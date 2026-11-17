@@ -193,3 +193,44 @@ def test_theme_toggle_is_hidden_without_js():
     css = read("styles/site.css")
     assert ".theme-toggle { display: none;" in css
     assert ".js .theme-toggle" in css
+
+
+def test_hover_motion_stays_inside_its_element():
+    css = read("styles/site.css")
+    arrow = re.search(r"\.s-arrow\{([^}]*)\}", css)
+    assert arrow and "display:inline-block" in arrow.group(1), (
+        "inline spans ignore transforms — the arrow hover never moved"
+    )
+    row = re.search(r"\.s-links-list a\{([^}]*)\}", css)
+    assert row and "padding:17px 6px 17px 0" in row.group(1), (
+        "the row needs room for the arrow's 4px slide"
+    )
+    underline = re.search(r"\.s-nav-links a::after\{([^}]*)\}", css)
+    assert underline and "bottom:0" in underline.group(1), (
+        "the nav underline must not paint over the header rule"
+    )
+    token = re.search(r"\.s-token:hover\{([^}]*)\}", css)
+    assert token and "z-index:1" in token.group(1)
+
+    demo = read("styles/demo.css")
+    pill = re.search(r"\.action-pill:hover \{([^}]*)\}", demo)
+    assert pill and "z-index: 1" in pill.group(1), (
+        "a lifted pill must paint above its neighbours"
+    )
+
+
+def test_edition_badge_never_wraps():
+    css = read("styles/site.css")
+    edition = re.search(r"\.s-edition\{([^}]*)\}", css)
+    assert edition and "white-space:nowrap" in edition.group(1)
+    assert css.count(".s-edition{display:none}") >= 2, (
+        "the edition badge should drop out at the tablet breakpoint, not wrap"
+    )
+
+
+def test_releases_page_matches_the_current_app_version():
+    from dizel_core.version import __version__
+
+    text = read("releases.html")
+    assert f"v{__version__}" in text
+    assert "v2.0.1" not in text

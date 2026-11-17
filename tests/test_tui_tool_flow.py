@@ -17,7 +17,20 @@ from inference.tui.app import DizelCMDApp
 from inference.tui.bridge.tool_bridge import ToolBridge
 from inference.tui.panels.modals.tool_approval import ToolApprovalModal
 from inference.tui.panels.workspace import WorkspacePanel
-from inference.tui.rendering.tool_block import ToolLine
+from inference.tui.rendering.tool_block import ToolBlock, ToolLine
+from inference.tui.theme import ACCENT, TEXT
+
+
+def _style_at(text, index: int) -> str:
+    for span in text.spans:
+        if span.start <= index < span.end:
+            return str(span.style)
+    return ""
+
+
+def _row_text(row) -> str:
+    height = max(1, row.size.height)
+    return "\n".join(row.render_line(y).text for y in range(height))
 
 
 def _defaults():
@@ -284,6 +297,56 @@ class ToolFlowTests(unittest.TestCase):
             return results
 
         self.assertEqual(self._run((120, 36), script), ["deny"])
+
+    def test_running_tool_name_sweeps_with_a_trailing_highlight(self):
+        block = ToolBlock(
+            "grep", "RUNNING", "pattern · src", frame="⠋", hot=2, elapsed="2.4s"
+        )
+        text = block.__rich__()
+        start = text.plain.index("grep")
+        hot_style = _style_at(text, start + 2)
+        trail_style = _style_at(text, start)
+        rest_style = _style_at(text, start + 3)
+
+        self.assertIn(ACCENT, hot_style)
+        self.assertIn("bold", hot_style)
+        self.assertIn(ACCENT, trail_style)
+        self.assertNotIn("bold", trail_style)
+        self.assertIn(TEXT, rest_style)
+        self.assertIn("2.4s", text.plain)
+
+    def test_finished_tool_name_is_plain_and_has_no_elapsed(self):
+        block = ToolBlock("grep", "DONE", "3 matches", hot=5, elapsed="9.9s")
+        text = block.__rich__()
+        start = text.plain.index("grep")
+
+        self.assertIn(TEXT, _style_at(text, start))
+        self.assertNotIn(ACCENT, _style_at(text, start))
+        self.assertNotIn("9.9s", text.plain)
+
+    def test_running_tool_line_counts_elapsed_and_stops_on_finish(self):
+        async def script(app, pilot):
+            workspace = app.query_one(WorkspacePanel)
+            workspace.clear_workspace(show_empty=False)
+            workspace.post_message(
+                ToolBridge.ToolStarted("grep", "pattern · src", key=51)
+            )
+            await pilot.pause()
+            row = list(workspace.query(ToolLine))[0]
+            before_hot = row._hot
+            row._started -= 2.5
+            row._tick()
+            running_text = _row_text(row)
+            row.finish("DONE", "3 matches")
+            await pilot.pause()
+            finished_text = _row_text(row)
+            return before_hot, row._hot, running_text, finished_text
+
+        before_hot, after_hot, running_text, finished_text = self._run((160, 42), script)
+        self.assertGreaterEqual(after_hot, before_hot + 1)
+        self.assertRegex(running_text, r"· \d+\.\d+s")
+        self.assertIn("3 matches", finished_text)
+        self.assertNotRegex(finished_text, r"· \d+\.\d+s")
 
 
 if __name__ == "__main__":

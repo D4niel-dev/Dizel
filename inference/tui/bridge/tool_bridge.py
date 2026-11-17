@@ -91,6 +91,10 @@ class ToolBridge:
             self._post(self.app.chat_bridge.SystemLog(
                 f"Routing to {self.app.active_provider} · {self.app.active_model}"
             ))
+            blocked = self.app.chat_bridge.enforce_usage()
+            if blocked:
+                self._post(self.app.chat_bridge.SystemLog(blocked))
+                return
             self._ui(self._start_assistant)
             self.app.chat_bridge.send(final_text)
         except Exception as error:

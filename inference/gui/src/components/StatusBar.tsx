@@ -149,8 +149,8 @@ export function StatusBar() {
             }
             title={
               window_.exhausted
-                ? `Usage window spent — resets in ${window_.resets_in}`
-                : `Usage window resets in ${window_.resets_in}`
+                ? `${window_.provider} usage window spent — resets in ${window_.resets_in}`
+                : `${window_.provider} usage window resets in ${window_.resets_in}`
             }
           >
             {window_.used.toLocaleString()} / {window_.capacity} used

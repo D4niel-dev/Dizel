@@ -36,6 +36,16 @@ const DEV_URL = "http://localhost:5173";
 
 // Captures are throwaway renders; they must not overwrite real geometry.
 const HEADLESS_CAPTURE = Boolean(process.env.DIZEL_SHOT);
+
+// Set the AppUserModelID before any window exists: Windows binds the taskbar
+// button (and its icon/grouping) to it at window creation.
+if (process.platform === "win32") app.setAppUserModelId("dev.dizel.desktop");
+
+// Decoded once so the window gets real icon bytes instead of a path the shell
+// may resolve after it has already built the taskbar button.
+const APP_ICON = nativeImage.createFromPath(
+  path.join(__dirname, "..", "public", "Dizel_GUI.ico"),
+);
 const windowState = require("./window-state.cjs");
 const windowStatePath = () =>
   process.env.DIZEL_WINDOW_STATE ||
@@ -520,8 +530,7 @@ function createWindow() {
     frame: false,
     backgroundColor: "#212121",
     title: "Dizel",
-    // Without this the taskbar shows Electron's default icon, not ours.
-    icon: path.join(__dirname, "..", "public", "Dizel_GUI.ico"),
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -558,7 +567,13 @@ function createWindow() {
     }, 400);
   };
 
-  win.once("ready-to-show", () => win?.show());
+  win.once("ready-to-show", () => {
+    win?.show();
+    // A restored-maximized window builds its taskbar button while still
+    // hidden, before the icon reaches the shell; reapply it now that the
+    // window is visible so the button does not start blank until clicked.
+    if (win && !APP_ICON.isEmpty()) win.setIcon(APP_ICON);
+  });
 
   const notifyMaximize = () => win?.webContents.send("window:maximized", win.isMaximized());
   win.on("maximize", () => {
@@ -759,8 +774,6 @@ function showWindow() {
 }
 
 app.whenReady().then(async () => {
-    if (process.platform === "win32") app.setAppUserModelId("dev.dizel.desktop");
-
     // Strict CSP for the packaged renderer only — the Vite dev server needs a
     // looser policy for its inline HMR preamble.
     if (!IS_DEV) {

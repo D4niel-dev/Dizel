@@ -185,6 +185,7 @@ def apply_provider(app: Any, slug: str, model: str = "", key: str = "") -> str:
     manager.reload_provider()
 
     app.active_provider = manager.active_provider_slug
+    app.sync_usage_provider()
 
     if app.active_provider == "local":
         if slug != "local":

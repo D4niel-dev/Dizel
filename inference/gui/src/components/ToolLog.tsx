@@ -50,7 +50,18 @@ export function ToolLog({ tools }: { tools: ToolCall[] }) {
                   <Icon name={tool.status === "failed" ? "close" : iconFor(tool)} size={12} />
                 )}
               </span>
-              <span className="tool-name">{label(tool.name)}</span>
+              <span className={`tool-name${tool.status === "running" ? " is-sweeping" : ""}`}>
+                {tool.status === "running"
+                  ? Array.from(label(tool.name)).map((letter, index) => (
+                      <span
+                        key={index}
+                        style={{ animationDelay: `${index * 45}ms` }}
+                      >
+                        {letter === " " ? "\u00A0" : letter}
+                      </span>
+                    ))
+                  : label(tool.name)}
+              </span>
               <span className="tool-detail">{tool.detail}</span>
               {tool.additions !== undefined && tool.deletions !== undefined && (
                 <span className="tool-stats">

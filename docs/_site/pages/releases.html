@@ -1,7 +1,7 @@
 <!--meta
 {
   "title": "Releases — Dizel",
-  "description": "Dizel releases: v2.0.1 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.",
+  "description": "Dizel releases: v2.0.3 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.",
   "nav": "releases",
   "layout": "public"
 }
@@ -11,7 +11,7 @@
   <header class="s-doc-head">
     <div class="s-crumb"><a href="index.html">Dizel</a><span>/</span><span>Releases</span></div>
     <h1>Releases</h1>
-    <div class="s-doc-meta"><span>Record 2026-11</span><span>v2.0.1 app</span><span>v1.5 model</span><span>v1.6 preview</span></div>
+    <div class="s-doc-meta"><span>Record 2026-11</span><span>v2.0.3 app</span><span>v1.5 model</span><span>v1.6 preview</span></div>
   </header>
 </div>
 
@@ -20,9 +20,9 @@
     <div class="s-section-head">
       <div>
         <p class="s-kicker">App release</p>
-        <h2>v2.0.1 is live.</h2>
+        <h2>v2.0.3 is live.</h2>
       </div>
-      <p class="s-section-copy">The Electron app, terminal client, and npm launcher ship together. This maintenance release focuses on updates, readable tool output, and one version source. The model is still v1.5; v1.6 remains a preview.</p>
+      <p class="s-section-copy">The Electron app, terminal client, and npm launcher ship together. This release gives every model provider its own usage window, remembers loaded checkpoints in the composer, calms the write-approval gates with a second confirmation, and fixes the desktop reply bug that affected every local checkpoint. The model is still v1.5; v1.6 remains a preview.</p>
     </div>
     <table class="s-matrix">
       <thead>
@@ -31,19 +31,19 @@
       <tbody>
         <tr>
           <th scope="row"><b>Desktop app</b><small>Windows installer</small></th>
-          <td data-label="Version">v2.0.1</td>
+          <td data-label="Version">v2.0.3</td>
           <td data-label="What ships">NSIS installer, blockmap, auto-update manifest</td>
-          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.1" target="_blank" rel="noopener">Download ↗</a></td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.3" target="_blank" rel="noopener">Download ↗</a></td>
         </tr>
         <tr>
           <th scope="row"><b>Terminal client</b><small>Portable archive</small></th>
-          <td data-label="Version">v2.0.1</td>
-          <td data-label="What ships"><code>Dizel-TUI-2.0.1.zip</code> and its <code>.cmd</code> launcher</td>
-          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.1" target="_blank" rel="noopener">Download ↗</a></td>
+          <td data-label="Version">v2.0.3</td>
+          <td data-label="What ships"><code>Dizel-TUI-2.0.3.zip</code> and its <code>.cmd</code> launcher</td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.3" target="_blank" rel="noopener">Download ↗</a></td>
         </tr>
         <tr>
           <th scope="row"><b>npm launcher</b><small><code>@d4niel-dev/dizel</code></small></th>
-          <td data-label="Version">v2.0.1</td>
+          <td data-label="Version">v2.0.3</td>
           <td data-label="What ships">Downloads and SHA-256 verifies the matching release</td>
           <td><a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm ↗</a></td>
         </tr>
@@ -58,9 +58,9 @@
     <div class="s-section-head">
       <div>
         <p class="s-kicker">Changelog</p>
-        <h2>What changed in 2.0.1.</h2>
+        <h2>What changed in 2.0.3.</h2>
       </div>
-      <p class="s-section-copy">A focused maintenance release: safer updates, readable tool results, and one version source.</p>
+      <p class="s-section-copy">Per-provider usage windows, a model switcher that remembers checkpoints, calmer approval gates, and the desktop reply fix.</p>
     </div>
     <table class="s-matrix">
       <thead>
@@ -68,32 +68,28 @@
       </thead>
       <tbody>
         <tr>
-          <th scope="row"><b>Updates</b><small>Both clients</small></th>
-          <td>Terminal checks, downloads, and stages releases in the background, applies them on quit or next launch, and exposes <code>/update</code>, <code>/update install</code>, and <code>/check-update</code>. Both surfaces mark available, downloading, and ready states. Dirty source checkouts are never overwritten.</td>
+          <th scope="row"><b>Usage limits</b><small>Both clients</small></th>
+          <td>Every API provider gets its own context window and its own 12-hour usage counter, reset time, and compaction count. Provider defaults (128k to 1M) can be overridden in Settings; local checkpoints keep their own window. The terminal now enforces the window exactly like the desktop.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Tool output</b><small>Both clients</small></th>
-          <td>Tool rows expand into inline drawers instead of separate modals. Edits show a numbered diff, writes show the file content, reads show line ranges, and searches show the query, URL, and results. Code is syntax-highlighted.</td>
+          <th scope="row"><b>Model switcher</b><small>Desktop</small></th>
+          <td>The composer's model menu lists "Recently loaded" checkpoints for one-click reloading, with a collapsible "All checkpoints" list beneath it. History is shared with the terminal.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Approvals</b><small>Desktop</small></th>
-          <td>Write and edit approvals carry the target path, action, diff, and line counts before the call is allowed.</td>
+          <th scope="row"><b>Tool rows</b><small>Both clients</small></th>
+          <td>Running tool names sweep a highlight across their letters; the terminal also shows elapsed seconds on each running row.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Versioning</b><small>All channels</small></th>
-          <td><code>dizel_core/version.py</code> is the single app version. <code>set_version.py</code> stamps the GUI, lockfile, and npm manifests, CI rejects drift, and desktop and terminal banners read the same source.</td>
+          <th scope="row"><b>Approvals</b><small>Both clients</small></th>
+          <td>"Always this session" and "Always allow" now ask a second time, with an amber warning that persistent trust applies to every project until revoked. Escape backs out of the warning.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Distribution</b><small>npm</small></th>
-          <td>The launcher now publishes as <code>@d4niel-dev/dizel</code>; install docs point at the scoped package.</td>
+          <th scope="row"><b>Fixes</b><small>Desktop</small></th>
+          <td>Replies from local checkpoints could end as "Generation ended without a reply."; the Ctrl+K palette is centered again; the Windows taskbar icon no longer starts blank; the usage meter reports the real provider window instead of a frozen 1,024.</td>
         </tr>
         <tr>
           <th scope="row"><b>Docs</b><small>Website</small></th>
-          <td>Spacing resets were corrected so section, footer, and card rhythm match the design system; release links and app labels now point at 2.0.1.</td>
-        </tr>
-        <tr>
-          <th scope="row"><b>Research tooling</b><small>v1.6</small></th>
-          <td>Reward-filter scoring and DPO pair selection scripts, with the Transformers version required by Qwen3 and Skywork reward models.</td>
+          <td>This page now tracks 2.0.3, the app screenshot was recaptured, and hover motion stays inside its element at every width.</td>
         </tr>
       </tbody>
     </table>

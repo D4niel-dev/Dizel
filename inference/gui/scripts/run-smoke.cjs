@@ -49,6 +49,19 @@ env.DIZEL_SHOT_JS_FILE = path.join(__dirname, "smoke.js");
 const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "dizel-smoke-config-"));
 env.DIZEL_CONFIG_DIR = configDir;
 
+// Deterministic checkpoint history for the composer's "Recently loaded"
+// section: one real checkpoint and one whose file no longer exists.
+const repoRoot = path.resolve(root, "..", "..");
+fs.writeFileSync(
+  path.join(configDir, "settings.json"),
+  JSON.stringify({
+    checkpoint_history: [
+      path.join(repoRoot, "checkpoints", "Dizel-1.5-SFT.gguf"),
+      path.join(repoRoot, "checkpoints", "retired-preview.gguf"),
+    ],
+  }),
+);
+
 const TIMEOUT_MS = Number(argOf("timeout", "360000"));
 
 console.log("smoke: booting the app…");
