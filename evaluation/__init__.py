@@ -2,13 +2,14 @@
 evaluation — Dizel Evaluation Infrastructure.
 
 Benchmark testing, automated scoring, regression detection,
-and report generation for model checkpoints.
+and report generation for model checkpoints. The shipped suite is the
+15-case core benchmark; RFC-0008 forbids using it as a release gate.
 
 Usage:
     from evaluation import EvalRunner, ReportGenerator
 
     runner = EvalRunner()
-    run = runner.run({"dizel": my_handler}, checkpoint="v1.2")
+    run = runner.run({"dizel": my_handler}, checkpoint="Dizel-1.5-Distill")
     print(ReportGenerator().text_report(run))
 """
 

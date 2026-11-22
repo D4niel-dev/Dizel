@@ -55,6 +55,11 @@ class ToolApprovalRequest(BaseModel):
     decision: str
 
 
+class PlanApprovalRequest(BaseModel):
+    approval_id: str
+    approved: bool
+
+
 @router.post("/tools/approve")
 def tools_approve(req: ToolApprovalRequest) -> Dict[str, Any]:
     """Resolve one pending diff approval from the SSE tool loop."""
@@ -65,6 +70,14 @@ def tools_approve(req: ToolApprovalRequest) -> Dict[str, Any]:
     if not ChatService.resolve_tool_approval(req.approval_id, req.decision):
         raise HTTPException(status_code=404, detail="Approval request is no longer pending.")
     return {"status": "ok", "approved": tool_trust.approved_for(req.decision)}
+
+
+@router.post("/tools/plan")
+def tools_plan_approve(req: PlanApprovalRequest) -> Dict[str, Any]:
+    """Resolve one pending plan approval from the SSE tool loop."""
+    if not ChatService.resolve_plan_approval(req.approval_id, req.approved):
+        raise HTTPException(status_code=404, detail="Approval request is no longer pending.")
+    return {"status": "ok", "approved": bool(req.approved)}
 
 
 class TrustUpdateRequest(BaseModel):
@@ -140,6 +153,8 @@ class LoadModelRequest(BaseModel):
 class ProfileRequest(BaseModel):
     model_name: str
     mode_name: str
+    thinking_effort: Optional[str] = None
+    speed: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
@@ -149,6 +164,12 @@ class ChatRequest(BaseModel):
     # True when the client is asking the model to keep writing the same answer.
     # The server then adds no user turn and appends to the last assistant message.
     continuation: bool = False
+    # View-only metadata for the clients (attached skill chips). Persisted with
+    # the user turn; never forwarded to a provider.
+    display: Optional[Dict[str, Any]] = None
+    # short | normal | detailed. Scales the reply's token budget; omitted means
+    # the configured default (token_budget.verbosity) applies.
+    verbosity: Optional[str] = None
 
 
 @router.get("/status")
@@ -177,8 +198,19 @@ def switch_provider() -> Dict[str, Any]:
 
 @router.post("/apply_profile")
 def apply_profile(req: ProfileRequest) -> Dict[str, Any]:
-    """Apply a model variant + mode profile (system prompt and budget)."""
-    return ChatService.apply_profile(req.model_name, req.mode_name)
+    """Apply a model variant + mode + Thinking effort profile."""
+    return ChatService.apply_profile(
+        req.model_name,
+        req.mode_name,
+        req.thinking_effort or "medium",
+        req.speed or "fast",
+    )
+
+
+@router.get("/prompts")
+def prompts() -> Dict[str, Any]:
+    """The base system prompt and the active mode's clause, separately."""
+    return ChatService.prompts()
 
 
 @router.post("/reload_settings")
@@ -201,7 +233,12 @@ async def stream_chat(req: ChatRequest) -> EventSourceResponse:
     """
     return EventSourceResponse(
         ChatService.stream_chat(
-            req.user_text, req.session_id, req.attachments, req.continuation
+            req.user_text,
+            req.session_id,
+            req.attachments,
+            req.continuation,
+            req.display,
+            req.verbosity,
         ),
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

@@ -18,7 +18,7 @@ from inference.tui.panels.modals.pickers import (
     ModePickerModal,
     ModelPickerModal,
     ProviderPickerModal,
-    TierPickerModal,
+    ThinkingEffortPickerModal,
 )
 from inference.tui.panels.modals.session_manager import SessionManagerModal
 from inference.tui.panels.modals.settings_modal import SettingsModal
@@ -44,6 +44,6 @@ __all__ = [
     "SessionManagerModal",
     "SettingsModal",
     "TextPromptModal",
-    "TierPickerModal",
+    "ThinkingEffortPickerModal",
     "ToolApprovalModal",
 ]

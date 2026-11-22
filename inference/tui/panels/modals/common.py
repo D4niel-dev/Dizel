@@ -26,6 +26,8 @@ class PickerItem:
     disabled: bool = False
     keywords: str = ""
     value: str | None = None
+    glyph: str = ""
+    color: str = ""
 
 
 def plain_text(value: object) -> Content:
@@ -50,11 +52,12 @@ def set_error(screen: ModalScreen, message: str) -> None:
 def _row(item: PickerItem) -> Content:
     marker = "●" if item.active else " "
     trailing = f"  ({item.trailing})" if item.trailing else ""
-    label_width = max(20, 58 - len(trailing))
-    parts: list[tuple[str, str]] = [
-        (f"{marker} ", ""),
-        (clip(item.label, label_width), "bold"),
-    ]
+    label_width = max(20, 54 - len(trailing))
+    parts: list[tuple[str, str]] = [(f"{marker} ", "")]
+    if item.glyph:
+        parts.append((f"{item.glyph} ", item.color or ""))
+    label_style = f"bold {item.color}".strip()
+    parts.append((clip(item.label, label_width), label_style))
     if trailing:
         parts.append((trailing, ""))
     if item.detail:

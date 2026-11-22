@@ -106,7 +106,8 @@ def _status(app: Any) -> str:
         f"messages     {len(app.session_bridge.current_messages)}",
         f"model        {app.active_model or '—'}",
         f"provider     {app.active_provider}",
-        f"tier/mode    {app.active_tier} · {app.active_mode}",
+        f"mode         {app.active_mode}",
+        f"effort       {getattr(app, 'active_thinking_effort', 'medium')}",
         f"ready        {getattr(manager, 'is_ready', False)}",
         f"context      {int(app.context_tokens):,} / {int(app.usage_manager.max_capacity):,}",
         f"budget       {int(app.budget_tokens):,}",
@@ -158,6 +159,14 @@ def _usage(app: Any) -> str:
     )
 
 
+def _bundle_text(app: Any) -> str:
+    from dizel_core import doctor
+
+    return "\n\n".join(
+        (_status(app), _context(app), _usage(app), doctor.summary_text())
+    )
+
+
 class DebugCommand(Command):
     name = "debug"
     help_text = "Toggle developer mode and run diagnostics or fixtures."
@@ -193,7 +202,7 @@ class DebugCommand(Command):
         elif action == "bundle":
             app.show_debug_output(
                 "Diagnostic bundle",
-                "\n\n".join((_status(app), _context(app), _usage(app))),
+                _bundle_text(app),
             )
         elif action == "echo":
             app.query_one("WorkspacePanel").add_debug_turn(

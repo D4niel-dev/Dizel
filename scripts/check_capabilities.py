@@ -19,7 +19,11 @@ from dizel_core import capabilities  # noqa: E402
 
 
 def main() -> int:
-    rows = capabilities.load()
+    try:
+        rows = capabilities.load()
+    except capabilities.ManifestError as error:
+        print(f"capabilities.json: {error}")
+        return 1
     if not rows:
         print("capabilities.json is missing or empty.")
         return 1

@@ -40,6 +40,26 @@ new Promise((resolve) => {
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // run-smoke.cjs prepends capabilities.json as window.__CAPABILITY_MANIFEST.
+  // Every desktop entry with a machine check must be findable here, or the
+  // manifest has drifted from what the app actually ships.
+  const manifest =
+    (window.__CAPABILITY_MANIFEST && window.__CAPABILITY_MANIFEST.capabilities) || [];
+  const guiChecks = (kind) =>
+    manifest
+      .map((cap) => ({ id: cap.id, check: cap.gui && cap.gui.check }))
+      .filter((row) => row.check && row.check.kind === kind);
+  const controlCheck = (ids) => {
+    const rows = guiChecks("control").filter((row) => ids.includes(row.id));
+    const missing = rows.filter(
+      (row) => !document.querySelector(`[data-capability="${row.check.value}"]`),
+    );
+    return {
+      ok: ids.every((id) => rows.some((row) => row.id === id)) && missing.length === 0,
+      missing: missing.map((row) => row.id),
+    };
+  };
+
   const boot = async () => {
     if (!store || typeof store.getState !== "function") {
       return resolve(JSON.stringify({ fatal: "no store on window.__dizel" }));
@@ -51,6 +71,14 @@ new Promise((resolve) => {
     }, 80);
 
     const api = store.getState();
+
+    // ── 0. capability manifest: mounted desktop controls ────────────────
+    // capabilities.json is the source of truth for each surface. Controls that
+    // stay mounted for the whole session must declare themselves with a
+    // data-capability attribute, so the manifest cannot drift from the DOM.
+    await waitFor(() => document.querySelector('[data-capability="model.switch"]'), 40);
+    check("capabilities: always-mounted controls resolve", () =>
+      controlCheck(["sessions.open", "model.switch", "settings.open"]));
 
     // ── 1. store surface ────────────────────────────────────────────────
     check("store: actions present", () => {
@@ -184,6 +212,18 @@ new Promise((resolve) => {
       };
     });
 
+    check("model switcher: a stored scorecard shows as a badge", () => {
+      const badge = document.querySelector(".popover .model-row .model-score");
+      return {
+        ok:
+          Boolean(badge) &&
+          /12\/15/.test(badge.textContent) &&
+          /coding/.test(badge.title),
+        text: badge && badge.textContent,
+        title: badge && badge.title,
+      };
+    });
+
     const collapse = document.querySelector(".popover .popover-collapse");
     if (collapse) collapse.click();
     await sleep(300);
@@ -263,6 +303,246 @@ new Promise((resolve) => {
     store.setState({ messages: [], streaming: false });
     await sleep(200);
 
+    // ── 4d. response mode chip (tier is gone) ───────────────────────────
+    check("mode: the tier state is gone", () => ({
+      ok: !("variant" in store.getState()) && !("setVariant" in store.getState()),
+      variant: store.getState().variant,
+    }));
+
+    const prevModeStatus = store.getState().status;
+    store.setState({
+      status: {
+        ...(prevModeStatus || {}),
+        is_ready: true,
+        provider: "local",
+        load: {
+          ...((prevModeStatus || {}).load || {}),
+          display_name: "Dizel 1.5 SFT",
+          checkpoint: "Dizel-1.5-SFT.gguf",
+        },
+      },
+    });
+    await sleep(300);
+
+    const modeChip = await waitFor(
+      () => document.querySelector('.composer-bar .bar-chip[title="Response mode"]'),
+      20,
+    );
+    check("mode chip: shows the mode, not a tier", () => {
+      const text = modeChip ? modeChip.textContent.trim() : "";
+      return {
+        ok:
+          Boolean(modeChip) &&
+          /Fast|Planning|Coding|Thinking/.test(text) &&
+          !/Flash|Pro\b/.test(text),
+        text,
+      };
+    });
+    if (modeChip) {
+      modeChip.click();
+      await waitFor(() => document.querySelector(".popover"), 20);
+      check("mode popover: four icon rows, no deep think", () => {
+        const rows = Array.from(document.querySelectorAll(".popover .mode-item"));
+        const names = rows.map((row) => row.textContent);
+        return {
+          ok:
+            rows.length === 4 &&
+            names.some((text) => /Thinking/.test(text)) &&
+            !names.some((text) => /Deep Think/.test(text)) &&
+            rows.every((row) => row.querySelector("svg")),
+          names,
+        };
+      });
+
+      const modeArrow = document.querySelector(
+        '.popover .mode-arrow[aria-label="Thinking effort"]',
+      );
+      if (modeArrow) modeArrow.click();
+      await waitFor(() => document.querySelector(".effort-panel:not(.speed-panel)"), 20);
+      // The old design was five coloured rings, so this used to count distinct
+      // border colours. The restyle replaced them with ticks plus a raised thumb,
+      // and the colour moved to the track fill — so the assertions moved with it.
+      check("thinking: five stops with one raised thumb", () => {
+        const stops = Array.from(
+          document.querySelectorAll(".effort-panel:not(.speed-panel) .effort-stop"),
+        );
+        const active = stops.filter((stop) => stop.classList.contains("active"));
+        const idle = stops.filter((stop) => !stop.classList.contains("active"));
+        const thumb = active[0] ? active[0].getBoundingClientRect() : null;
+        const tick = idle[0] ? idle[0].getBoundingClientRect() : null;
+        return {
+          ok:
+            stops.length === 5 &&
+            active.length === 1 &&
+            Boolean(thumb && tick) &&
+            thumb.width >= tick.width * 2,
+          stops: stops.length,
+          active: active.length,
+          thumb: thumb ? Math.round(thumb.width) : null,
+          tick: tick ? Math.round(tick.width) : null,
+        };
+      });
+      check("thinking: the track is filled in the effort colour", () => {
+        const fill = document.querySelector(".effort-panel:not(.speed-panel) .effort-fill");
+        if (!fill) return { ok: false, reason: "no fill element" };
+        const style = getComputedStyle(fill);
+        // The fill is a vertical gradient now, so the colour is in background-image
+        // and backgroundColor reads as transparent.
+        return {
+          ok:
+            style.backgroundImage !== "none" &&
+            fill.getBoundingClientRect().width >= 0,
+          width: Math.round(fill.getBoundingClientRect().width),
+          image: style.backgroundImage.slice(0, 60),
+        };
+      });
+
+      // Regression: picking a stop used to close the whole popover, because the
+      // effort panel is portalled outside the Picker's subtree and every click in
+      // it read as an outside click. A bare .click() skips the document mousedown
+      // listener, so this has to fire the full sequence to catch it.
+      const pickStop = document.querySelectorAll(".effort-panel:not(.speed-panel) .effort-stop")[1];
+      if (pickStop) {
+        for (const type of ["mousedown", "mouseup", "click"]) {
+          pickStop.dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+          );
+        }
+      }
+      await new Promise((r) => setTimeout(r, 320));
+      check("thinking: picking a stop keeps the panel open", () => ({
+        ok: Boolean(document.querySelector(".effort-panel:not(.speed-panel)")),
+        picked: Boolean(pickStop),
+      }));
+      check("thinking: effort panel is on screen", () => {
+        const panel = document.querySelector(".effort-panel:not(.speed-panel)");
+        if (!panel) return { ok: false, reason: "missing" };
+        const rect = panel.getBoundingClientRect();
+        const style = getComputedStyle(panel);
+        return {
+          ok:
+            rect.width > 100 &&
+            rect.height > 60 &&
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.right <= window.innerWidth &&
+            rect.bottom <= window.innerHeight &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0",
+          rect: {
+            top: Math.round(rect.top),
+            left: Math.round(rect.left),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
+          viewport: { w: window.innerWidth, h: window.innerHeight },
+          display: style.display,
+          opacity: style.opacity,
+          zIndex: style.zIndex,
+        };
+      });
+      const highStop = Array.from(
+        document.querySelectorAll(".effort-panel:not(.speed-panel) .effort-stop"),
+      )[2];
+      if (highStop) highStop.click();
+      await sleep(500);
+      check("thinking: high effort applies with its color", () => {
+        const chip = document.querySelector(
+          '.composer-bar .bar-chip[title="Response mode"]',
+        );
+        return {
+          ok:
+            store.getState().mode === "Thinking" &&
+            store.getState().thinkingEffort === "high" &&
+            // The chip shows the effort alone now; "High" is also a substring of
+            // "X-High", so this compares the whole label rather than matching.
+            chip !== null &&
+            chip.textContent.trim() === "High" &&
+            getComputedStyle(chip).color === "rgb(244, 114, 182)",
+          mode: store.getState().mode,
+          effort: store.getState().thinkingEffort,
+          chipText: chip ? chip.textContent.trim() : null,
+          color: chip ? getComputedStyle(chip).color : null,
+        };
+      });
+
+      // Regression: the thumb used to be centred on the first/last tick, and those
+      // sat half a column inside the track — so at Low and Max it never
+      // reached either end of the bar. Its edge has to touch the track's edge.
+      const thumbSize = () => {
+        const scale = document.querySelector(".effort-panel:not(.speed-panel) .effort-scale");
+        if (!scale) return 28;
+        const value = parseFloat(getComputedStyle(scale).getPropertyValue("--thumb"));
+        return Number.isFinite(value) ? value : 28;
+      };
+
+      // Poll on the thumb's CENTRE, not its edges. The centre is
+      // `left + p * (width - thumb)` and does not move during the width
+      // transition, so it is the one value that is stable the whole time. Edge
+      // measurements kept landing mid-animation and reading the previous stop.
+      const edgeGapAt = async (index) => {
+        const open = document.querySelector(".effort-panel:not(.speed-panel)");
+        if (!open) return null;
+        const stops = Array.from(open.querySelectorAll(".effort-stop"));
+        if (!stops[index]) return null;
+
+        const track = open.querySelector(".effort-scale").getBoundingClientRect();
+        const size = thumbSize();
+        const progress = index / (stops.length - 1);
+        const expectedCentre = track.left + size / 2 + progress * (track.width - size);
+
+        for (const type of ["mousedown", "mouseup", "click"]) {
+          stops[index].dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+          );
+        }
+
+        for (let i = 0; i < 40; i += 1) {
+          await sleep(60);
+          const panel = document.querySelector(".effort-panel:not(.speed-panel)");
+          if (!panel) return null;
+          const thumb = panel.querySelector(".effort-stop.active").getBoundingClientRect();
+          const centre = thumb.left + thumb.width / 2;
+          const fill = panel.querySelector(".effort-fill");
+          const opacity = Number(getComputedStyle(fill).opacity);
+          // Zero effort hides the fill; anything above it is fully opaque.
+          const targetOpacity = index === 0 ? 0 : 1;
+          if (thumb.width < size - 1) continue;
+          if (Math.abs(centre - expectedCentre) > 1) continue;
+          if (Math.abs(opacity - targetOpacity) > 0.01) continue;
+
+          const box = panel.querySelector(".effort-scale").getBoundingClientRect();
+          const fillBox = fill.getBoundingClientRect();
+          return {
+            left: Math.round(thumb.left - box.left),
+            right: Math.round(box.right - thumb.right),
+            fillWidth: Math.round(fillBox.width),
+            fillOpacity: opacity,
+          };
+        }
+        return null;
+      };
+
+      const atLow = await edgeGapAt(0);
+      const atDeep = await edgeGapAt(4);
+      await edgeGapAt(2); // leave it on High for anything that follows
+      check("thinking: thumb reaches both ends of the track", () => ({
+        ok:
+          Boolean(atLow && atDeep) &&
+          atLow.left <= 1 &&
+          atDeep.right <= 1 &&
+          atLow.fillOpacity < 0.02,
+        atLow,
+        atDeep,
+      }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await store.getState().setMode("Fast");
+      await sleep(200);
+    }
+    store.setState({ status: prevModeStatus });
+    await sleep(200);
+
     // ── 5. chat state: export, placement, transcript ────────────────────
     const now = Date.now();
     store.setState({
@@ -282,10 +562,45 @@ new Promise((resolve) => {
       return { ok: Boolean(exportBtn) && !exportBtn.disabled, found: Boolean(exportBtn) };
     });
 
+    check("capabilities: export control resolves", () => controlCheck(["app.export"]));
+
     check("chat: assistant bubbles rendered", () => {
       const n = document.querySelectorAll(".msg.assistant").length;
       return { ok: n === 2, count: n };
     });
+
+    // ── 5b. read aloud goes through the OS speech engine ───────────────
+    let speechStubbed = false;
+    const realSpeech = window.speechSynthesis;
+    const spoken = [];
+    try {
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          speak: (utterance) => spoken.push(utterance && utterance.text),
+          cancel: () => {},
+        },
+      });
+      speechStubbed = true;
+    } catch {
+      /* the engine object is not replaceable in this runtime */
+    }
+    if (speechStubbed) {
+      const readBtn = document.querySelector(".msg.assistant .msg-actions .act.speak");
+      if (readBtn) readBtn.click();
+      await sleep(200);
+      check("read aloud: the speaker button sends the reply to the engine", () => ({
+        ok: spoken.length === 1 && String(spoken[0]).includes("Paris"),
+        count: spoken.length,
+        spoken: spoken.length ? String(spoken[0]).slice(0, 40) : null,
+      }));
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: realSpeech,
+      });
+    } else {
+      check("read aloud: speechSynthesis is stubbable", () => ({ ok: false }));
+    }
 
     const chatPop = await openVariant();
     check("popover: opens up in a chat", () => ({
@@ -341,6 +656,32 @@ new Promise((resolve) => {
       const text = document.querySelectorAll(".msg.assistant")[1].textContent;
       return { ok: text.includes("1871"), text: text.slice(0, 60) };
     });
+
+    check("siblings: compare button renders", () => ({
+      ok: Boolean(document.querySelector(".sib-compare")),
+    }));
+
+    const compareBtn = document.querySelector(".sib-compare");
+    if (compareBtn) {
+      compareBtn.click();
+      await waitFor(() => document.querySelector(".compare-panel"), 20);
+      check("siblings: compare opens every version", () => {
+        const cols = Array.from(document.querySelectorAll(".compare-col"));
+        const text = cols.map((col) => col.textContent).join(" ");
+        return {
+          ok:
+            cols.length === 2 &&
+            /1871/.test(text) &&
+            cols.some((col) => col.classList.contains("is-current")),
+          cols: cols.length,
+        };
+      });
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await sleep(250);
+      check("siblings: compare closes on Escape", () => ({
+        ok: !document.querySelector(".compare-panel"),
+      }));
+    }
 
     // ── 8. Lottie dots ──────────────────────────────────────────────────
     store.setState({
@@ -434,6 +775,93 @@ new Promise((resolve) => {
       store.setState({ approval: null, error: null });
       await sleep(200);
     }
+
+    // ── 9b2. plan approvals ─────────────────────────────────────────────
+    // The checklist renders every step; a failed resolve must keep the dialog
+    // open with its buttons re-enabled; synthetic fixtures resolve locally.
+    store.setState({
+      planApproval: {
+        id: "smoke-unknown-plan",
+        task: "Ship the release checklist",
+        steps: ["Tag the release", "Publish the changelog", "Smoke-test the installer"],
+        synthetic: false,
+      },
+    });
+    const planExecute = await waitFor(() => {
+      const btns = Array.from(
+        document.querySelectorAll(".plan-approval .tool-approval-actions button"),
+      );
+      return btns.find((b) => b.textContent.trim() === "Execute plan") || null;
+    }, 20);
+    check("plan: dialog lists every step", () => {
+      const items = Array.from(
+        document.querySelectorAll(".plan-approval-steps li"),
+      ).map((li) => li.textContent.trim());
+      const heading = document.querySelector(".plan-approval-head h2");
+      return {
+        ok:
+          Boolean(planExecute) &&
+          items.length === 3 &&
+          items[0] === "Tag the release" &&
+          /Plan approval/.test(heading ? heading.textContent : ""),
+        items,
+      };
+    });
+    if (planExecute) {
+      planExecute.click();
+      await waitFor(() => store.getState().error, 20);
+      await sleep(300);
+      check("plan: buttons re-enable after a failed resolve", () => {
+        const btns = Array.from(
+          document.querySelectorAll(".plan-approval .tool-approval-actions button"),
+        );
+        return {
+          ok:
+            btns.length === 2 &&
+            btns.every((b) => !b.disabled) &&
+            store.getState().planApproval !== null,
+          disabled: btns.map((b) => b.disabled),
+        };
+      });
+      store.setState({ planApproval: null, error: null });
+      await sleep(200);
+    }
+
+    store.setState({
+      planApproval: {
+        id: "smoke-synthetic-plan",
+        task: "Ship it",
+        steps: ["Tag", "Publish"],
+        synthetic: true,
+      },
+    });
+    await waitFor(() => document.querySelector(".plan-approval"), 20);
+    const planDiscard = Array.from(
+      document.querySelectorAll(".plan-approval .tool-approval-actions button"),
+    ).find((b) => b.textContent.trim() === "Discard");
+    if (planDiscard) planDiscard.click();
+    await waitFor(() => store.getState().planApproval === null, 20);
+    check("plan: discard closes the dialog", () => ({
+      ok: store.getState().planApproval === null && !document.querySelector(".plan-approval"),
+    }));
+
+    store.setState({
+      planApproval: {
+        id: "smoke-synthetic-plan-execute",
+        task: "Ship it",
+        steps: ["Tag"],
+        synthetic: true,
+      },
+    });
+    await waitFor(() => document.querySelector(".plan-approval"), 20);
+    const planGo = Array.from(
+      document.querySelectorAll(".plan-approval .tool-approval-actions button"),
+    ).find((b) => b.textContent.trim() === "Execute plan");
+    if (planGo) planGo.click();
+    await waitFor(() => store.getState().planApproval === null, 20);
+    check("plan: execute closes the dialog", () => ({
+      ok: store.getState().planApproval === null && !document.querySelector(".plan-approval"),
+    }));
 
     // ── 9c. delete is a destructive, always-manual gate ─────────────────
     // A delete approval must read "Delete file", warn about the recycle bin,
@@ -641,7 +1069,24 @@ new Promise((resolve) => {
       const sw = Array.from(document.querySelectorAll(".set-content .set-switch"));
       return sw.find((b) => b.getAttribute("aria-label") === "Always allow writes and edits") || null;
     }, 30);
-    check("trust: settings offers the persistent switch", () => ({ ok: Boolean(trustSwitch) }));
+    check("trust: settings offers the persistent switch", () => {
+      if (trustSwitch) return { ok: true };
+      // Report what the dialog actually rendered, so a failure is diagnosable
+      // instead of just "not found".
+      const content = document.querySelector(".set-content");
+      const switches = Array.from(
+        document.querySelectorAll(".set-content .set-switch"),
+      ).map((el) => el.getAttribute("aria-label"));
+      return {
+        ok: false,
+        settingsOpen: store.getState().settingsOpen,
+        tab: store.getState().settingsTab,
+        hasContent: Boolean(content),
+        switches,
+        text: content ? content.textContent.trim().slice(0, 80) : null,
+        error: store.getState().settingsError,
+      };
+    });
     if (trustSwitch) {
       trustSwitch.click();
       await waitFor(() => store.getState().trust?.persistent === true, 30);
@@ -689,7 +1134,15 @@ new Promise((resolve) => {
     });
 
     store.getState().openSettings("Chat");
-    await sleep(600);
+    // Four local requests are fast, but the suite can have the sidecar busy; a
+    // fixed 600ms lost that race and read the "Reading settings…" placeholder.
+    await waitFor(
+      () =>
+        /Usage limit/.test(
+          (document.querySelector(".set-content") || {}).textContent || "",
+        ),
+      20,
+    );
     check("limits: Settings shows the usage-limit row", () => {
       const content = document.querySelector(".set-content") || document.body;
       const text = content.textContent || "";
@@ -697,10 +1150,138 @@ new Promise((resolve) => {
         ok:
           /Usage limit/.test(text) &&
           /checkpoint reports its own context window/i.test(text),
+        snippet: text.trim().slice(0, 70),
+      };
+    });
+    check("memory: Settings shows the project context section", () => {
+      const content = document.querySelector(".set-content") || document.body;
+      const text = content.textContent || "";
+      return {
+        ok: /Project context/.test(text) && /Project memory/.test(text),
+        snippet: text.trim().slice(0, 70),
       };
     });
     store.getState().closeSettings();
     await sleep(200);
+
+    // ── 9d0. Attached skill chips ───────────────────────────────────────
+    // Picking a skill attaches a chip and keeps the draft short; the model
+    // still receives the expanded prompt at send time.
+    const emailSkill = store.getState().skills.find((skill) => skill.name === "email");
+    check("skills: catalog includes email", () => ({ ok: Boolean(emailSkill) }));
+    if (emailSkill && typeof store.getState().attachSkill === "function") {
+      store.getState().newChat();
+      await sleep(300);
+      await store.getState().attachSkill(emailSkill, "hello");
+      await sleep(400);
+      check("skills: attach renders a chip", () => {
+        const chips = document.querySelectorAll(".composer .skill-chip");
+        return {
+          ok: store.getState().attachedSkills.length === 1 && chips.length === 1,
+          state: store.getState().attachedSkills.length,
+          chips: chips.length,
+          draft: store.getState().draft,
+        };
+      });
+      check("skills: the draft stays short", () => ({
+        ok: store.getState().draft.trim() === "",
+        draft: store.getState().draft.slice(0, 60),
+      }));
+
+      const second = store.getState().skills.find((skill) => skill.name !== "email");
+      if (second) await store.getState().attachSkill(second, "");
+      await sleep(300);
+      check("skills: multiple chips ride together", () => ({
+        ok: store.getState().attachedSkills.length === 2,
+        count: store.getState().attachedSkills.length,
+      }));
+
+      const textarea = document.querySelector(".composer textarea");
+      textarea.focus();
+      textarea.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }),
+      );
+      await sleep(250);
+      check("skills: backspace on an empty draft removes the last chip", () => ({
+        ok: store.getState().attachedSkills.length === 1,
+        count: store.getState().attachedSkills.length,
+      }));
+
+      document.querySelector(".composer .skill-x")?.click();
+      await sleep(250);
+      check("skills: the chip x removes it", () => ({
+        ok: store.getState().attachedSkills.length === 0,
+        count: store.getState().attachedSkills.length,
+      }));
+
+      // Send: the outgoing request must carry the expanded prompt plus the
+      // view-only display record. A targeted fetch stub returns one SSE frame.
+      const realFetch = window.fetch;
+      let captured = null;
+      window.fetch = async (url, init) => {
+        if (String(url).includes("/chat/stream")) {
+          captured = JSON.parse(init.body);
+          return new Response('data: {"type": "done", "text": "ok"}\n\n', {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          });
+        }
+        return realFetch(url, init);
+      };
+      await store.getState().attachSkill(emailSkill, "args");
+      store.getState().setDraft("hello");
+      await store.getState().send("hello");
+      await sleep(500);
+      window.fetch = realFetch;
+      check("skills: send carries the prompt and the display record", () => ({
+        ok:
+          Boolean(captured) &&
+          captured.user_text.includes("email") &&
+          captured.display?.text === "hello" &&
+          captured.display?.skills?.[0]?.name === "email",
+        hasText: Boolean(captured && captured.user_text.includes("email")),
+        display: captured && captured.display,
+      }));
+
+      const now = Date.now();
+      store.setState({
+        messages: [
+          {
+            id: "skill-u1",
+            role: "user",
+            content: "PROMPT BODY\n\nhello",
+            createdAt: now,
+            display: { text: "hello", skills: [{ name: "email", title: "Email" }] },
+          },
+          { id: "skill-a1", role: "assistant", content: "ok", createdAt: now + 1 },
+        ],
+        streaming: false,
+      });
+      await sleep(300);
+      check("skills: the sent bubble shows the chip, not the body", () => {
+        const chips = document.querySelectorAll(".msg.user .msg-skill");
+        const text = document.querySelector(".msg.user .user-text")?.textContent ?? "";
+        return {
+          ok: chips.length === 1 && text.trim() === "hello",
+          chips: chips.length,
+          text,
+        };
+      });
+
+      store.getState().beginEdit("skill-u1");
+      await sleep(600);
+      check("skills: edit restores the chip and the typed text", () => ({
+        ok:
+          store.getState().draft.trim() === "hello" &&
+          store.getState().attachedSkills.length === 1,
+        draft: store.getState().draft.slice(0, 40),
+        chips: store.getState().attachedSkills.length,
+      }));
+      store.getState().cancelEdit();
+      await sleep(200);
+    } else {
+      check("skills: attachSkill exists", () => ({ ok: false }));
+    }
 
     // ── 9d. Ctrl+K command palette ──────────────────────────────────────
     // A global palette jumps to commands and recent chats. It must open on
@@ -712,6 +1293,35 @@ new Promise((resolve) => {
         { id: "smoke-pal-s2", title: "Beta budget notes", created: "", preview: "", pinned: false, archived: false, tags: [] },
       ],
     });
+
+    // The manifest's palette checks need the debug catalog, which the list
+    // only builds when debug mode is on. Mount a palette after enabling it,
+    // then restore the mode and reopen through the keyboard for the flow.
+    const hadDebug = store.getState().debug;
+    if (!hadDebug) store.getState().toggleDebug();
+    store.getState().openPalette();
+    await waitFor(() => document.querySelector(".command-palette input"), 20);
+    await sleep(250);
+    check("capabilities: palette commands resolve", () => {
+      // Read the name cells, not the row text: the description follows the
+      // name with no separator, so a boundary match on row text can't work.
+      const names = Array.from(
+        document.querySelectorAll(".command-palette .command-name"),
+      ).map((name) => name.textContent.trim());
+      const wanted = guiChecks("palette");
+      const missing = wanted.filter(
+        (row) => !names.includes(`/${row.check.value}`),
+      );
+      return {
+        ok: wanted.length > 0 && missing.length === 0,
+        missing: missing.map((row) => row.id),
+        count: names.length,
+      };
+    });
+    store.getState().closePalette();
+    if (!hadDebug) store.getState().toggleDebug();
+    await sleep(250);
+
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }));
     const palInput = await waitFor(() => document.querySelector(".command-palette input"), 20);
     check("palette: opens on Ctrl+K", () => ({
@@ -720,6 +1330,8 @@ new Promise((resolve) => {
       open: store.getState().paletteOpen,
     }));
     if (palInput) {
+      check("capabilities: palette control resolves", () => controlCheck(["commands.palette"]));
+
       check("palette: dialog is horizontally centered", () => {
         const pal = document.querySelector(".command-palette");
         const rect = pal.getBoundingClientRect();
@@ -793,6 +1405,191 @@ new Promise((resolve) => {
     store.setState({ sessions: [] });
     await sleep(200);
 
+    // ── 9e. Runtime doctor ──────────────────────────────────────────────
+    // /doctor is always available (no debug mode) and renders the sidecar's
+    // offline checks in the diagnostics panel.
+    await store.getState().runSlash("/doctor");
+    const doctorPanel = await waitFor(() => {
+      const panel = store.getState().debugPanel;
+      return panel && panel.title === "Runtime doctor" ? panel : null;
+    }, 30);
+    check("doctor: /doctor renders the runtime report", () => ({
+      ok:
+        Boolean(doctorPanel) &&
+        /Python/.test(doctorPanel.body) &&
+        /Core packages/.test(doctorPanel.body),
+      title: doctorPanel && doctorPanel.title,
+    }));
+    store.getState().closeDebugPanel();
+    await sleep(200);
+
+    // ── 9f0. Scorecard panel ────────────────────────────────────────────
+    const scoredPath = window.__SCORECARD_PATH;
+    if (scoredPath) {
+      await store.getState().runSlash(`/scorecard ${scoredPath}`);
+      const cardPanel = await waitFor(() => {
+        const p = store.getState().debugPanel;
+        return p && p.title === "Scorecard" ? p : null;
+      }, 30);
+      check("scorecard: /scorecard <path> renders the stored card", () => ({
+        ok:
+          Boolean(cardPanel) &&
+          /12\/15/.test(cardPanel.body) &&
+          /coding/.test(cardPanel.body),
+        body: cardPanel && cardPanel.body.slice(0, 100),
+      }));
+      store.getState().closeDebugPanel();
+      await sleep(200);
+    } else {
+      check("scorecard: fixture checkpoint present", () => ({ ok: false }));
+    }
+
+    // ── 9f1. Usage & cost panel ─────────────────────────────────────────
+    await store.getState().runSlash("/cost");
+    const costPanel = await waitFor(() => {
+      const p = store.getState().debugPanel;
+      return p && p.title === "Usage & cost" ? p : null;
+    }, 30);
+    check("cost: /cost renders the provider table", () => ({
+      ok:
+        Boolean(costPanel) &&
+        /local/.test(costPanel.body) &&
+        /estimate/i.test(costPanel.body),
+      body: costPanel && costPanel.body.slice(0, 100),
+    }));
+    store.getState().closeDebugPanel();
+    await sleep(200);
+
+    // ── 9f2. Project memory ─────────────────────────────────────────────
+    await store.getState().runSlash("/memory add Uses CRLF for .cmd files.");
+    const memoryPanel = await waitFor(() => {
+      const p = store.getState().debugPanel;
+      return p && p.title === "Project memory" ? p : null;
+    }, 30);
+    check("memory: /memory add stores and lists an entry", () => ({
+      ok: Boolean(memoryPanel) && /CRLF/.test(memoryPanel.body),
+      body: memoryPanel && memoryPanel.body.slice(0, 100),
+    }));
+    store.getState().closeDebugPanel();
+    await sleep(150);
+    await store.getState().runSlash("/memory clear");
+    const clearedPanel = await waitFor(() => {
+      const p = store.getState().debugPanel;
+      return p && /Cleared 1 entry/.test(p.body) ? p : null;
+    }, 30);
+    check("memory: /memory clear removes the entry", () => ({
+      ok: Boolean(clearedPanel),
+      body: clearedPanel && clearedPanel.body,
+    }));
+    store.getState().closeDebugPanel();
+    await sleep(150);
+
+    // ── 9f3. /review and /commit send the diff, show a compact line ─────
+    const realFetchGit = window.fetch;
+    let reviewSent = null;
+    let commitSent = null;
+    window.fetch = async (url, init) => {
+      const target = String(url);
+      if (target.includes("/project/git/diff")) {
+        const staged = target.includes("mode=staged");
+        return new Response(
+          JSON.stringify({
+            available: true,
+            branch: "main",
+            files: [{ status: "M", path: "app.py" }],
+            diff: "+ print('x')",
+            truncated: false,
+            error: "",
+            prompt: staged
+              ? "Write one commit message for these staged changes."
+              : "Review this working-tree diff.",
+            display: staged
+              ? "Draft a commit message · 1 staged files"
+              : "Review the working-tree diff · 1 files",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (target.includes("/chat/stream")) {
+        const body = JSON.parse(init.body);
+        if (body.user_text.includes("commit message")) commitSent = body;
+        else reviewSent = body;
+        return new Response('data: {"type": "done", "text": "looks fine"}\n\n', {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return realFetchGit(url, init);
+    };
+    await store.getState().runSlash("/review");
+    await sleep(600);
+    await store.getState().runSlash("/commit");
+    await sleep(600);
+    window.fetch = realFetchGit;
+
+    check("git: /review sends the diff prompt with a compact display", () => {
+      const user = [...store.getState().messages]
+        .reverse()
+        .find((m) => m.role === "user" && /commit message|working-tree/.test(m.display?.text || ""));
+      return {
+        ok:
+          Boolean(reviewSent) &&
+          /Review this working-tree diff/.test(reviewSent.user_text) &&
+          Boolean(
+            store
+              .getState()
+              .messages.some((m) => m.display?.text?.startsWith("Review the working-tree diff")),
+          ),
+        display: user && user.display && user.display.text,
+      };
+    });
+    check("git: /commit sends the staged prompt and never commits", () => {
+      return {
+        ok:
+          Boolean(commitSent) &&
+          /commit message/i.test(commitSent.user_text) &&
+          store
+            .getState()
+            .messages.some((m) => m.display?.text?.startsWith("Draft a commit message")),
+        sent: commitSent && commitSent.user_text.slice(0, 40),
+      };
+    });
+
+    // ── 9d2. /plan sends the drafting prompt ───────────────────────────
+    let planSent = null;
+    const realFetchPlan = window.fetch;
+    window.fetch = async (url, init) => {
+      const target = String(url);
+      if (target.includes("/chat/stream")) {
+        planSent = JSON.parse(init.body);
+        return new Response('data: {"type": "done", "text": "Plan:\\n1. Step"}\n\n', {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
+      return realFetchPlan(url, init);
+    };
+    await store.getState().runSlash("/plan fix the build");
+    await sleep(600);
+    window.fetch = realFetchPlan;
+
+    check("plan: /plan sends the drafting prompt with a compact display", () => ({
+      ok:
+        Boolean(planSent) &&
+        /Draft a short numbered plan/.test(planSent.user_text) &&
+        store
+          .getState()
+          .messages.some((m) => m.display?.text?.startsWith("Plan · fix the build")),
+      sent: planSent ? planSent.user_text.slice(0, 40) : null,
+    }));
+
+    check("plan: /plan selects Planning", () => ({
+      ok: store.getState().mode === "Planning",
+      mode: store.getState().mode,
+    }));
+    await store.getState().setMode("Fast");
+    await sleep(200);
+
     // ── 9e. In-app release notes (bundled changelog) ────────────────────
     // About offers the bundled CHANGELOG offline. A "New" badge shows until
     // the notes are viewed; the modal renders markdown and closes on Escape.
@@ -831,6 +1628,283 @@ new Promise((resolve) => {
         ok: store.getState().releaseNotesOpen === false && !document.querySelector(".release-notes-modal"),
       }));
     }
+    store.getState().closeSettings();
+    await sleep(200);
+
+    // ── 9j. image input follows the model's vision flag ─────────────────
+    // That flag now comes from the provider's own capabilities (Ollama
+    // /api/show) instead of a model-name regex. The local checkpoint is
+    // text-only, so the Images row must be disabled and say so.
+    const addTrigger = document.querySelector('.composer-bar .bar-btn[title="Add to prompt"]');
+    if (addTrigger) {
+      addTrigger.click();
+      await sleep(300);
+      check("attachments: image input follows the model's vision flag", () => {
+        const row = Array.from(document.querySelectorAll(".popover .popover-item")).find(
+          (el) => /Images/.test(el.textContent || ""),
+        );
+        const vision = store.getState().status?.model_info?.vision === true;
+        return {
+          ok: Boolean(row) && row.disabled === !vision,
+          vision,
+          disabled: row ? row.disabled : null,
+          hint: row ? (row.querySelector(".popover-hint") || {}).textContent : null,
+        };
+      });
+      addTrigger.click();
+      await sleep(200);
+    }
+
+    // ── 9k. context panel ───────────────────────────────────────────────
+    const ctxTrigger = document.querySelector('[data-capability="context.rail"]');
+    if (ctxTrigger) {
+      ctxTrigger.click();
+      await sleep(400);
+      check("context: panel lists the prompt blocks", () => {
+        const panel = document.querySelector(".ctx-panel");
+        const labels = Array.from(
+          panel ? panel.querySelectorAll(".ctx-row span") : [],
+        ).map((el) => el.textContent);
+        return {
+          ok:
+            Boolean(panel) &&
+            labels.includes("System prompt") &&
+            labels.includes("Mode instructions") &&
+            labels.includes("Conversation"),
+          labels,
+        };
+      });
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+      await sleep(300);
+      check("context: panel closes on Escape", () => ({
+        ok: !document.querySelector(".ctx-panel"),
+      }));
+    }
+
+    // ── 9l. session digest ─────────────────────────────────────────────
+    // Derived from loaded messages: no model call and nothing to cache.
+    const savedMessages = store.getState().messages;
+    const seeded = Array.from({ length: 12 }, (_, i) => ({
+      id: `digest-${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      content:
+        i === 0
+          ? "Fix the Windows launcher line endings"
+          : i === 10
+            ? "Can you check the TUI as well?"
+            : i === 11
+              ? "All green - both launchers work"
+              : `turn ${i}`,
+    }));
+    store.setState({ messages: seeded, streaming: false });
+    await sleep(400);
+    check("digest: long chat shows the reading aid", () => {
+      const card = document.querySelector('[data-capability="session.digest"]');
+      const text = card ? card.textContent || "" : "";
+      return {
+        ok:
+          Boolean(card) &&
+          /Started with/.test(text) &&
+          /Fix the Windows launcher/.test(text) &&
+          /Last asked/.test(text) &&
+          /All green/.test(text),
+      };
+    });
+    const dismiss = document.querySelector(".digest-close");
+    if (dismiss) dismiss.click();
+    await sleep(250);
+    check("digest: dismiss removes the card", () => ({
+      ok: !document.querySelector('[data-capability="session.digest"]'),
+    }));
+    store.setState({ messages: savedMessages });
+    await sleep(250);
+
+    // ── 9m. fast reply speeds ───────────────────────────────────────────
+    await store.getState().setMode("Fast");
+    await store.getState().setFastSpeed("fast");
+    await sleep(300);
+    const speedChip = document.querySelector(
+      '.composer-bar .bar-chip[title="Response mode"]',
+    );
+    if (speedChip) {
+      speedChip.click();
+      await sleep(300);
+      const fastArrow = document.querySelector(
+        '.popover .mode-arrow[aria-label="Fast speed"]',
+      );
+      if (fastArrow) fastArrow.click();
+      await waitFor(() => document.querySelector(".speed-panel"), 20);
+      const stops = Array.from(
+        document.querySelectorAll(".speed-panel .effort-stop"),
+      );
+      check("speed: three tiers in the panel", () => ({
+        ok: stops.length === 3,
+        count: stops.length,
+      }));
+      if (stops[1]) {
+        for (const type of ["mousedown", "mouseup", "click"]) {
+          stops[1].dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, button: 0 }),
+          );
+        }
+      }
+      await sleep(500);
+      check("speed: chip shows only the tier in its colour", () => {
+        const chip = document.querySelector(
+          '.composer-bar .bar-chip[title="Response mode"]',
+        );
+        const text = chip ? chip.textContent.trim() : "";
+        const color = chip ? getComputedStyle(chip).color : "";
+        return {
+          ok: text === "Turbo" && color === "rgb(79, 214, 190)",
+          text,
+          color,
+        };
+      });
+      check("speed: mode prompt follows the tier", () => ({
+        ok: store.getState().modePrompt.includes("(Turbo)"),
+        prompt: store.getState().modePrompt.slice(0, 70),
+      }));
+
+      // The circle must drag, not just take clicks like the first version did.
+      const speedScale = document.querySelector(".speed-panel .effort-scale");
+      if (speedScale) {
+        const marks = Array.from(speedScale.querySelectorAll(".effort-stop"));
+        const first = marks[0].getBoundingClientRect();
+        const last = marks[marks.length - 1].getBoundingClientRect();
+        const fromX = first.left + first.width / 2;
+        const toX = last.left + last.width / 2;
+        const y = first.top + first.height / 2;
+        const drag = (type, x) =>
+          speedScale.dispatchEvent(
+            new PointerEvent(type, {
+              bubbles: true,
+              cancelable: true,
+              pointerId: 7,
+              clientX: x,
+              clientY: y,
+            }),
+          );
+        drag("pointerdown", fromX);
+        await sleep(80);
+        drag("pointermove", toX);
+        await sleep(80);
+        drag("pointerup", toX);
+        await sleep(400);
+      }
+      check("speed: dragging the thumb changes the tier", () => ({
+        ok: store.getState().fastSpeed === "ultrafast",
+        speed: store.getState().fastSpeed,
+      }));
+    }
+
+    // ── 9o. response length: + menu row and Settings share one value ───
+    const verbAddTrigger = document.querySelector(
+      '.composer-bar .bar-btn[title="Add to prompt"]',
+    );
+    if (verbAddTrigger) {
+      verbAddTrigger.click();
+      await waitFor(() => document.querySelector('[data-capability="chat.verbosity"]'), 20);
+      check("verbosity: row lives in its own Reply section", () => {
+        const row = document.querySelector('[data-capability="chat.verbosity"]');
+        const labels = Array.from(
+          document.querySelectorAll(".popover .popover-label"),
+        ).map((item) => item.textContent.trim());
+        const reply = labels.findIndex((label) => /^Reply$/.test(label));
+        const insert = labels.findIndex((label) => /^Insert$/.test(label));
+        return {
+          ok:
+            Boolean(row) &&
+            row.closest(".popover") !== null &&
+            /Length/.test(row.textContent || "") &&
+            row.getBoundingClientRect().height <= 30 &&
+            reply >= 0 &&
+            insert === reply + 1,
+          labels,
+        };
+      });
+
+      const lengthArrow = document.querySelector(
+        '.popover .mode-arrow[aria-label="Reply length"]',
+      );
+      if (lengthArrow) lengthArrow.click();
+      await waitFor(() => document.querySelector(".verbosity-panel"), 20);
+      check("verbosity: flyout explains each option", () => {
+        const panel = document.querySelector(".verbosity-panel");
+        const text = panel ? panel.textContent || "" : "";
+        return {
+          ok:
+            Boolean(panel) &&
+            /0\.6×/.test(text) &&
+            /1\.0×/.test(text) &&
+            /1\.5×/.test(text) &&
+            /Answer only what was asked/.test(text) &&
+            /Reasoning, examples and caveats/.test(text) &&
+            !/Also in Settings/.test(text) &&
+            !/Response length/.test(text),
+        };
+      });
+      const flyoutDetailed = Array.from(
+        document.querySelectorAll(".verbosity-option"),
+      ).find((option) => /Detailed/.test(option.textContent || ""));
+      if (flyoutDetailed) flyoutDetailed.click();
+      await sleep(450);
+      check("verbosity: choosing an option updates the row", () => ({
+        ok:
+          store.getState().verbosity === "detailed" &&
+          /Detailed/.test(
+            (document.querySelector('[data-capability="chat.verbosity"]') || {})
+              .textContent || "",
+          ),
+        verbosity: store.getState().verbosity,
+      }));
+    }
+
+    store.getState().openSettings("Chat");
+    await waitFor(
+      () =>
+        /Response length/.test(
+          (document.querySelector(".set-content") || {}).textContent || "",
+        ),
+      20,
+    );
+    check("verbosity: Settings mirrors the flyout", () => {
+      const pressed = Array.from(
+        document.querySelectorAll(".set-content .persona-chip"),
+      ).find((chip) => chip.getAttribute("aria-pressed") === "true");
+      return {
+        ok: Boolean(pressed) && pressed.textContent.trim() === "Detailed",
+        selected: pressed ? pressed.textContent.trim() : null,
+      };
+    });
+    const shortOption = Array.from(
+      document.querySelectorAll(".set-content .persona-chip"),
+    ).find((chip) => chip.textContent.trim() === "Short");
+    if (shortOption) shortOption.click();
+    await sleep(450);
+    check("verbosity: changing Settings updates the row", () => ({
+      ok: store.getState().verbosity === "short",
+      verbosity: store.getState().verbosity,
+    }));
+    store.getState().closeSettings();
+    await sleep(200);
+
+    // ── 9p. System theme option ────────────────────────────────────────
+    store.getState().openSettings("Appearance");
+    await waitFor(
+      () =>
+        /Color mode/.test((document.querySelector(".set-content") || {}).textContent || ""),
+      20,
+    );
+    check("theme: System option is available", () => {
+      const group = document.querySelector('[role="radiogroup"][aria-label="Color mode"]');
+      const labels = Array.from(group ? group.querySelectorAll("button") : []).map(
+        (button) => button.textContent.trim(),
+      );
+      return { ok: labels.includes("System"), labels };
+    });
     store.getState().closeSettings();
     await sleep(200);
 

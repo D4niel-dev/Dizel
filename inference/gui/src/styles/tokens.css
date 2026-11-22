@@ -1,9 +1,11 @@
 /**
  * Design tokens.
  *
- * Dark values are sampled pixel-for-pixel from the running PySide6 app
- * (see .pyside-welcome.png): bg #212121, chrome #171717, accent #10a37f,
- * borders #303030. Light and dark-blue come from theme/colors.py tuples.
+ * The dark theme is a seven-step surface ladder borrowed from Gemini's web app
+ * (bg-chat #171717, panels #1e1f20, cards #222327) with #8ab4f8 as the accent.
+ * The light and dark-blue themes come from the app's own theme tuples. The
+ * desktop's original PySide6 palette (#212121 / #0ea5e9) is no longer used here
+ * — treat this file, not any older note, as the source of truth.
  */
 
 @font-face {

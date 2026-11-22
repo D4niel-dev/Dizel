@@ -49,6 +49,7 @@ const THEMES: { value: ThemeName; label: string }[] = [
   { value: "dark", label: "Dark" },
   { value: "light", label: "Light" },
   { value: "dark-blue", label: "Dark blue" },
+  { value: "system", label: "System" },
 ];
 
 const FONT_SCALES: { value: FontScale; label: string }[] = [
@@ -171,13 +172,83 @@ function Select({
   );
 }
 
+/** Project rules and memory, loaded when the Chat tab mounts. */
+function ProjectContextSettings() {
+  const [memory, setMemory] = useState<api.ProjectMemoryPayload | null>(null);
+  const load = () => {
+    api
+      .projectMemory()
+      .then(setMemory)
+      .catch(() => setMemory(null));
+  };
+  useEffect(load, []);
+  const clear = () => {
+    void api
+      .clearMemory()
+      .then(load)
+      .catch(() => undefined);
+  };
+
+  const ruleCount = memory?.rules.length ?? 0;
+  const entryCount = memory?.entries.length ?? 0;
+
+  return (
+    <Section
+      title="Project context"
+      hint="DIZEL.md, AGENTS.md, and durable project memory are added to every request."
+    >
+      {/* A count of zero is not a fact worth a spec column: "0 files" floats
+          next to a sentence that already says the same thing. With nothing
+          loaded, the row becomes the explanation itself, full width. */}
+      <Row
+        label="Project rules"
+        spec={ruleCount > 0}
+        hint={
+          !memory
+            ? "Reading…"
+            : ruleCount === 0
+              ? "None found. Add a DIZEL.md or AGENTS.md at the project root and every request picks it up."
+              : memory.rules_summary
+        }
+      >
+        {ruleCount > 0 ? (
+          <span>
+            {ruleCount} {ruleCount === 1 ? "file" : "files"}
+          </span>
+        ) : null}
+      </Row>
+      <Row
+        label="Project memory"
+        hint={
+          !memory
+            ? "Reading…"
+            : entryCount === 0
+              ? "No saved notes yet. Add one with /memory add <text>; it is prepended to later requests."
+              : `${entryCount} ${entryCount === 1 ? "note" : "notes"} in context — manage them with /memory`
+        }
+      >
+        {/* Nothing to clear is not a disabled control; it is no control. */}
+        {entryCount > 0 && (
+          <button className="btn ghost" onClick={clear}>
+            Clear memory
+          </button>
+        )}
+      </Row>
+    </Section>
+  );
+}
+
 export function SettingsDialog() {
   const open = useChat((s) => s.settingsOpen);
+  const verbosity = useChat((s) => s.verbosity);
+  const setVerbosity = useChat((s) => s.setVerbosity);
   const trust = useChat((s) => s.trust);
   const setPersistentTrust = useChat((s) => s.setPersistentTrust);
   const revokeSessionTrust = useChat((s) => s.revokeSessionTrust);
   const settingsTab = useChat((s) => s.settingsTab);
   const close = useChat((s) => s.closeSettings);
+  const mode = useChat((s) => s.mode);
+  const modePrompt = useChat((s) => s.modePrompt);
   const save = useChat((s) => s.saveSettings);
   const models = useChat((s) => s.models);
   const loadSessions = useChat((s) => s.loadSessions);
@@ -350,10 +421,22 @@ export function SettingsDialog() {
   }, [open, settingsTab]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Closing mid-load used to leave the flag set, so reopening could show the
+      // placeholder forever.
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
+
+    // A load that never settles must not lock the dialog behind "Reading
+    // settings…": the watchdog releases it either way. Four local requests
+    // answer in tens of milliseconds, so four seconds is already generous.
+    const watchdog = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 4000);
     setNotice(null);
     setConfirmClear(false);
     setConfirmCache(false);
@@ -474,14 +557,16 @@ export function SettingsDialog() {
         setCustomUrl((router.custom_url as string) ?? "");
         setFacts(modelFacts);
 
-        setLoading(false);
       })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
+      .catch(() => undefined)
+      .finally(() => {
+        window.clearTimeout(watchdog);
+        setLoading(false);
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
     };
   }, [open, currentTheme, prefs]);
 
@@ -1409,6 +1494,8 @@ export function SettingsDialog() {
                       </Row>
                     </Section>
 
+                    <ProjectContextSettings />
+
                     <Section title="Usage window" hint="A 12-hour budget that resets on its own.">
                       <Row
                         label="Spent this window"
@@ -1436,6 +1523,36 @@ export function SettingsDialog() {
                       </Row>
                     </Section>
 
+                    <Section
+                      title="Response length"
+                      hint="Also changes the system prompt, so Short and Detailed really do differ."
+                    >
+                      <Row
+                        label="Reply length"
+                        hint="Same setting as the chip in the composer bar"
+                      >
+                        <div className="persona-row">
+                          {(
+                            [
+                              ["short", "Short", "Answer only what was asked"],
+                              ["normal", "Normal", "The default length"],
+                              ["detailed", "Detailed", "Reasoning, examples and caveats"],
+                            ] as const
+                          ).map(([id, label, hint]) => (
+                            <button
+                              key={id}
+                              className="persona-chip"
+                              aria-pressed={verbosity === id}
+                              onClick={() => setVerbosity(id)}
+                              title={hint}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </Row>
+                    </Section>
+
                     <Section title="System prompt">
                       {Object.keys(personas).length > 0 && (
                         <div className="field-block">
@@ -1456,9 +1573,7 @@ export function SettingsDialog() {
                         </div>
                       )}
                       <div className="field-block">
-                        <label htmlFor="system-prompt">
-                          Instructions prepended to every message
-                        </label>
+                        <label htmlFor="system-prompt">System prompt</label>
                         <textarea
                           id="system-prompt"
                           className="set-textarea"
@@ -1468,6 +1583,22 @@ export function SettingsDialog() {
                           placeholder="You are Dizel, a careful assistant…"
                           spellCheck={false}
                         />
+                        <span className="set-hint">
+                          Sent with every message, before the mode instructions below.
+                        </span>
+                      </div>
+                      <div className="field-block">
+                        <div className="prompt-mode-head">
+                          <label>Mode prompt</label>
+                          <span className="prompt-mode-tag">{mode}</span>
+                        </div>
+                        <div className="set-readonly" aria-live="polite">
+                          {modePrompt || "Pick a mode in the composer to see its instructions."}
+                        </div>
+                        <span className="set-hint">
+                          Added after the system prompt. Follows the mode chosen in the
+                          composer, so it is not edited here.
+                        </span>
                       </div>
                     </Section>
 
@@ -2078,6 +2209,13 @@ export function SettingsDialog() {
                         <span className="keys">
                           <kbd>Ctrl</kbd>
                           <kbd>,</kbd>
+                        </span>
+                      </Row>
+                      <Row label="Artifacts rail">
+                        <span className="keys">
+                          <kbd>Ctrl</kbd>
+                          <kbd>Shift</kbd>
+                          <kbd>A</kbd>
                         </span>
                       </Row>
                       <Row label="Close a dialog">

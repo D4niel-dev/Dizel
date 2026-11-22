@@ -1,7 +1,7 @@
 """Title block: the chat's own name, with its context cost on the right.
 
 The terminal twin of OpenCode's header — a raised block carrying ``# title`` and
-the token spend, instead of a row of chips. The model and tier moved into the
+the token spend, instead of a row of chips. The model and mode moved into the
 composer footer, so repeating them here would be the same sentence twice.
 """
 

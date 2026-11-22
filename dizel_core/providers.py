@@ -29,6 +29,9 @@ import requests
 
 DEFAULT_TIMEOUT = 20
 STREAM_TIMEOUT = 300
+# /api/show answers from a loaded daemon in milliseconds. It runs on the startup
+# path, so it gets its own short budget rather than DEFAULT_TIMEOUT.
+SHOW_TIMEOUT = 3
 
 # Model IDs are the only capability signal most provider APIs expose. These
 # families are multimodal; anything else stays text-only.
@@ -58,6 +61,36 @@ def model_supports_vision(provider: str, model: str) -> bool:
             )
         )
     return bool(_VISION_MODEL.search(name))
+
+
+def probe_vision(provider: Any, model: str) -> Optional[bool]:
+    """Ask a provider whether a model accepts images.
+
+    Returns True or False when the provider answered, and None when it could not
+    say (no such endpoint, daemon down, old Ollama without `capabilities`). None
+    is not "no" — callers fall back to the name heuristic instead.
+    """
+    if provider is None or not model:
+        return None
+    show = getattr(provider, "show_model", None)
+    if show is None:
+        return None
+    try:
+        capabilities = show(model)
+    except Exception:
+        return None
+    if not isinstance(capabilities, (list, tuple)):
+        return None
+    return "vision" in [str(item).lower() for item in capabilities]
+
+
+def resolve_vision(
+    provider_slug: str, model: str, cached: Optional[bool] = None
+) -> bool:
+    """The provider's answer when there is one, otherwise the name heuristic."""
+    if cached is not None:
+        return bool(cached)
+    return model_supports_vision(provider_slug, model)
 
 
 def split_data_url(value: str) -> Optional[tuple[str, str]]:
@@ -129,6 +162,32 @@ class BaseProvider:
             response.close()
         except Exception:
             pass
+
+    def show_model(self, model: str) -> Optional[List[str]]:
+        """The model's `capabilities` from /api/show, or None if it cannot say.
+
+        Ollama reports ["completion", "vision"] for multimodal models. This is the
+        authoritative answer; the name regex is only a fallback.
+        """
+        try:
+            response = self._session.post(
+                f"{self.base}/api/show",
+                json={"model": model},
+                timeout=SHOW_TIMEOUT,
+            )
+        except Exception:
+            return None
+        if response.status_code != 200:
+            return None
+        try:
+            data = response.json()
+        except Exception:
+            return None
+        # A proxy or a captive portal can answer 200 with a list or a bare string.
+        if not isinstance(data, dict):
+            return None
+        capabilities = data.get("capabilities")
+        return capabilities if isinstance(capabilities, list) else None
 
     def list_models(self, key: str = "") -> List[ModelInfo]:
         raise NotImplementedError

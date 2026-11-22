@@ -8,8 +8,8 @@
   // ── Theme ──────────────────────────────────────────────────────────────
   const themeButton = $("[data-theme-toggle]");
   const themeMeta = $('meta[name="theme-color"]');
-  const LIGHT = "#F1F2EC";
-  const DARK = "#141519";
+  const LIGHT = "#E8EAED";
+  const DARK = "#131418";
 
   const storedTheme = () => {
     try {
@@ -59,6 +59,16 @@
     }
   }
 
+  // ── Nav elevation ──────────────────────────────────────────────────────
+  const navBar = $("[data-nav-bar]");
+  if (navBar) {
+    const syncNav = () => {
+      navBar.toggleAttribute("data-scrolled", window.scrollY > 4);
+    };
+    window.addEventListener("scroll", syncNav, { passive: true });
+    syncNav();
+  }
+
   // ── Mobile menu ─────────────────────────────────────────────────────────
   const menuButton = $("#s-menu");
   const mobileMenu = $("#s-mobile-menu");
@@ -68,24 +78,46 @@
       mobileMenu.hidden = !open;
       menuButton.setAttribute("aria-expanded", String(open));
     });
+    const closeMenu = () => {
+      mobileMenu.hidden = true;
+      menuButton.setAttribute("aria-expanded", "false");
+    };
     $$("a", mobileMenu).forEach((link) => {
-      link.addEventListener("click", () => {
-        mobileMenu.hidden = true;
-        menuButton.setAttribute("aria-expanded", "false");
-      });
+      link.addEventListener("click", closeMenu);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || mobileMenu.hidden) return;
+      closeMenu();
+      menuButton.focus();
     });
   }
 
   // ── Docs client tabs ───────────────────────────────────────────────────
-  $$("[data-doc-tab]").forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const name = tab.dataset.docTab;
-      $$("[data-doc-tab]").forEach((item) =>
-        item.setAttribute("aria-selected", String(item === tab)),
-      );
-      $$("[data-doc-panel]").forEach((panel) => {
-        panel.hidden = panel.dataset.docPanel !== name;
-      });
+  const selectTab = (tab) => {
+    const name = tab.dataset.docTab;
+    $$("[data-doc-tab]").forEach((item) => {
+      const on = item === tab;
+      item.setAttribute("aria-selected", String(on));
+      item.tabIndex = on ? 0 : -1;
+    });
+    $$("[data-doc-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.docPanel !== name;
+    });
+  };
+  $$("[data-doc-tab]").forEach((tab, index, all) => {
+    tab.tabIndex = tab.getAttribute("aria-selected") === "true" ? 0 : -1;
+    tab.addEventListener("click", () => selectTab(tab));
+    tab.addEventListener("keydown", (event) => {
+      const step =
+        event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+      let next = null;
+      if (step) next = all[(index + step + all.length) % all.length];
+      else if (event.key === "Home") next = all[0];
+      else if (event.key === "End") next = all[all.length - 1];
+      if (!next) return;
+      event.preventDefault();
+      selectTab(next);
+      next.focus();
     });
   });
 
@@ -174,6 +206,13 @@
     tokenButtons.forEach((button) => {
       button.addEventListener("click", () => selectToken(button.dataset.token));
     });
+    // one authored entrance: the router fires once on arrival, then only on input
+    if (routeFrame && !reduceMotion) {
+      window.setTimeout(() => {
+        routeFrame.classList.add("is-routing");
+        window.setTimeout(() => routeFrame.classList.remove("is-routing"), 1200);
+      }, 750);
+    }
   }
 
   // ── Model card scrollspy ───────────────────────────────────────────────

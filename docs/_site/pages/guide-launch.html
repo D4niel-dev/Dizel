@@ -36,7 +36,16 @@ npm run dev</code></pre>
   --device cuda</code></pre>
   </div>
   <p>Type <code>/help</code> for commands, <code>/skills</code> for prompt templates, and <code>/mcp</code> for plugin servers.</p>
+  <p><code>/copy</code> puts the last reply on the clipboard (OSC 52), <code>/find</code> walks the transcript, <code>/verbosity</code> sets how long replies may run, and <code>/open</code> hands the chat to the desktop app.</p>
 </section>
+
+<section class="s-docs-section">
+  <h2 id="handoff">Moving a chat between clients</h2>
+  <p>Sessions are files, so either client can open what the other wrote. In the desktop app, a chat's row menu has <b>Continue in terminal</b>; in the terminal, <code>/open</code> opens the same chat in the window. A packaged install also answers <code>dizel://session/&lt;id&gt;</code>, and both clients accept the id directly:</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main --session 20261118_143022</code></pre>
+  </div>
 
 <section class="s-docs-section">
   <h2 id="headless">Headless generation</h2>

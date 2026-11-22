@@ -22,12 +22,22 @@ from inference.tui.panels.input_bar import InputBar
 from inference.tui.commands.builtins import register_builtins
 from inference.tui.commands.builtins.tools import AVAILABLE_TOOLS
 from inference.tui.bridge.chat_bridge import ChatBridge
-from inference.tui.constants import MODES, TIERS
+from inference.tui.constants import (
+    FAST_SPEED_COLORS,
+    FAST_SPEED_LABELS,
+    MODE_COLORS,
+    MODES,
+    THINKING_EFFORT_COLORS,
+    THINKING_EFFORT_LABELS,
+)
 from inference.tui.rendering.history_message import HistoryMessage
-from inference.tui.rendering.message_block import MessageBlock, message_style
 from inference.tui.settings_apply import chat_pref
 from dizel_core.usage_manager import UsageManager
 from dizel_core.token_budget import model_family as detect_model_family
+from dizel_core.token_budget import (
+    normalize_fast_speed,
+    normalize_thinking_effort,
+)
 from model.naming import model_display_name
 
 # Below this width the session sidebar would leave the transcript too narrow
@@ -122,8 +132,13 @@ class DizelCMDApp(App):
 
     # Reactive state
     active_model = reactive("")
-    active_tier = reactive("Flash")
     active_mode = reactive("Fast")
+    active_thinking_effort = reactive("medium")
+    active_fast_speed = reactive("fast")
+    # short | normal | detailed — scales the reply's token budget. Read from
+    # token_budget.verbosity at mount and written back by /verbosity, so the
+    # terminal and the desktop agree on what the setting means.
+    active_verbosity = reactive("normal")
     active_provider = reactive("local")
     generation_state = reactive("IDLE")
     session_id = reactive("")
@@ -163,6 +178,7 @@ class DizelCMDApp(App):
         self.usage_manager = UsageManager()
         self._tool_states = {name: False for name in AVAILABLE_TOOLS}
         self._trusted_sessions: set[str] = set()
+        self.attached_skills: list[dict] = []
         register_builtins()
         self.chat_bridge = ChatBridge(self, manager=preloaded)
         from inference.tui.bridge.tool_bridge import ToolBridge
@@ -221,7 +237,22 @@ class DizelCMDApp(App):
         from dizel_core.config_manager import ConfigManager
 
         cfg = ConfigManager.load()
-        saved_prompt = str(cfg.get("system_prompt", "")).strip()
+        from dizel_core.token_budget import strip_legacy_mode_clause
+
+        budget_cfg = cfg.get("token_budget")
+        saved_verbosity = (
+            str(budget_cfg.get("verbosity", "normal")).strip().lower()
+            if isinstance(budget_cfg, dict)
+            else "normal"
+        )
+        if saved_verbosity in ("short", "normal", "detailed"):
+            self.active_verbosity = saved_verbosity
+
+        # Older settings stored the base prompt with the mode clause appended; the
+        # clause is applied separately now, so keep only the base.
+        saved_prompt = strip_legacy_mode_clause(
+            str(cfg.get("system_prompt", ""))
+        ).strip()
         default_prompt = str(ConfigManager._DEFAULTS.get("system_prompt", "")).strip()
         if saved_prompt and saved_prompt != default_prompt:
             mgr.system_prompt = saved_prompt
@@ -574,7 +605,7 @@ class DizelCMDApp(App):
         self.budget_tokens = 0
         self.sync_usage_provider()
         # The new checkpoint may belong to a different family (Dizel, Mila or
-        # a generic model), so re-resolve the tier/mode profile now.
+        # a generic model), so re-resolve the mode profile now.
         self._apply_profile()
 
         label = self.active_model or "Model"
@@ -596,7 +627,7 @@ class DizelCMDApp(App):
             return
         self._log_system(f"Load error: {message}", "error")
 
-    # ── Tier and mode ──────────────────────────────────────────────────
+    # ── Response mode ──────────────────────────────────────────────────
     @property
     def model_family(self) -> str:
         """Profile family for the loaded local model; empty for providers."""
@@ -605,56 +636,81 @@ class DizelCMDApp(App):
         return detect_model_family(self.active_model)
 
     @property
-    def is_dizel_model(self) -> bool:
-        return self.model_family == "Dizel"
-
-    @property
     def response_label(self) -> str:
         """What the footer calls the active response profile."""
-        return self.active_tier if self.is_dizel_model else self.active_mode
+        if self.active_mode == "Thinking":
+            label = THINKING_EFFORT_LABELS.get(
+                self.active_thinking_effort, "Medium"
+            )
+            return f"Thinking · {label}"
+        if self.active_mode == "Fast":
+            # The chip is the tier itself, matching the desktop app.
+            return FAST_SPEED_LABELS.get(self.active_fast_speed, "Fast")
+        return self.active_mode
+
+    @property
+    def response_color(self) -> str:
+        if self.active_mode == "Thinking":
+            return THINKING_EFFORT_COLORS.get(
+                self.active_thinking_effort, "#a78bfa"
+            )
+        if self.active_mode == "Fast":
+            return FAST_SPEED_COLORS.get(self.active_fast_speed, "#38bdf8")
+        return MODE_COLORS.get(self.active_mode, "#007aff")
 
     def _profile_family(self) -> str:
-        family = self.model_family
-        if not family:
-            return ""
-        return self.active_tier if family == "Dizel" else family
+        return self.model_family
 
     def _apply_profile(self) -> None:
-        """Tiers and modes are local-model concepts; API models keep their own."""
+        """Modes and their Thinking effort are local-model concepts."""
         if self.active_provider != "local":
             return
         family = self._profile_family()
         if not family:
             return
         try:
-            self.chat_bridge.manager.apply_profile(family, self.active_mode)
+            self.chat_bridge.manager.apply_profile(
+                family,
+                self.active_mode,
+                self.active_thinking_effort,
+                self.active_fast_speed,
+            )
         except Exception:
             pass
 
-    def set_tier(self, tier: str, announce: bool = True) -> None:
-        if not self.is_dizel_model:
-            if announce:
-                self._log_system(
-                    "Tier applies to Dizel models only — use /mode for this model.",
-                    "error",
-                )
-            return
-        if tier not in TIERS:
-            tier = TIERS[0]
-        self.active_tier = tier
-        self._apply_profile()
-        if announce:
-            self._log_system(f"{tier} · {self.active_mode} mode")
-
-    def set_mode(self, mode: str, announce: bool = True) -> None:
+    def set_mode(
+        self,
+        mode: str,
+        thinking_effort: str | None = None,
+        announce: bool = True,
+    ) -> None:
         """Change the response mode and apply its prompt/sampling profile."""
         if mode not in MODES:
             mode = MODES[0]
+        if thinking_effort is not None:
+            self.active_thinking_effort = normalize_thinking_effort(thinking_effort)
         self.active_mode = mode
         self._apply_profile()
         if announce:
-            label = f"{self.active_tier} · {mode} mode" if self.is_dizel_model else f"{mode} mode"
-            self._log_system(label)
+            self._log_system(f"{self.response_label} mode")
+
+    def set_thinking_effort(self, effort: str, announce: bool = True) -> None:
+        key = normalize_thinking_effort(effort)
+        self.active_thinking_effort = key
+        if self.active_mode == "Thinking":
+            self._apply_profile()
+        if announce:
+            self._log_system(
+                f"Thinking effort · {THINKING_EFFORT_LABELS.get(key, 'Medium')}"
+            )
+
+    def set_fast_speed(self, speed: str, announce: bool = True) -> None:
+        key = normalize_fast_speed(speed)
+        self.active_fast_speed = key
+        if self.active_mode == "Fast":
+            self._apply_profile()
+        if announce:
+            self._log_system(f"Fast speed · {FAST_SPEED_LABELS.get(key, 'Fast')}")
 
     def action_switch_agent(self) -> None:
         current = self.active_mode if self.active_mode in MODES else MODES[0]
@@ -887,6 +943,60 @@ class DizelCMDApp(App):
             yield ContextPanel()
         yield StatusBar()
 
+    def _load_messages_into_app(self, messages: list) -> None:
+        """Point the model context and the transcript at exactly these messages."""
+        self.context_tokens = sum(
+            max(1, len(str(m.get("content", ""))) // 4) for m in messages
+        )
+        self.budget_tokens = 0
+        # Keep the model's own context in step with the transcript on screen.
+        try:
+            self.chat_bridge.manager.load_history(
+                [{"role": m["role"], "content": m["content"]} for m in messages]
+            )
+        except Exception:
+            pass
+
+        workspace = self.query_one(WorkspacePanel)
+        # An empty tab is still a new chat: keep the welcome visible. The
+        # transcript only replaces it once the session has messages.
+        workspace.clear_workspace(show_empty=not messages)
+        full_assistant_text = []
+        for msg in messages:
+            if msg["role"] == "assistant":
+                workspace.mount(HistoryMessage(msg["content"], ts=msg.get("ts")))
+                full_assistant_text.append(msg["content"])
+            else:
+                display = msg.get("display") or None
+                workspace.add_user_message(
+                    (display or {}).get("text", msg["content"]),
+                    display,
+                    ts=msg.get("ts"),
+                )
+        workspace.scroll_end(animate=False)
+
+        try:
+            from inference.tui.panels.artifact_panel import ArtifactPanel
+
+            self.query_one(ArtifactPanel).add_artifacts("\n".join(full_assistant_text))
+        except Exception:
+            pass
+
+    def edit_and_resend(self, index: int, text: str) -> str:
+        """Replace the prompt at `index` and drop everything after it."""
+        if self.generation_state in ("STREAMING", "THINKING"):
+            return "Still generating — press esc to stop first."
+        text = str(text or "").strip()
+        if not text:
+            return "Nothing to send."
+        messages = list(self.session_bridge.current_messages)
+        if index < 0 or index >= len(messages):
+            return "That turn is no longer available."
+        self.session_bridge.current_messages = messages[:index]
+        self._tab_messages[self.session_id] = list(self.session_bridge.current_messages)
+        self._load_messages_into_app(self.session_bridge.current_messages)
+        return self.send_composed(text, text)
+
     def load_session_to_workspace(self, session_id: str, announce: bool = True) -> bool:
         if not session_id:
             return False
@@ -910,45 +1020,7 @@ class DizelCMDApp(App):
             self.open_tabs.append(session_id)
 
         messages = self.session_bridge.current_messages
-        self.context_tokens = sum(
-            max(1, len(str(m.get("content", ""))) // 4) for m in messages
-        )
-        self.budget_tokens = 0
-        # Keep the model's own context in step with the transcript on screen.
-        try:
-            self.chat_bridge.manager.load_history(
-                [{"role": m["role"], "content": m["content"]} for m in messages]
-            )
-        except Exception:
-            pass
-
-        workspace = self.query_one(WorkspacePanel)
-        # An empty tab is still a new chat: keep the welcome visible. The
-        # transcript only replaces it once the session has messages.
-        workspace.clear_workspace(show_empty=not messages)
-        full_assistant_text = []
-        for msg in messages:
-            if msg["role"] == "assistant":
-                workspace.mount(HistoryMessage(msg["content"], ts=msg.get("ts")))
-                full_assistant_text.append(msg["content"])
-            else:
-                workspace.mount(
-                    Static(
-                        MessageBlock(
-                            msg["role"].upper(),
-                            msg["content"],
-                            **message_style(self, timestamp=msg.get("ts")),
-                        )
-                    )
-                )
-        workspace.scroll_end(animate=False)
-
-        try:
-            from inference.tui.panels.artifact_panel import ArtifactPanel
-
-            self.query_one(ArtifactPanel).add_artifacts("\n".join(full_assistant_text))
-        except Exception:
-            pass
+        self._load_messages_into_app(messages)
 
         if announce and messages:
             self._log_system(f"Loaded {len(messages)} messages from this session.")
@@ -971,6 +1043,7 @@ class DizelCMDApp(App):
             self.chat_bridge.manager.load_history([])
         except Exception:
             pass
+        self.clear_attached_skills()
         self.session_bridge.create()
         if self.session_id:
             self._tab_messages[self.session_id] = []
@@ -1076,6 +1149,47 @@ class DizelCMDApp(App):
             prompt.value = text
             prompt.cursor_position = len(text)
             prompt.focus()
+        except Exception:
+            pass
+
+    def send_composed(self, display_text: str, content: str) -> str:
+        """Send a turn whose transcript line is compact while the model gets content."""
+        if self.generation_state in ("STREAMING", "THINKING"):
+            return "Still generating — press esc to stop first."
+        display = {"text": display_text, "skills": []}
+        self.generation_state = "THINKING"
+        try:
+            workspace = self.query_one(WorkspacePanel)
+            workspace.add_user_message(display_text, display)
+        except Exception:
+            pass
+        self.session_bridge.add_message("user", content, display)
+        self.refresh_tabs()
+        self.tool_bridge.run_tools_and_send(content, display)
+        return ""
+
+    def attach_skill(self, skill: dict) -> None:
+        self.attached_skills.append(skill)
+        self._refresh_skill_row()
+
+    def remove_last_skill(self) -> bool:
+        if not self.attached_skills:
+            return False
+        self.attached_skills.pop()
+        self._refresh_skill_row()
+        return True
+
+    def clear_attached_skills(self) -> None:
+        if not self.attached_skills:
+            return
+        self.attached_skills = []
+        self._refresh_skill_row()
+
+    def _refresh_skill_row(self) -> None:
+        try:
+            from inference.tui.panels.input_bar import InputBar
+
+            self.query_one(InputBar).refresh_skills()
         except Exception:
             pass
 

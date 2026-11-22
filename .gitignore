@@ -39,7 +39,6 @@ logs/
 *.safetensors
 *.gguf
 /models/
-evaluation/benchmarks/
 
 # -----------------------
 # Dataset files
@@ -59,6 +58,8 @@ inference/dizel_ui/.dizel/
 !package.json
 !package-lock.json
 !tsconfig.json
+# Benchmark cases are source, not generated data.
+!evaluation/benchmarks/core_benchmarks.json
 !capabilities.json
 !inference/gui/package.json
 !inference/gui/package-lock.json
@@ -129,6 +130,7 @@ inference/tui/preview-*.png
 .workbuddy-ai/
 plans/
 docs/.hallmark/
+configs/Dizel-X/
 
 # -----------------------
 # Secrets (never commit)

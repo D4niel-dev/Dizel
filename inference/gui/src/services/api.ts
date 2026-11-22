@@ -12,9 +12,12 @@ import type {
   ModelFacts,
   ProviderInfo,
   RecentModelEntry,
+  Scorecard,
+  ScorecardSummary,
   SessionSummary,
   SkillInfo,
   StreamEvent,
+  Verbosity,
 } from "../types";
 import { resolveSidecar } from "./sidecar";
 
@@ -79,9 +82,122 @@ export const stopGeneration = () =>
 export const listSessions = () => request<SessionSummary[]>("/session/list");
 
 export const getSession = (id: string) =>
-  request<{ id: string; title: string; messages: { role: string; content: string }[] }>(
-    `/session/${encodeURIComponent(id)}`,
+  request<{
+    id: string;
+    title: string;
+    messages: {
+      role: string;
+      content: string;
+      display?: {
+        text: string;
+        skills: { name: string; title: string; args?: string }[];
+      };
+    }[];
+  }>(`/session/${encodeURIComponent(id)}`);
+
+export interface DoctorCheck {
+  id: string;
+  label: string;
+  status: "ok" | "warn" | "fail";
+  detail: string;
+}
+
+export interface DoctorReport {
+  checks: DoctorCheck[];
+  counts: { ok: number; warn: number; fail: number };
+  status: "ok" | "warn" | "fail";
+}
+
+export const doctor = () => request<DoctorReport>("/health/doctor");
+
+export const getCurrentScorecard = () => request<Scorecard>("/models/scorecard/current");
+
+export const getScorecard = (path: string) =>
+  request<Scorecard>(`/models/scorecard?path=${encodeURIComponent(path)}`);
+
+export interface ScorecardRunState {
+  running: boolean;
+  done: number;
+  total: number;
+  error: string | null;
+  scorecard: ScorecardSummary | null;
+  path: string;
+}
+
+export const startScorecardRun = () =>
+  request<{ started: boolean; total?: number; error?: string }>(
+    "/models/scorecard/run",
+    { method: "POST" },
   );
+
+export const scorecardRunStatus = () =>
+  request<ScorecardRunState>("/models/scorecard/run");
+
+export interface UsageProviderRow {
+  provider: string;
+  active: boolean;
+  used: number;
+  capacity: number;
+  percent: number;
+  resets_in_seconds: number;
+  compactions: number;
+  max_compactions: number;
+  estimated_cost: number | null;
+  pricing: string;
+}
+
+export interface UsageReportPayload {
+  providers: UsageProviderRow[];
+  window_hours: number;
+}
+
+export const usageReport = () => request<UsageReportPayload>("/usage/report");
+
+export interface ProjectMemoryEntry {
+  id: string;
+  text: string;
+  created: string;
+  source: string;
+}
+
+export interface ProjectMemoryPayload {
+  project: string;
+  entries: ProjectMemoryEntry[];
+  rules: { name: string; path: string; chars: number }[];
+  rules_summary: string;
+  rules_truncated: boolean;
+}
+
+export const projectMemory = () => request<ProjectMemoryPayload>("/project/memory");
+
+export const addMemory = (text: string) =>
+  request<ProjectMemoryEntry>("/project/memory/add", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+
+export const removeMemory = (id: string) =>
+  request<{ removed: boolean }>("/project/memory/remove", {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  });
+
+export const clearMemory = () =>
+  request<{ removed: number }>("/project/memory/clear", { method: "POST" });
+
+export interface GitDiffPayload {
+  available: boolean;
+  branch: string;
+  files: { status: string; path: string }[];
+  diff: string;
+  truncated: boolean;
+  error: string;
+  prompt?: string;
+  display?: string;
+}
+
+export const gitDiff = (mode: "review" | "staged") =>
+  request<GitDiffPayload>(`/project/git/diff?mode=${mode}`);
 
 export const deleteSession = (id: string) =>
   request<{ status: string }>(`/session/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -102,6 +218,12 @@ export const renameSession = (id: string, title: string) =>
   request<{ session_id: string; title: string }>(
     `/session/${encodeURIComponent(id)}/rename`,
     { method: "POST", body: JSON.stringify({ title }) },
+  );
+
+export const setSessionTags = (id: string, tags: string[]) =>
+  request<{ session_id: string; tags: string[] }>(
+    `/session/${encodeURIComponent(id)}/tags`,
+    { method: "POST", body: JSON.stringify({ tags }) },
   );
 
 export const truncateSession = (id: string, keep: number) =>
@@ -202,6 +324,13 @@ export const cancelDictationDownload = () =>
 
 export interface ContextUsage {
   system: number;
+  /** Token cost of each part of the composed system prompt. */
+  system_blocks?: {
+    base: number;
+    mode: number;
+    verbosity?: number;
+    project: number;
+  };
   conversation: number;
   reserved: number;
   /** Messages the server dropped to fit the window on the last prompt. */
@@ -261,6 +390,12 @@ export const resolveToolApproval = (approvalId: string, decision: string) =>
   request<{ status: string; approved: boolean }>("/chat/tools/approve", {
     method: "POST",
     body: JSON.stringify({ approval_id: approvalId, decision }),
+  });
+
+export const resolvePlanApproval = (approvalId: string, approved: boolean) =>
+  request<{ status: string; approved: boolean }>("/chat/tools/plan", {
+    method: "POST",
+    body: JSON.stringify({ approval_id: approvalId, approved }),
   });
 
 export const trustState = (sessionId?: string | null) =>
@@ -356,10 +491,25 @@ export const listProviderModels = (slug: string) =>
     `/providers/models?slug=${encodeURIComponent(slug)}`,
   );
 
-export const applyProfile = (variant: string, mode: string) =>
-  request<{ status: string; profile: string }>("/chat/apply_profile", {
+export const getPrompts = () =>
+  request<{ system_prompt: string; mode_prompt: string; mode: string }>("/chat/prompts");
+
+export const applyProfile = (
+  variant: string,
+  mode: string,
+  thinkingEffort = "medium",
+  speed = "fast",
+) =>
+  request<{ status: string; profile: string; system_prompt: string; mode_prompt: string }>(
+    "/chat/apply_profile",
+    {
     method: "POST",
-    body: JSON.stringify({ model_name: variant, mode_name: mode }),
+    body: JSON.stringify({
+      model_name: variant,
+      mode_name: mode,
+      thinking_effort: thinkingEffort,
+      speed,
+    }),
   });
 
 // ── Profile ─────────────────────────────────────────────────────────────────
@@ -568,6 +718,8 @@ export async function streamChat(
   signal: AbortSignal,
   continuation = false,
   attachments: string[] = [],
+  display?: { text: string; skills: { name: string; title: string; args?: string }[] },
+  verbosity?: Verbosity,
 ): Promise<void> {
   if (!base) await initApi();
 
@@ -579,6 +731,8 @@ export async function streamChat(
       session_id: sessionId,
       attachments,
       continuation,
+      display,
+      verbosity,
     }),
     signal,
   });

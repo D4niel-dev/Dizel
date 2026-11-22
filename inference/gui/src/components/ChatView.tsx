@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Composer } from "./Composer";
 import { Icon } from "./Icon";
@@ -6,6 +6,7 @@ import { MessageBubble } from "./MessageBubble";
 import { ModelLoader } from "./ModelLoader";
 import { dayPart, greeting } from "../services/greeting";
 import { fillWelcome, sampleWelcome } from "../services/welcome";
+import { buildDigest } from "../services/digest";
 import type { IconName } from "./Icon";
 import { useChat } from "../store/chatStore";
 
@@ -42,6 +43,16 @@ const SUGGESTIONS: Suggestion[] = [
 
 export function ChatView() {
   const messages = useChat((s) => s.messages);
+  const sessionId = useChat((s) => s.sessionId);
+  const streaming = useChat((s) => s.streaming);
+  const digest = useMemo(() => buildDigest(messages), [messages]);
+  // Keyed by session: opening a different chat makes the card eligible again.
+  // `undefined` is deliberately distinct from a null sessionId: a brand-new chat
+  // has no id, and using null for "not dismissed" hid the card there.
+  const [digestDismissed, setDigestDismissed] = useState<
+    string | null | undefined
+  >(undefined);
+  const showDigest = Boolean(digest) && !streaming && digestDismissed !== sessionId;
   const username = useChat((s) => s.username);
   const greetingStyle = useChat((s) => s.profile.greetingStyle);
   const booted = useChat((s) => s.booted);
@@ -289,7 +300,7 @@ export function ChatView() {
   return (
     <div className="stream-wrap">
       {findOpen && (
-        <div className="find-bar" role="search">
+        <div className="find-bar" role="search" data-capability="sessions.search_transcript">
           <Icon name="search" size={13} />
           <input
             autoFocus
@@ -329,6 +340,42 @@ export function ChatView() {
         </div>
       )}
       <div className="stream" ref={scrollRef} onScroll={onScroll}>
+        {showDigest && digest && (
+          <div className="digest-card" data-capability="session.digest">
+            <div className="digest-head">
+              <span>Where you left off</span>
+              <button
+                className="digest-close"
+                onClick={() => setDigestDismissed(sessionId)}
+                title="Dismiss"
+                aria-label="Dismiss digest"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+            {digest.started && (
+              <div className="digest-row">
+                <span>Started with</span>
+                <b>{digest.started}</b>
+              </div>
+            )}
+            {digest.asking && (
+              <div className="digest-row">
+                <span>Last asked</span>
+                <b>{digest.asking}</b>
+              </div>
+            )}
+            {digest.answered && (
+              <div className="digest-row">
+                <span>Dizel said</span>
+                <b>{digest.answered}</b>
+              </div>
+            )}
+            <div className="digest-foot">
+              {digest.count} messages · a reading aid, not a reply
+            </div>
+          </div>
+        )}
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} flash={flashId === message.id} />
         ))}

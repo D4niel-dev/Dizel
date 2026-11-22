@@ -30,7 +30,7 @@
                 <p class="s-abstract">Dizel 1.6 Flash is a decoder-only sparse mixture-of-experts model: 435.3M total parameters, 293.7M active per token, and a 2,048-token context. It is a preview. The weights and downstream benchmarks are not published.</p>
                 <div class="s-status-note"><i aria-hidden="true"></i><span><b>Evaluation checkpoint.</b> This is a pretrain snapshot, not an instruct release. Use v1.5 for the published model that runs in the app.</span></div>
                 <h3>What is verified</h3>
-                <p>At step 10,500, the held-out BPB is <code>1.1236</code> and validation loss is <code>3.4479</code>. These are training-loop measurements, not downstream benchmark scores. The fixed 500-document holdout is not yet published.</p>
+                <p>At step 16,500, validation loss is <code>3.3158</code>. The last measured held-out BPB is <code>1.1236</code> at step 10,500. These are training-loop measurements, not downstream benchmark scores. The fixed 500-document holdout is not yet published.</p>
                 <h3>What is not</h3>
                 <p>There is no public benchmark table, no instruct weights, and no multimodal encoder. The preview exists to test the sparse architecture and the training recipe before a stable release.</p>
               </section>
@@ -61,11 +61,11 @@
 
               <section id="mc-training">
                 <h2>Training</h2>
-                <p>Pretraining runs on one T4 with an effective batch of 65,536 tokens. Every 500 steps the run validates on a fixed 500-document holdout and syncs the best checkpoint. The last verified point is step 10,500.</p>
+                <p>Pretraining runs on one T4 with an effective batch of 65,536 tokens. Every 500 steps the run validates on a fixed 500-document holdout and syncs the best checkpoint. The last verified point is step 16,500 (validation loss <code>3.3158</code>).</p>
                 <table class="s-paper-table">
                   <thead><tr><th>Stage</th><th>Data</th><th>Objective</th><th>Status</th></tr></thead>
                   <tbody>
-                    <tr><td>Pretrain</td><td>3B-token corpus</td><td>Next token</td><td><span class="s-tag is-warn"><i></i>Training · 22.9%</span></td></tr>
+                    <tr><td>Pretrain</td><td>3B-token corpus</td><td>Next token</td><td><span class="s-tag is-warn"><i></i>Training · 36.0%</span></td></tr>
                     <tr><td>SFT</td><td>Post-training mix</td><td>Supervised</td><td><span class="s-tag is-muted"><i></i>Not started</span></td></tr>
                     <tr><td>Token-level KD</td><td>Qwen teacher</td><td>Distillation</td><td><span class="s-tag is-muted"><i></i>Not started</span></td></tr>
                     <tr><td>DPO</td><td>Preference pairs</td><td>Preference</td><td><span class="s-tag is-muted"><i></i>Optional</span></td></tr>
@@ -73,7 +73,7 @@
                 </table>
                 <div class="s-callout"><b>Read the number in context.</b> BPB is computed on raw UTF-8 bytes, so it is comparable across the 100K SentencePiece and 151,936-row Qwen vocabularies. Raw token cross-entropy is not comparable across tokenizers.</div>
                 <h3>Progress</h3>
-                <p><code>688.1M</code> of <code>3B</code> training tokens · step <code>10,500</code> of <code>45,777</code> · last verified BPB <code>1.1236</code>. Values are copied from the last validation run; this page does not poll the training process.</p>
+                <p><code>1.081B</code> of <code>3B</code> training tokens · step <code>16,500</code> of <code>45,777</code> · last verified BPB <code>1.1236</code> at step <code>10,500</code>. Values are copied from the last validation run; this page does not poll the training process.</p>
               </section>
 
               <section id="mc-evaluation">
@@ -82,8 +82,8 @@
                 <table class="s-paper-table">
                   <thead><tr><th>Metric</th><th>Value</th><th>Scope</th></tr></thead>
                   <tbody>
-                    <tr><td>Held-out BPB</td><td class="num">1.1236</td><td>Fixed 500-document holdout; training-loop proxy</td></tr>
-                    <tr><td>Validation loss</td><td class="num">3.4479</td><td>Same holdout, step 10,500</td></tr>
+                    <tr><td>Held-out BPB</td><td class="num">1.1236</td><td>Fixed 500-document holdout; last measured at step 10,500</td></tr>
+                    <tr><td>Validation loss</td><td class="num">3.3158</td><td>Same holdout, step 16,500</td></tr>
                     <tr><td>Downstream benchmarks</td><td class="num">—</td><td><span class="s-tag is-muted"><i></i>Not published</span></td></tr>
                   </tbody>
                 </table>

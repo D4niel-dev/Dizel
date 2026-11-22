@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 APP_NAME = "Dizel"
-__version__ = "2.0.3"
+__version__ = "2.0.4"
 VERSION = __version__
 REPOSITORY = "D4niel-dev/Dizel"
 RELEASES_URL = f"https://github.com/{REPOSITORY}/releases"

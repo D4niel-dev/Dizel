@@ -184,7 +184,7 @@ Applied here:
 1. **No sidebar by default.** The chat is the screen; `ctrl+t` raises the session
    list. `_sessions_auto = False` at mount so a resize doesn't bring it back.
 2. **Input footer.** `InputBar` grew from 3 rows to 4: prompt row, then a footer
-   row with the tier in accent and the model in `$text-3`. This is why the header
+   row with the mode in accent and the model in `$text-3`. This is why the header
    chips are now redundant — same information, twice.
 3. **Warm palette** (section 3) to match.
 
@@ -220,7 +220,7 @@ single-column layout:
    a steady `●` at rest, and token count. The percentage lives in the composer
    footer so the top bar, status line, and footer do not say the same thing
    three times.
-4. **Composer footer.** Agent/tier, model/provider, `ctx N%`, and contextual
+4. **Composer footer.** Mode, model/provider, `ctx N%`, and contextual
    hints (`esc stop`, `ctrl+k commands`). Placeholders rotate every 4.5s while
    the composer is empty and idle.
 5. **Sessions.** The New chat row is filled and bold; `RECENT` is always shown
@@ -295,7 +295,7 @@ shell, palette, and OpenCode structure stay.
    off the window edge. `+` is accent, `×` turns red on hover.
 2. **Welcome as a composition.** A time-aware greeting, one muted subline, and
    three starter shelves. The 2026-11-15 simplification removed the `LOCAL
-   WORKSPACE` kicker, model/tier line, and keycap hint row: each repeated a
+   WORKSPACE` kicker, model/mode line, and keycap hint row: each repeated a
    signal already carried by the tab strip, composer footer, or status bar. The
    pyfiglet wordmark stays above the greeting, centered with the subline over the
    composer; the three starter shelves moved to a shelf under the composer. The
@@ -311,7 +311,7 @@ shell, palette, and OpenCode structure stay.
    with `max_scroll_y = 0`.
 4. **Composer deck.** A flat surface block with one thick, full-cell accent
    left rail, not a rounded frame or a hairline border. Inside: a filled
-   mode/tier chip, the model with a trailing profile stripped so
+   mode chip, the model with a trailing profile stripped so
    `Dizel 1.6 Flash` never repeats `Flash`, a five-cell segmented context gauge
    (three at compact widths; spaced `▰` fill and `▱` empty cells), and a hint
    that reacts to state: `↵ send` while there is text, `esc stop` while

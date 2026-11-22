@@ -321,6 +321,12 @@ class AssistantMessage(Vertical):
         mode = chat_pref(self.app, "typing_animation", "smooth")
         now = time.monotonic()
         period = _CADENCE.get(mode, 0.08)
+        # Markdown is parsed whole on every paint, so a long answer costs more
+        # per frame than a short one. Stretch the interval with length instead of
+        # holding 12 fps into a 20k-character reply — the reader cannot tell the
+        # difference, the CPU can.
+        if mode != "cinematic":
+            period += min(0.20, len(raw) / 4000 * 0.03)
         if now - self._last_paint < period:
             return
 

@@ -44,7 +44,14 @@ class ConfigService:
     @staticmethod
     def get_config() -> Dict[str, Any]:
         """Get the current application configuration (MCP secrets redacted)."""
-        return redact_config(ConfigManager.load())
+        config = redact_config(ConfigManager.load())
+        # Settings used to store the base prompt with the mode clause appended. The
+        # clause is derived now, so the screen only receives the base.
+        from dizel_core.token_budget import strip_legacy_mode_clause
+
+        if isinstance(config.get("system_prompt"), str):
+            config["system_prompt"] = strip_legacy_mode_clause(config["system_prompt"])
+        return config
 
     @staticmethod
     def update_config(updates: Dict[str, Any]) -> Dict[str, Any]:

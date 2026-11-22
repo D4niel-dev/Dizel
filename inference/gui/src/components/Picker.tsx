@@ -1,11 +1,19 @@
 import { useEffect, useRef } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode,
+} from "react";
 
 interface PickerProps {
   /** Content of the trigger button. */
   label: ReactNode;
   triggerClassName?: string;
   triggerTitle?: string;
+  /** Inline style for the trigger, used to tint the active mode. */
+  triggerStyle?: CSSProperties;
+  /** Capability manifest id this trigger implements, for smoke checks. */
+  triggerDataCapability?: string;
   placement?: "up" | "down";
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -20,6 +28,8 @@ export function Picker({
   label,
   triggerClassName = "bar-btn",
   triggerTitle,
+  triggerStyle,
+  triggerDataCapability,
   placement = "up",
   open,
   onOpenChange,
@@ -32,7 +42,16 @@ export function Picker({
     if (!open) return;
 
     const onPointerDown = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) onOpenChange(false);
+      const target = event.target as Node | null;
+      if (ref.current?.contains(target)) return;
+      // A nested panel rendered through a portal lives outside this subtree, so
+      // `contains` can never see it and every click inside would read as an
+      // outside click. Such panels opt out with this attribute instead of trying
+      // to stop propagation, which does not work against a document listener.
+      if (target instanceof Element && target.closest("[data-picker-keep-open]")) {
+        return;
+      }
+      onOpenChange(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -99,6 +118,8 @@ export function Picker({
         aria-label={triggerTitle}
         aria-haspopup="menu"
         aria-expanded={open}
+        data-capability={triggerDataCapability}
+        style={triggerStyle}
         ref={triggerRef}
         onClick={() => onOpenChange(!open)}
       >

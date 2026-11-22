@@ -41,6 +41,12 @@ declare global {
         json: string,
       ): Promise<string | { error: string } | null>;
       onNewChat(callback: () => void): () => void;
+      /** A chat handed over by `dizel://session/<id>` or `--session=<id>`. */
+      pendingSession(): Promise<string>;
+      onOpenSession(callback: (sessionId: string) => void): () => void;
+      openInTerminal(
+        sessionId: string,
+      ): Promise<{ ok: boolean; error?: string }>;
       pathForFile(file: File): string;
       readDataUrl(
         path: string,

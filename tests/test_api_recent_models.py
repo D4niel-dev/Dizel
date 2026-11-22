@@ -43,3 +43,49 @@ def test_recent_models_is_empty_without_history(client):
     response = client.get("/api/models/recent")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def _card():
+    return {
+        "version": 1,
+        "suite": "core",
+        "suite_version": 1,
+        "total": 15,
+        "passed": 12,
+        "pass_rate": 0.8,
+        "avg_score": 0.83,
+        "tok_per_s": 41.2,
+        "evaluated_at": "2026-11-18T12:00:00",
+        "by_category": {"coding": 0.9},
+    }
+
+
+def test_recent_models_carry_their_scorecard(client, tmp_path, monkeypatch):
+    from dizel_core import scorecards
+
+    monkeypatch.setattr(scorecards, "SCORECARDS_DIR", str(tmp_path / "scorecards"))
+    path = tmp_path / "Dizel-1.5-SFT.gguf"
+    path.write_bytes(b"weights")
+    checkpoint_history.record(str(path))
+    scorecards.save(str(path), _card())
+
+    items = client.get("/api/models/recent").json()
+
+    assert items[0]["scorecard"]["passed"] == 12
+    assert items[0]["scorecard"]["tok_per_s"] == 41.2
+
+
+def test_scorecard_routes_read_stored_cards(client, tmp_path, monkeypatch):
+    from dizel_core import scorecards
+
+    monkeypatch.setattr(scorecards, "SCORECARDS_DIR", str(tmp_path / "scorecards"))
+    path = tmp_path / "Dizel-1.5-SFT.gguf"
+    path.write_bytes(b"weights")
+    scorecards.save(str(path), _card())
+
+    ok = client.get("/api/models/scorecard", params={"path": str(path)})
+    assert ok.status_code == 200
+    assert ok.json()["passed"] == 12
+
+    missing = client.get("/api/models/scorecard", params={"path": str(tmp_path / "x.gguf")})
+    assert missing.status_code == 404

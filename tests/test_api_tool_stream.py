@@ -84,7 +84,9 @@ class FakeManager:
         approve_tool=None,
         on_thinking=None,
         continuation=False,
+        display=None,
     ):
+        self.received_display = display
         call = {
             "name": "edit_file",
             "args": {"path": "README.md", "old": "a", "new": "b"},
@@ -122,12 +124,56 @@ class ThreadedFakeManager(FakeManager):
     def send_with_tools(
         self, user_text, attachments, on_token, on_done, on_error, **kwargs
     ):
+        self.received_display = kwargs.get("display")
+
         def worker():
             time.sleep(0.05)
             on_token("Hello")
             on_done("Hello world")
 
         threading.Thread(target=worker, daemon=True).start()
+
+
+def test_stream_forwards_skill_display_to_the_manager():
+    manager = ThreadedFakeManager()
+    display = {"text": "hi", "skills": [{"name": "outline", "title": "Outline"}]}
+
+    with mock.patch.object(ChatService, "get_manager", return_value=manager), mock.patch(
+        "api.services.chat_service.get_usage_manager", return_value=FakeUsage()
+    ), mock.patch(
+        "api.services.session_service.SessionService.create_or_update_session",
+        return_value=None,
+    ):
+        async def collect():
+            async for frame in ChatService.stream_chat("expanded body", display=display):
+                if json.loads(frame["data"])["type"] in ("done", "error"):
+                    break
+
+        asyncio.run(collect())
+
+    assert manager.received_display == display
+
+
+def test_stream_refuses_while_a_scorecard_run_is_active():
+    from api.services.scorecard_service import ScorecardService
+
+    manager = ThreadedFakeManager()
+    with mock.patch.object(
+        ScorecardService, "is_running", return_value=True
+    ), mock.patch.object(ChatService, "get_manager", return_value=manager), mock.patch(
+        "api.services.chat_service.get_usage_manager", return_value=FakeUsage()
+    ):
+        async def collect():
+            frames = []
+            async for frame in ChatService.stream_chat("hello"):
+                frames.append(json.loads(frame["data"]))
+                break
+            return frames
+
+        frames = asyncio.run(collect())
+
+    assert frames[0]["type"] == "error"
+    assert "scorecard" in frames[0]["message"].lower()
 
 
 def test_stream_delivers_threaded_generation_reply():

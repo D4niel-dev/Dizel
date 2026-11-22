@@ -177,15 +177,15 @@ class TuiSkillCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(registry.lookup("us").name, "unit-skill")
         self.assertEqual(registry.lookup("help").name, "help")
 
-    async def test_execute_inserts_expanded_prompt(self):
+    async def test_execute_attaches_the_skill(self):
         from inference.tui.commands.parser import parse_command
         from inference.tui.commands.registry import registry
 
         class App:
-            inserted = ""
+            attached = []
 
-            def insert_prompt(self, text: str) -> None:
-                self.inserted = text
+            def attach_skill(self, skill) -> None:
+                self.attached.append(skill)
 
         with mock.patch.object(skills_core, "list_skills", return_value=[self.fake]):
             self.register_skills()
@@ -194,18 +194,19 @@ class TuiSkillCommandTests(unittest.IsolatedAsyncioTestCase):
         result = await registry.lookup("unit-skill").execute(
             app, parse_command("/unit-skill the payload")
         )
-        self.assertIn("Apply this to the payload", app.inserted)
-        self.assertIn("/unit-skill", result)
+        self.assertEqual([skill["name"] for skill in app.attached], ["unit-skill"])
+        self.assertIn("Apply this to the payload", app.attached[0]["prompt"])
+        self.assertIn("Attached", result)
 
-    async def test_large_skill_warns_before_sending(self):
+    async def test_large_skill_stays_a_chip(self):
         from inference.tui.commands.builtins.skills import SkillCommand
         from inference.tui.commands.parser import parse_command
 
         class App:
-            inserted = ""
+            attached = []
 
-            def insert_prompt(self, text: str) -> None:
-                self.inserted = text
+            def attach_skill(self, skill) -> None:
+                self.attached.append(skill)
 
         skill = skills_core.Skill(
             name="big-skill",
@@ -215,8 +216,9 @@ class TuiSkillCommandTests(unittest.IsolatedAsyncioTestCase):
         )
         app = App()
         result = await SkillCommand(skill).execute(app, parse_command("/big-skill"))
-        self.assertIn("large", result)
-        self.assertEqual(len(app.inserted), 5000)
+        self.assertEqual(len(app.attached), 1)
+        self.assertEqual(len(app.attached[0]["prompt"]), 5000)
+        self.assertNotIn("trim", result)
 
     async def test_skills_command_lists_and_reloads(self):
         from inference.tui.commands.parser import parse_command

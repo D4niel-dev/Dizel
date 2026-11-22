@@ -40,6 +40,11 @@ class SessionService:
         return history_manager.toggle_archive_session(session_id)
 
     @staticmethod
+    def set_tags(session_id: str, tags: List[str]) -> Optional[List[str]]:
+        """Replace a session's tags; None means the session does not exist."""
+        return history_manager.set_session_tags(session_id, tags)
+
+    @staticmethod
     def truncate(session_id: str, keep: int) -> bool:
         """Keep only the first `keep` messages."""
         return history_manager.truncate_session(session_id, keep)

@@ -2,13 +2,12 @@
 (function () {
   var root = document.documentElement;
   var meta = document.querySelector('meta[name="theme-color"]');
-  var light = "#F1F2EC";
-  var dark = "#141519";
+  var light = "#E8EAED";
+  var dark = "#131418";
   var stored = null;
   try { stored = localStorage.getItem("dizel.site.theme"); } catch (_) {}
-  var darkMode = stored
-    ? stored === "dark"
-    : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  var prefersDark = !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  var darkMode = !stored || stored === "system" ? prefersDark : stored === "dark";
   root.classList.add("js");
   root.dataset.theme = darkMode ? "dark" : "light";
   root.style.colorScheme = darkMode ? "dark" : "light";

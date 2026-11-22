@@ -84,6 +84,18 @@ contextBridge.exposeInMainWorld("dizel", {
     return () => ipcRenderer.removeListener("app:new-chat", handler);
   },
 
+  /** A chat to open, from `dizel://session/<id>`, the CLI, or the terminal. */
+  pendingSession: () => ipcRenderer.invoke("app:pending-session"),
+
+  onOpenSession: (callback) => {
+    const handler = (_event, sessionId) => callback(sessionId);
+    ipcRenderer.on("app:open-session", handler);
+    return () => ipcRenderer.removeListener("app:open-session", handler);
+  },
+
+  /** Hand this chat to the terminal client and leave the window open. */
+  openInTerminal: (sessionId) => ipcRenderer.invoke("app:open-in-terminal", sessionId),
+
   /** Electron 32+ removed File.path; this is the supported replacement. */
   pathForFile: (file) => {
     try {

@@ -21,10 +21,15 @@ export type IconName =
   | "chevronLeft"
   | "chevronRight"
   | "mic"
+  | "volume"
+  | "stop"
   | "arrowUp"
   | "settings"
   | "more"
   | "copy"
+  | "compare"
+  | "bolt"
+  | "listChecks"
   | "refresh"
   | "check"
   | "download"
@@ -38,6 +43,7 @@ export type IconName =
   | "music"
   | "search"
   | "sparkles"
+  | "brain"
   | "keyboard"
   | "info"
   | "thumbUp"
@@ -164,6 +170,14 @@ const shapes: Record<IconName, ReactNode> = {
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </>
   ),
+  volume: (
+    <>
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18 6a9 9 0 0 1 0 12" />
+    </>
+  ),
+  stop: <rect x="6" y="6" width="12" height="12" rx="2.5" />,
   refresh: (
     <>
       <path d="M21 3v6h-6" />
@@ -184,6 +198,23 @@ const shapes: Record<IconName, ReactNode> = {
     <>
       <path d="M18 6L6 18" />
       <path d="M6 6l12 12" />
+    </>
+  ),
+  compare: (
+    <>
+      <rect x="3.5" y="4.5" width="7" height="15" rx="1.5" />
+      <rect x="13.5" y="4.5" width="7" height="15" rx="1.5" />
+    </>
+  ),
+  bolt: <path d="M13 2 4 14h6l-1 8 9-12h-6z" />,
+  listChecks: (
+    <>
+      <path d="M3.5 6l1.8 1.8L8.5 4.6" />
+      <path d="M3.5 12l1.8 1.8 3.2-3.2" />
+      <path d="M3.5 18l1.8 1.8 3.2-3.2" />
+      <path d="M12 6h8.5" />
+      <path d="M12 12h8.5" />
+      <path d="M12 18h8.5" />
     </>
   ),
   minimize: <path d="M5 12h14" />,
@@ -230,6 +261,19 @@ const shapes: Record<IconName, ReactNode> = {
     <>
       <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z" />
       <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" />
+    </>
+  ),
+  brain: (
+    <>
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
+      <path d="M17.599 6.5a3 3 0 0 0 .399-1.375" />
+      <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" />
+      <path d="M3.477 10.896a4 4 0 0 1 .585-.396" />
+      <path d="M19.938 10.5a4 4 0 0 1 .585.396" />
+      <path d="M6 18a4 4 0 0 1-1.967-.516" />
+      <path d="M19.967 17.484A4 4 0 0 1 18 18" />
     </>
   ),
   keyboard: (

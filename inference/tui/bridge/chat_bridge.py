@@ -80,7 +80,10 @@ class ChatBridge:
     def _approve_tool(self, change) -> bool:
         """Block the tool thread until the user approves or rejects the diff."""
         from dizel_core import tool_trust
-        from dizel_core.tools import _project_root
+        from dizel_core.tools import PlanChange, _project_root
+
+        if isinstance(change, PlanChange):
+            return self._approve_plan(change)
 
         persistent = tool_trust.persistent_enabled()
         if tool_trust.should_auto_approve(
@@ -142,6 +145,45 @@ class ChatBridge:
             return False
         return bool(holder["approved"])
 
+    def _approve_plan(self, change) -> bool:
+        """Block the tool thread until the user executes or discards the plan."""
+        event = threading.Event()
+        holder: dict = {"modal": None, "approved": False}
+
+        def done(approved) -> None:
+            holder["approved"] = bool(approved)
+            event.set()
+
+        def show() -> None:
+            from inference.tui.panels.modals.plan_approval import PlanApprovalModal
+
+            try:
+                modal = PlanApprovalModal(change)
+                holder["modal"] = modal
+                self.app.push_screen(modal, done)
+            except Exception:
+                event.set()
+
+        try:
+            self.app.call_from_thread(show)
+        except Exception:
+            return False
+        if not event.wait(180):
+            def _dismiss_if_open() -> None:
+                modal = holder.get("modal")
+                try:
+                    if modal is not None and self.app.screen is modal:
+                        modal.dismiss(False)
+                except Exception:
+                    pass
+
+            try:
+                self.app.call_from_thread(_dismiss_if_open)
+            except Exception:
+                pass
+            return False
+        return bool(holder["approved"])
+
     def enforce_usage(self) -> str | None:
         """Apply the active provider's usage policy before a turn.
 
@@ -180,7 +222,7 @@ class ChatBridge:
         return None
 
     # ── Generation ───────────────────────────────────────────────────
-    def send(self, text: str) -> None:
+    def send(self, text: str, display: dict | None = None) -> None:
         self._sync_provider_state()
         self._session_id = self.app.session_id
         self._cost = 0.0
@@ -277,9 +319,11 @@ class ChatBridge:
             on_token=on_token,
             on_done=on_done,
             on_error=on_error,
+            verbosity=getattr(self.app, "active_verbosity", "normal"),
             on_tool=on_tool,
             on_tool_start=on_tool_start,
             approve_tool=self._approve_tool,
+            display=display,
         )
 
     def _sync_provider_state(self) -> None:

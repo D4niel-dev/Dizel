@@ -8,7 +8,10 @@ import { ProviderAvatar } from "./ProviderAvatar";
 import { Skeleton } from "./Skeleton";
 import { modelName } from "../services/model";
 import { Picker } from "./Picker";
+import { VerbosityPicker } from "./VerbosityPicker";
+import { ModePicker } from "./ModePicker";
 import { useChat } from "../store/chatStore";
+import type { ScorecardSummary } from "../types";
 import {
   buildCommandGroups,
   filterCommands,
@@ -17,10 +20,10 @@ import {
   type CommandGroup,
 } from "../services/commands";
 
-/** Model families exposed in the composer — Dizel 1.6's Flash and Pro tiers. */
-const LINEUP = ["Flash", "Pro"];
-const DEFAULT_MODES = ["Fast", "Planning", "Coding", "Thinking", "Deep Think"];
+/** Response modes for local models; profiles supply the per-family lists. */
+const DEFAULT_MODES = ["Fast", "Planning", "Coding", "Thinking"];
 
+/** The reply-length ladder. Server-side it scales the reply's token budget. */
 const extension = (name: string) => {
   const parts = name.split(".");
   return parts.length > 1 ? (parts.pop() as string).slice(0, 3).toUpperCase() : "TXT";
@@ -40,6 +43,7 @@ type LocalEntry = {
   kind: string;
   size: number;
   exists?: boolean;
+  scorecard?: ScorecardSummary | null;
 };
 
 export function Composer() {
@@ -51,6 +55,8 @@ export function Composer() {
   const ready = useChat((s) => s.status?.is_ready ?? false);
 
   const attachments = useChat((s) => s.attachments);
+  const attachedSkills = useChat((s) => s.attachedSkills);
+  const detachSkill = useChat((s) => s.detachSkill);
   const recentPaths = useChat((s) => s.recentPaths);
   const prompts = useChat((s) => s.prompts);
   const addFiles = useChat((s) => s.addFiles);
@@ -60,15 +66,17 @@ export function Composer() {
   const removeAttachment = useChat((s) => s.removeAttachment);
   const visionReady = useChat((s) => s.status?.model_info?.vision === true);
 
-  const variant = useChat((s) => s.variant);
   // Empty state: the composer sits mid-screen, so the menu drops down into the
   // space below it. In a conversation the composer is pinned to the bottom and a
   // downward menu would fall off the window, so it opens upward.
   const emptyState = useChat((s) => s.messages.length === 0);
   const placement = emptyState ? "down" : "up";
-  const setVariant = useChat((s) => s.setVariant);
   const mode = useChat((s) => s.mode);
   const setMode = useChat((s) => s.setMode);
+  const thinkingEffort = useChat((s) => s.thinkingEffort);
+  const setThinkingEffort = useChat((s) => s.setThinkingEffort);
+  const fastSpeed = useChat((s) => s.fastSpeed);
+  const setFastSpeed = useChat((s) => s.setFastSpeed);
   const profiles = useChat((s) => s.profiles);
 
   const micState = useChat((s) => s.micState);
@@ -89,7 +97,7 @@ export function Composer() {
   const arrowUpEditsLast = useChat((s) => s.prefs.arrowUpEditsLast);
   const sessionId = useChat((s) => s.sessionId);
 
-  const [variantOpen, setVariantOpen] = useState(false);
+  const [modeOpen, setModeOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [allModelsOpen, setAllModelsOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -129,7 +137,6 @@ export function Composer() {
         ? "Mila"
         : "Generic"
     : "";
-  const isDizelModel = modelFamily === "Dizel";
 
   const modelLabel = isLocal
     ? localName
@@ -177,6 +184,20 @@ export function Composer() {
             : "Missing file"}
         </small>
       </span>
+      {entry.scorecard ? (
+        <span
+          className="model-score"
+          title={
+            `${entry.scorecard.passed}/${entry.scorecard.total} core cases · ` +
+            Object.entries(entry.scorecard.by_category ?? {})
+              .map(([name, score]) => `${name} ${Number(score).toFixed(2)}`)
+              .join(" · ") +
+            ` · ${entry.scorecard.evaluated_at}`
+          }
+        >
+          {entry.scorecard.passed}/{entry.scorecard.total}
+        </span>
+      ) : null}
       {active && <Icon name="check" size={13} />}
     </button>
   );
@@ -259,8 +280,8 @@ export function Composer() {
   }, [slashQuery, debug]);
 
   useEffect(() => {
-    if (toolsOpen || modelOpen || variantOpen) setDrawerDismissed(true);
-  }, [toolsOpen, modelOpen, variantOpen]);
+    if (toolsOpen || modelOpen || modeOpen) setDrawerDismissed(true);
+  }, [toolsOpen, modelOpen, modeOpen]);
 
   useEffect(() => {
     if (modelOpen) void loadRecentModels();
@@ -304,28 +325,19 @@ export function Composer() {
     });
   }, [composerFocus]);
 
-  // Dizel 1.6 names its tiers Flash and Pro. The backend still carries the
-  // older Dizel/Mila profiles for the PySide6 GUI, so filter them out here.
-  const variants = LINEUP.filter((name) => name in profiles);
-  // Tier belongs to Dizel only. Mila and generic checkpoints still get modes,
-  // but their profile family comes from the loaded model, not the tier state.
-  const profileFamily = isDizelModel ? variant : modelFamily;
-  const modes = profileFamily && profiles[profileFamily]?.length
-    ? profiles[profileFamily]
+  const modes = modelFamily && profiles[modelFamily]?.length
+    ? profiles[modelFamily]
     : DEFAULT_MODES;
 
+  // The loaded model decides the profile family; loading another family
+  // re-applies the current mode so its prompt and sampling land on it.
+  const appliedFamily = useRef("");
   useEffect(() => {
-    if (!isLocal || !ready) return;
-    if (isDizelModel) {
-      if (variants.length > 0 && !variants.includes(variant)) {
-        void setVariant(variants[0]);
-      }
-      return;
-    }
-    if (modelFamily && variant !== modelFamily) {
-      void setVariant(modelFamily);
-    }
-  }, [isLocal, ready, isDizelModel, modelFamily, variant, setVariant, variants]);
+    if (!isLocal || !ready || !modelFamily) return;
+    if (appliedFamily.current === modelFamily) return;
+    appliedFamily.current = modelFamily;
+    void setMode(mode);
+  }, [isLocal, ready, modelFamily, mode, setMode]);
 
   const pasteText = async () => {
     let text = "";
@@ -401,7 +413,7 @@ export function Composer() {
 
   const submit = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text && attachedSkills.length === 0) return;
 
     // The send button is another way to take the highlighted suggestion.
     if (drawerOpen && commandMatches.length > 0) {
@@ -415,8 +427,7 @@ export function Composer() {
       void runSlash(text).then((handled) => {
         const state = useChat.getState();
         if (handled) {
-          // A skill replaces the draft with its expanded prompt; leave that in
-          // place. Other commands just consumed the input.
+          // A skill attaches as a chip; the slash text itself is consumed.
           if (state.draft.trim() === text) setDraft("");
           return;
         }
@@ -507,6 +518,29 @@ export function Composer() {
         )}
 
         <div className="composer" ref={composerRef}>
+        {attachedSkills.length > 0 && (
+          <div className="skill-chips" aria-label="Attached skills">
+            {attachedSkills.map((skill, index) => (
+              <div
+                className="skill-chip"
+                key={`${skill.name}-${index}`}
+                title={`/${skill.name}${skill.args ? ` ${skill.args}` : ""} — applies when you send`}
+              >
+                <span className="skill-mark" aria-hidden="true">
+                  ✦
+                </span>
+                <span className="skill-name">{skill.title}</span>
+                <button
+                  className="skill-x"
+                  onClick={() => detachSkill(index)}
+                  aria-label={`Remove ${skill.title}`}
+                >
+                  <Icon name="close" size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="chips">
             {attachments.map((file) => (
@@ -571,6 +605,18 @@ export function Composer() {
           }}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing) return;
+
+            // Backspace on an empty draft removes the newest attached skill,
+            // the same way it would delete a character.
+            if (
+              event.key === "Backspace" &&
+              draft === "" &&
+              attachedSkills.length > 0
+            ) {
+              event.preventDefault();
+              detachSkill(attachedSkills.length - 1);
+              return;
+            }
 
             if (drawerOpen) {
               const active = commandMatches[activeCommandIndex];
@@ -727,6 +773,10 @@ export function Composer() {
             )}
 
             <div className="popover-sep" />
+            <div className="popover-label">Reply</div>
+            <VerbosityPicker open={toolsOpen} />
+
+            <div className="popover-sep" />
             <div className="popover-label">Insert</div>
             <button
               className="popover-item"
@@ -843,6 +893,7 @@ export function Composer() {
             onOpenChange={setModelOpen}
             triggerClassName="bar-chip"
             triggerTitle="Model"
+            triggerDataCapability="model.switch"
             label={
               <>
                 {isLocal ? (
@@ -966,58 +1017,30 @@ export function Composer() {
           </Picker>
 
           {isLocal && (
-            <Picker
-              open={variantOpen}
+            <ModePicker
+              open={modeOpen}
+              onOpenChange={setModeOpen}
               placement={placement}
-              onOpenChange={setVariantOpen}
-              triggerClassName={mode !== "Fast" ? "bar-chip is-armed" : "bar-chip"}
-              triggerTitle={isDizelModel ? "Model tier and response mode" : "Response mode"}
-              label={
-                <>
-                  {isDizelModel ? variant : mode}
-                  {isDizelModel && mode !== "Fast" && <span className="chip-mode">{mode}</span>}
-                  <Icon name="chevronDown" size={11} />
-                </>
-              }
-            >
-              {isDizelModel && (
-                <>
-                  <div className="popover-label">Tier</div>
-                  {variants.map((name) => (
-                    <button
-                      key={name}
-                      className={name === variant ? "popover-item active" : "popover-item"}
-                      onClick={() => {
-                        setVariantOpen(false);
-                        void setVariant(name);
-                      }}
-                    >
-                      <span className="popover-item-main">{name}</span>
-                      {name === variant && <Icon name="check" size={13} />}
-                    </button>
-                  ))}
-                  {variants.length === 0 && <div className="popover-empty">No profiles</div>}
-
-                  <div className="popover-sep" />
-                </>
-              )}
-
-              <div className="popover-label">Mode</div>
-              {modes.map((name) => (
-                <button
-                  key={name}
-                  className={name === mode ? "popover-item active" : "popover-item"}
-                  onClick={() => {
-                    setVariantOpen(false);
-                    void setMode(name);
-                  }}
-                >
-                  <span className="popover-item-main">{name}</span>
-                  {name === mode && <Icon name="check" size={13} />}
-                </button>
-              ))}
-            </Picker>
+              modes={modes}
+              mode={mode}
+              effort={thinkingEffort}
+              speed={fastSpeed}
+              onMode={(name) => {
+                // Do not close here: ModePicker closes itself when a mode row is
+                // clicked, and this same handler is reached from the effort panel,
+                // where switching to Thinking must leave the panel open.
+                void setMode(name);
+              }}
+              onEffort={(next) => {
+                void setThinkingEffort(next);
+              }}
+              onSpeed={(next) => {
+                void setFastSpeed(next);
+              }}
+            />
           )}
+
+
             </>
           )}
 
@@ -1049,7 +1072,7 @@ export function Composer() {
             <button
               className="send-circle"
               onClick={submit}
-              disabled={!draft.trim() || !ready}
+              disabled={(!draft.trim() && attachedSkills.length === 0) || !ready}
               title="Send"
             >
               <Icon name="arrowUp" size={16} strokeWidth={2} />

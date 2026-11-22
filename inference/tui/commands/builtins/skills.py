@@ -6,10 +6,6 @@ from inference.tui.commands.registry import Command, registry
 
 from dizel_core import skills as skills_core
 
-# Matches the GUI threshold: flag prompts large enough to pressure a small
-# local context window.
-LARGE_SKILL_CHARS = 4000
-
 
 class SkillCommand(Command):
     """One registered prompt template, invoked as /name."""
@@ -26,16 +22,19 @@ class SkillCommand(Command):
         self.examples = [f"/{skill.name} <text to work on>"]
 
     async def execute(self, app: Any, invocation: CommandInvocation) -> str:
-        prompt = skills_core.expand_skill(self.skill, " ".join(invocation.args))
-        app.insert_prompt(prompt)
-        if len(prompt) > LARGE_SKILL_CHARS:
-            return (
-                f"Inserted /{self.name} into the composer — large "
-                f"(~{len(prompt) // 4} tokens); trim it before sending."
-            )
+        args = " ".join(invocation.args)
+        prompt = skills_core.expand_skill(self.skill, args)
+        app.attach_skill(
+            {
+                "name": self.skill.name,
+                "title": self.skill.title,
+                "prompt": prompt,
+                "args": args,
+            }
+        )
         return (
-            f"Inserted /{self.name} into the composer — "
-            "edit it if needed, then press enter to send."
+            f"Attached /{self.name} — it applies when you send. "
+            "Backspace on an empty prompt removes it."
         )
 
 

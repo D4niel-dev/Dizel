@@ -1,0 +1,34 @@
+<!--meta
+{
+  "title": "Dizel docs — Capabilities",
+  "description": "What the Dizel desktop app and terminal client each can do, generated from the capability manifest the tests enforce.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "capabilities"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Capabilities</span></div>
+<h1>Capabilities</h1>
+<p class="s-docs-lede">What each client can do today, generated from the manifest the tests enforce. A dash is a recorded gap, not an oversight.</p>
+
+<div class="s-callout"><b>{{capabilities_summary}}</b> Both clients answer <code>/capabilities</code> themselves; the terminal adds <code>/capabilities gaps</code>.</div>
+
+<section class="s-docs-section">
+  <h2 id="matrix">The matrix</h2>
+  <div class="s-table-scroll">
+    <table class="s-matrix">
+      <thead>
+        <tr><th scope="col">Capability</th><th scope="col">Desktop</th><th scope="col">Terminal</th></tr>
+      </thead>
+      <tbody>
+{{capabilities_table}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="checks">How this stays honest</h2>
+  <p>Terminal commands and key bindings are checked against the real command registry in the test suite. Desktop palette entries and mounted controls are checked by the GUI smoke harness. Entries without a machine check are verified by hand, and a dash stays a dash until the surface ships the feature.</p>
+</section>

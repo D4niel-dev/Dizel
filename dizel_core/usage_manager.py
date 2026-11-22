@@ -67,6 +67,37 @@ class UsageManager:
         if capacity and capacity > 0:
             self._capacities[self._active] = float(capacity)
 
+    def providers_snapshot(self) -> list[dict]:
+        """Every provider's window for the cost dashboard.
+
+        Display-only: an expired bucket reads as empty with no reset time left,
+        without mutating the stored state of providers that are not active.
+        """
+        now = time.time()
+        rows: list[dict] = []
+        for slug in sorted(self._providers):
+            bucket = self._providers[slug]
+            last_reset = float(bucket.get("last_reset", now))
+            expired = (now - last_reset) > self.RESET_WINDOW
+            used = 0.0 if expired else float(bucket.get("usage", 0.0) or 0.0)
+            compactions = 0 if expired else int(bucket.get("compaction_count", 0) or 0)
+            capacity = float(self._capacities.get(slug, self.DEFAULT_CAPACITY))
+            rows.append(
+                {
+                    "provider": slug,
+                    "active": slug == self._active,
+                    "used": round(used, 2),
+                    "capacity": round(capacity, 2),
+                    "percent": min(100, int((used / max(capacity, 1)) * 100)),
+                    "resets_in_seconds": (
+                        0 if expired else max(0, int(self.RESET_WINDOW - (now - last_reset)))
+                    ),
+                    "compactions": compactions,
+                    "max_compactions": self.MAX_COMPACTIONS,
+                }
+            )
+        return rows
+
     def load_state(self) -> None:
         try:
             path = config_manager.SETTINGS_FILE.replace("settings.json", "usage_state.json")

@@ -120,6 +120,7 @@ export function CommandPalette() {
         className="command-palette"
         role="dialog"
         aria-label="Command palette"
+        data-capability="commands.palette"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <input

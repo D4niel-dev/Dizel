@@ -312,6 +312,35 @@ def add_tag_to_session(session_id: str, tag: str) -> bool:
     return False
 
 
+def set_session_tags(session_id: str, tags: List[str]) -> Optional[List[str]]:
+    """Replace a session's tags. Returns the stored list, or None if not found.
+
+    Cleaning lives here rather than in each client: lowercase, no leading `#`,
+    no blanks, no duplicates, and a length cap that keeps a row readable.
+    """
+    _ensure_dir()
+    clean: List[str] = []
+    for raw in tags:
+        tag = str(raw).strip().lower().lstrip("#")[:24]
+        if tag and tag not in clean:
+            clean.append(tag)
+    clean = clean[:6]
+
+    for fname in os.listdir(HISTORY_DIR):
+        if fname.startswith(session_id) and fname.endswith(".json"):
+            path = os.path.join(HISTORY_DIR, fname)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data["tags"] = clean
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                return clean
+            except Exception:
+                return None
+    return None
+
+
 def delete_session(session_id: str) -> bool:
     """Delete a session file.  Returns True if deleted."""
     _ensure_dir()

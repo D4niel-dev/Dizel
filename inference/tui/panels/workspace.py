@@ -5,6 +5,8 @@ from textual import on
 
 import time
 
+from rich.markup import escape
+
 from inference.tui.rendering.assistant_message import AssistantMessage
 from inference.tui.rendering.message_block import MessageBlock, message_style
 from inference.tui.rendering.tool_block import ToolLine
@@ -14,6 +16,7 @@ from inference.tui.bridge.tool_bridge import ToolBridge
 from inference.tui.panels.context_panel import ContextPanel
 from inference.tui.rendering.empty_state import EmptyStateBlock, StarterShelf
 from inference.tui.settings_apply import chat_pref
+from inference.tui.theme import ACCENT
 
 
 class WorkspacePanel(VerticalScroll):
@@ -30,6 +33,14 @@ class WorkspacePanel(VerticalScroll):
         self._context_rail_visible = False
         self._tool_rows: dict[int, ToolLine] = {}
         self._tool_results: dict[int, tuple[str, str, dict]] = {}
+        # Every turn that landed, in order, with the widget that owns it. The
+        # transcript is the only place a long reply can hide, so /find needs a
+        # map from text back to a row it can scroll to.
+        self._turns: list[tuple[str, Static]] = []
+        self._find_query = ""
+        self._find_hits: list[tuple[int, Static]] = []
+        self._find_cursor = -1
+        self._find_flash = None
 
     def on_mount(self) -> None:
         self._set_empty_mode(bool(self.query(EmptyStateBlock)))
@@ -84,6 +95,56 @@ class WorkspacePanel(VerticalScroll):
         if self.is_vertical_scroll_end:
             self._follow()
 
+    # ── Search ───────────────────────────────────────────────────────
+    def find(self, query: str = "") -> dict:
+        """Jump to the next turn containing `query`. Empty repeats the last one.
+
+        The unit of a hit is a turn, not a character: this view is a list of
+        mounted widgets, so the useful promise is "the row that has it is now
+        on screen", not an in-line highlight offset.
+        """
+        needle = query.strip() or self._find_query
+        if not needle:
+            return {"query": "", "index": 0, "turns": 0, "matches": 0}
+
+        lowered = needle.lower()
+        if lowered != self._find_query.lower():
+            self._find_query = needle
+            self._find_hits = []
+            for text, widget in self._turns:
+                count = text.lower().count(lowered)
+                if count and getattr(widget, "is_mounted", False):
+                    self._find_hits.append((count, widget))
+            self._find_cursor = -1
+
+        if not self._find_hits:
+            return {"query": needle, "index": 0, "turns": 0, "matches": 0}
+
+        self._find_cursor = (self._find_cursor + 1) % len(self._find_hits)
+        total = sum(count for count, _ in self._find_hits)
+        _, widget = self._find_hits[self._find_cursor]
+        self._flash(widget)
+        try:
+            self.scroll_to_widget(widget, animate=False, top=True)
+        except Exception:
+            pass
+        return {
+            "query": needle,
+            "index": self._find_cursor + 1,
+            "turns": len(self._find_hits),
+            "matches": total,
+        }
+
+    def _flash(self, widget: Static) -> None:
+        """Tint the row long enough to find it, then hand the colour back."""
+        try:
+            widget.add_class("-find-hit")
+        except Exception:
+            return
+        if self._find_flash is not None:
+            self._find_flash.stop()
+        self._find_flash = self.set_timer(1.6, lambda: widget.remove_class("-find-hit"))
+
     # ── Output ───────────────────────────────────────────────────────
     def add_system_message(self, text: str, level: str = "info") -> None:
         """A command result or error that belongs in the conversation.
@@ -127,12 +188,34 @@ class WorkspacePanel(VerticalScroll):
             self._set_empty_mode(False)
             self._set_context_rail(True)
 
-    def add_user_message(self, text: str) -> None:
+    def add_user_message(
+        self, text: str, display: dict | None = None, ts: float | None = None
+    ) -> None:
         self._remove_empty_state()
-        self.mount(
-            Static(MessageBlock("USER", text, **message_style(self.app, timestamp=time.time())))
-        )
+        if display and display.get("skills"):
+            self.mount(Static(self._skill_chips(display), classes="skill-chips"))
+        if text or not display:
+            block = Static(
+                MessageBlock(
+                    "USER",
+                    text,
+                    **message_style(self.app, timestamp=ts or time.time()),
+                )
+            )
+            self.mount(block)
+            self._remember(text, block)
         self._follow()
+
+    def _remember(self, text: str, widget: Static) -> None:
+        if text and text.strip():
+            self._turns.append((text, widget))
+
+    @staticmethod
+    def _skill_chips(display: dict) -> str:
+        return "   ".join(
+            f"[{ACCENT}]▣ {escape(str(skill.get('title') or skill.get('name') or 'skill'))}[/]"
+            for skill in display.get("skills", [])
+        )
 
     def add_debug_turn(self, text: str) -> None:
         """Mount a completed assistant turn without charging model metrics."""
@@ -270,8 +353,10 @@ class WorkspacePanel(VerticalScroll):
     def on_done(self, event: ChatBridge.GenerationDone) -> None:
         stick = self.is_vertical_scroll_end
         if self.current_message:
-            self.current_message.stream.finish()
-            self.current_message.finalize(event.full_text)
+            finished = self.current_message
+            finished.stream.finish()
+            finished.finalize(event.full_text)
+            self._remember(event.full_text, finished)
             self.current_message = None
             if stick:
                 self._follow()
@@ -344,6 +429,10 @@ class WorkspacePanel(VerticalScroll):
         self.current_message = None
         self._tool_rows.clear()
         self._tool_results.clear()
+        self._turns.clear()
+        self._find_query = ""
+        self._find_hits = []
+        self._find_cursor = -1
         try:
             self.app.clear_reply_metrics()
         except Exception:

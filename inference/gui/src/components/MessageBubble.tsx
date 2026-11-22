@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +10,7 @@ import { ThinkingDots } from "./ThinkingDots";
 import { ToolLog } from "./ToolLog";
 import { formatBytes } from "./AttachmentPreview";
 import { MessageFeedbackControls } from "./MessageFeedbackControls";
+import { CompareDialog } from "./CompareDialog";
 import { modelName } from "../services/model";
 import { useChat } from "../store/chatStore";
 
@@ -62,19 +63,101 @@ function ExternalLink({ href, children }: { href?: string; children?: ReactNode 
   );
 }
 
-const Markdown = memo(function Markdown({ text, highlight }: { text: string; highlight: boolean }) {
+const Markdown = memo(function Markdown({
+  text,
+  highlight,
+  live = false,
+}: {
+  text: string;
+  highlight: boolean;
+  live?: boolean;
+}) {
+  // While a reply streams, the whole answer used to be re-parsed on every
+  // reveal tick — O(n²) in the reply's length, and the reason long answers got
+  // sticky. Completed blocks are stable strings, so each one parses once and
+  // only the block still being written is re-parsed.
+  const blocks = useMemo(
+    () => (live && text.length > 400 ? splitBlocks(text) : null),
+    [text, live],
+  );
+
   return (
     <div className="md">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={highlight ? [[rehypeHighlight, { detect: true, ignoreMissing: true }]] : []}
-        components={{ pre: CodeBlock, a: ExternalLink }}
-      >
-        {text.trimStart()}
-      </ReactMarkdown>
+      {blocks ? (
+        <>
+          {blocks.done.map((block, index) => (
+            <MarkdownBlock key={`${index}-${block.length}`} text={block} highlight={highlight} />
+          ))}
+          {blocks.tail.trim() && (
+            <MarkdownBlock text={blocks.tail} highlight={highlight} />
+          )}
+        </>
+      ) : (
+        <MarkdownBlock text={text} highlight={highlight} />
+      )}
     </div>
   );
 });
+
+const MarkdownBlock = memo(function MarkdownBlock({
+  text,
+  highlight,
+}: {
+  text: string;
+  highlight: boolean;
+}) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={highlight ? [[rehypeHighlight, { detect: true, ignoreMissing: true }]] : []}
+      components={{ pre: CodeBlock, a: ExternalLink }}
+    >
+      {text.trimStart()}
+    </ReactMarkdown>
+  );
+});
+
+const LIST_OR_QUOTE = /^\s*(?:[-*+]\s|\d+[.)]\s|>)/;
+
+/**
+ * Split streamed markdown at blank lines outside fenced code.
+ *
+ * A blank line between two lists (or two quote paragraphs) is *not* a boundary:
+ * markdown renders that as one loose block, and splitting it would add a gap
+ * that disappears the moment the reply finishes. Everything else splits safely.
+ */
+function splitBlocks(text: string): { done: string[]; tail: string } {
+  const lines = text.split("\n");
+  const done: string[] = [];
+  let fence = false;
+  let start = 0;
+
+  const nextContent = (from: number): string => {
+    for (let i = from; i < lines.length; i += 1) {
+      if (lines[i].trim()) return lines[i];
+    }
+    return "";
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\s*(?:```|~~~)/.test(line)) {
+      fence = !fence;
+      continue;
+    }
+    if (fence || line.trim() !== "") continue;
+
+    const chunk = lines.slice(start, i).join("\n");
+    const following = nextContent(i + 1);
+    if (!chunk.trim() || !following) continue;
+    if (LIST_OR_QUOTE.test(chunk) && LIST_OR_QUOTE.test(following)) continue;
+
+    done.push(chunk);
+    start = i + 1;
+  }
+
+  return { done, tail: lines.slice(start).join("\n") };
+}
 
 const TYPING_FACTORS: Record<Prefs["typingAnimation"], number> = {
   off: 1,
@@ -384,6 +467,8 @@ export function MessageBubble({
   const showFork = useChat((s) => s.showFork);
   const continueLast = useChat((s) => s.continueLast);
   const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const holdMs = message.holdMs ?? 0;
   const [revealed, setRevealed] = useState(
     () => Date.now() - message.createdAt >= holdMs,
@@ -457,6 +542,21 @@ export function MessageBubble({
     }
   };
 
+  const toggleSpeak = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(stripFileBlocks(view.content));
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  };
+
   if (message.role === "user") {
     return (
       <div className={flash ? "msg user is-found" : "msg user"} data-mid={message.id}>
@@ -479,9 +579,30 @@ export function MessageBubble({
           </div>
         ) : null}
 
+        {message.display?.skills?.length ? (
+          <div className="msg-skills">
+            {message.display.skills.map((skill, index) => (
+              <span
+                className="msg-skill"
+                key={`${skill.name}-${index}`}
+                title={`/${skill.name} — sent with this message`}
+              >
+                <span className="skill-mark" aria-hidden="true">
+                  ✦
+                </span>
+                {skill.title}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         <div className="user-card">
           <div className="msg-label">You</div>
-          <div className="user-text">{stripFileBlocks(message.content)}</div>
+          {(message.display?.text || !message.display) && (
+            <div className="user-text">
+              {message.display?.text ?? stripFileBlocks(message.content)}
+            </div>
+          )}
         </div>
 
         {!streaming && (
@@ -595,15 +716,32 @@ export function MessageBubble({
       {hasTools && <ToolLog tools={tools} />}
 
       {!holding && parsed.main && (
-        <Markdown text={typedMain} highlight={prefs.syntaxHighlight} />
+        <Markdown
+          text={typedMain}
+          highlight={prefs.syntaxHighlight}
+          live={Boolean(message.streaming)}
+        />
       )}
       {message.streaming && !isPending && !holding && parsed.main && <span className="caret" />}
 
       {!message.streaming && !holding && (
         <div className="msg-actions">
-          <button className="act" onClick={() => void copy()}>
+          <button
+            className="act"
+            data-capability="chat.copy"
+            onClick={() => void copy()}
+          >
             <Icon name={copied ? "check" : "copy"} size={13} />
             {copied ? "Copied" : "Copy"}
+          </button>
+          <button
+            className={speaking ? "act speak is-speaking" : "act speak"}
+            onClick={toggleSpeak}
+            title={speaking ? "Stop reading aloud" : "Read this reply aloud"}
+            aria-pressed={speaking}
+          >
+            <Icon name={speaking ? "stop" : "volume"} size={13} />
+            {speaking ? "Stop" : "Read"}
           </button>
           <button className="act" onClick={() => void regenerate()} disabled={streaming}>
             <Icon name="refresh" size={13} />
@@ -645,12 +783,28 @@ export function MessageBubble({
               >
                 <Icon name="chevronDown" size={12} style={{ transform: "rotate(-90deg)" }} />
               </button>
+              <button
+                className="sib-btn sib-compare"
+                onClick={() => setComparing(true)}
+                title="Compare versions"
+                aria-label="Compare versions"
+              >
+                <Icon name="compare" size={12} />
+              </button>
             </span>
           )}
 
           <span className="spacer" />
           <span className="msg-meta">{metaLine(view, prefs, modelName(status))}</span>
         </div>
+      )}
+
+      {comparing && siblings && siblings.length > 1 && (
+        <CompareDialog
+          versions={siblings}
+          currentIndex={message.siblingIndex ?? 0}
+          onClose={() => setComparing(false)}
+        />
       )}
     </div>
   );

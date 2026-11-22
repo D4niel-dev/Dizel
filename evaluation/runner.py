@@ -8,7 +8,7 @@ and produces scored EvalRun results.
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from .schema import EvalCase, EvalCategory, EvalRun
@@ -74,7 +74,7 @@ class EvalRunner:
             result = self._scorer.score(case, actual, duration_ms=elapsed_ms)
             run.results.append(result)
 
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(timezone.utc)
         return run
 
     def run_single(self, case: EvalCase, handler: EvalHandler) -> dict:
@@ -88,14 +88,3 @@ class EvalRunner:
 
         result = self._scorer.score(case, actual, duration_ms=elapsed_ms)
         return result.to_dict()
-
-    def save_run(self, run: EvalRun, output_dir: Optional[str] = None):
-        """Persist an EvalRun to disk as JSON."""
-        out_dir = output_dir or os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "results"
-        )
-        os.makedirs(out_dir, exist_ok=True)
-        path = os.path.join(out_dir, f"eval_{run.id}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(run.to_dict(), f, indent=2, ensure_ascii=False)
-        return path

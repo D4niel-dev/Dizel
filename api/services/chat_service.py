@@ -28,6 +28,10 @@ from model.naming import model_display_name
 _SHELL_PREFIXES = ("/sh ", "/py ")
 _ALLOW_SHELL = os.environ.get("DIZEL_ALLOW_SHELL", "").lower() in ("1", "true", "yes")
 
+# The reply-length ladder. Anything else is ignored rather than trusted, so a
+# bad client cannot invent a budget multiplier.
+_VERBOSITIES = ("short", "normal", "detailed")
+
 
 def _sse(payload: Dict[str, Any]) -> Dict[str, str]:
     """Shape one event for sse-starlette. Data must be a pre-serialised string."""
@@ -72,6 +76,26 @@ class ChatService:
 
     # ── model lifecycle ──────────────────────────────────────────────────
 
+    @staticmethod
+    def _system_blocks(manager: Any) -> Dict[str, int]:
+        """Token cost of each part of the composed system prompt.
+
+        `system_content()` joins the base, mode clause, response-length clause and
+        project rules. Counting only `system_prompt` used to miss all the others.
+        """
+        from dizel_core.token_budget import verbosity_clause
+
+        return {
+            "base": manager.count_tokens(manager.system_prompt or ""),
+            "mode": manager.count_tokens(getattr(manager, "mode_prompt", "") or ""),
+            "verbosity": manager.count_tokens(
+                verbosity_clause(getattr(manager, "turn_verbosity", "normal"))
+            ),
+            "project": manager.count_tokens(
+                getattr(manager, "project_context", "") or ""
+            ),
+        }
+
     @classmethod
     def context_usage(cls, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -89,13 +113,17 @@ class ChatService:
             data = history_manager.load_session(session_id) or {}
             messages = data.get("messages", []) or []
 
-        system = manager.count_tokens(manager.system_prompt or "")
+        blocks = cls._system_blocks(manager)
+        system = sum(blocks.values())
         conversation = sum(manager.count_tokens(m.get("content", "")) for m in messages)
         used = system + conversation
         reserved = int(getattr(manager, "last_budget", 0) or 0)
 
         return {
             "system": system,
+            # Split out so the panel can show where the fixed cost goes. `system`
+            # stays the sum, because the status bar and the TUI both read it.
+            "system_blocks": blocks,
             "conversation": conversation,
             "reserved": reserved,
             "trimmed": int(getattr(manager, "last_trimmed", 0) or 0),
@@ -159,9 +187,35 @@ class ChatService:
         return {"status": "ok", "active_provider": manager.active_provider_slug}
 
     @classmethod
-    def apply_profile(cls, model_name: str, mode_name: str) -> Dict[str, Any]:
-        cls.get_manager().apply_profile(model_name, mode_name)
-        return {"status": "ok", "profile": f"{model_name} / {mode_name}"}
+    def apply_profile(
+        cls,
+        model_name: str,
+        mode_name: str,
+        thinking_effort: str = "medium",
+        speed: str = "fast",
+    ) -> Dict[str, Any]:
+        manager = cls.get_manager()
+        manager.apply_profile(model_name, mode_name, thinking_effort, speed)
+        return {
+            "status": "ok",
+            "profile": f"{model_name} / {mode_name} / {thinking_effort}",
+            "speed": speed if mode_name == "Fast" else "fast",
+            # Returned so the composer's mode change updates the settings screen
+            # without a second round trip.
+            "system_prompt": manager.system_prompt,
+            "mode_prompt": manager.mode_prompt,
+        }
+
+    @classmethod
+    def prompts(cls) -> Dict[str, Any]:
+        """The user's base prompt and the active mode's clause, kept apart."""
+        manager = cls.get_manager()
+        return {
+            "system_prompt": manager.system_prompt,
+            "mode_prompt": manager.mode_prompt,
+            "mode": getattr(manager, "_active_mode", ""),
+            "thinking_effort": getattr(manager, "_active_thinking_effort", ""),
+        }
 
     @classmethod
     def reload_settings(cls) -> Dict[str, Any]:
@@ -212,7 +266,10 @@ class ChatService:
     def _request_tool_approval(cls, change, emit, tool_id: int = 0, session_id: str = "") -> bool:
         """Emit a diff and block the tool thread until the GUI answers."""
         from dizel_core import tool_trust
-        from dizel_core.tools import _project_root
+        from dizel_core.tools import PlanChange, _project_root
+
+        if isinstance(change, PlanChange):
+            return cls._request_plan_approval(change, emit)
 
         persistent = tool_trust.persistent_enabled()
         if tool_trust.should_auto_approve(
@@ -268,12 +325,54 @@ class ChatService:
             return bool(entry.get("approved"))
 
     @classmethod
+    def _request_plan_approval(cls, change, emit) -> bool:
+        """Emit the plan and block the tool thread until the GUI answers."""
+        approval_id = uuid.uuid4().hex
+        waiting = threading.Event()
+        entry = {
+            "event": waiting,
+            "approved": False,
+            "kind": "plan",
+            "claimed": False,
+        }
+        with cls._approval_lock:
+            cls._approvals[approval_id] = entry
+
+        emit(
+            {
+                "type": "plan",
+                "id": approval_id,
+                "task": change.task,
+                "steps": list(change.steps),
+            }
+        )
+
+        signalled = waiting.wait(300)
+        with cls._approval_lock:
+            entry = cls._approvals.pop(approval_id, entry)
+            if not signalled or not entry.get("claimed"):
+                entry["claimed"] = True
+                entry["approved"] = False
+            return bool(entry.get("approved"))
+
+    @classmethod
+    def resolve_plan_approval(cls, approval_id: str, approved: bool) -> bool:
+        with cls._approval_lock:
+            entry = cls._approvals.get(approval_id)
+            if entry is None or entry.get("claimed") or entry.get("kind") != "plan":
+                return False
+            entry["claimed"] = True
+            entry["approved"] = bool(approved)
+            entry["event"].set()
+        return True
+
+    @classmethod
     def resolve_tool_approval(cls, approval_id: str, decision: str) -> bool:
         from dizel_core import tool_trust
 
         with cls._approval_lock:
             entry = cls._approvals.get(approval_id)
-            if entry is None or entry.get("claimed"):
+            if entry is None or entry.get("claimed") or entry.get("kind") == "plan":
                 return False
             entry["claimed"] = True
             # A delete gate must never grant standing write trust, even via a
@@ -328,11 +427,24 @@ class ChatService:
         session_id: Optional[str] = None,
         attachments: Optional[List[str]] = None,
         continuation: bool = False,
+        display: Optional[Dict[str, Any]] = None,
+        verbosity: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, str], None]:
         """Stream one assistant turn as SSE events.
 
         Events: start | token | done | error
         """
+        from api.services.scorecard_service import ScorecardService
+
+        if ScorecardService.is_running():
+            yield _sse(
+                {
+                    "type": "error",
+                    "message": "A scorecard run is in progress. Wait for it to finish.",
+                }
+            )
+            return
+
         manager = cls.get_manager()
 
         if not manager.is_ready:
@@ -515,21 +627,28 @@ class ChatService:
                 finally:
                     _put({"type": "__send_end__"})
 
+            # Only pass a length the client actually chose: an omitted kwarg
+            # leaves the configured budget alone, and a manager without the
+            # parameter (tests, older adapters) still works.
+            send_kwargs: Dict[str, Any] = {
+                "user_text": user_text,
+                "attachments": attachments or [],
+                "on_token": on_token,
+                "on_done": finish_done,
+                "on_error": finish_error,
+                "on_tool": on_tool,
+                "on_tool_start": on_tool_start,
+                "approve_tool": lambda change: cls._request_tool_approval(
+                    change, _put, getattr(tool_context, "key", 0), session_id or ""
+                ),
+                "on_thinking": on_thinking,
+                "continuation": continuation,
+                "display": display,
+            }
+            if verbosity in _VERBOSITIES:
+                send_kwargs["verbosity"] = verbosity
             try:
-                manager.send_with_tools(
-                    user_text=user_text,
-                    attachments=attachments or [],
-                    on_token=on_token,
-                    on_done=finish_done,
-                    on_error=finish_error,
-                    on_tool=on_tool,
-                    on_tool_start=on_tool_start,
-                    approve_tool=lambda change: cls._request_tool_approval(
-                        change, _put, getattr(tool_context, "key", 0), session_id or ""
-                    ),
-                    on_thinking=on_thinking,
-                    continuation=continuation,
-                )
+                manager.send_with_tools(**send_kwargs)
             except Exception as exc:
                 _put({"type": "error", "message": str(exc)})
                 _put({"type": "__send_end__"})

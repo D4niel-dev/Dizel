@@ -149,7 +149,7 @@ class ChatPreferenceRuntimeTests(unittest.TestCase):
     def test_enter_to_send_off_opens_editor_and_ctrl_s_sends(self):
         async def script(app, pilot):
             app._chat_prefs["enter_to_send"] = False
-            app.tool_bridge.run_tools_and_send = lambda text: None
+            app.tool_bridge.run_tools_and_send = lambda text, display=None: None
             inp = app.query_one("#prompt-input", PromptInput)
             inp.focus()
             inp.value = "hello"

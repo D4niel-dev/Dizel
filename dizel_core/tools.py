@@ -80,6 +80,15 @@ class FileChange:
     deletions: int
 
 
+@dataclass(frozen=True)
+class PlanChange:
+    """One reviewed plan; the approval UI renders this."""
+
+    task: str
+    steps: tuple[str, ...]
+    tool: str = "plan"
+
+
 @dataclass
 class Tool:
     name: str
@@ -87,6 +96,7 @@ class Tool:
     args: Dict[str, str]
     run: Callable[..., str]
     requires_approval: bool = False
+    approval_verb: str = "Write"
 
     def schema(self) -> str:
         args = ", ".join(f'"{k}": {v}' for k, v in self.args.items())
@@ -617,6 +627,68 @@ def _system_info() -> str:
     )
 
 
+def _remember(
+    text: str,
+    approve: Callable[[FileChange], bool] | None = None,
+) -> str:
+    content = " ".join(str(text or "").split()).strip()
+    if not content:
+        return "[remember] Empty memory text."
+    change = FileChange(
+        "remember",
+        "Project memory",
+        "remember",
+        f"+ {content}",
+        1,
+        0,
+    )
+    approved, note = _approved(change, approve, "Remember")
+    if not approved:
+        return f"[remember] {note}"
+    from . import memory_store
+
+    try:
+        memory_store.add(content, project_root=_project_root(), source="model")
+    except ValueError as error:
+        return f"[remember] {error}"
+    return f"[remember] Saved to project memory: {content[:120]}"
+
+
+def _plan(task: str = "", steps: str = "", approve=None) -> str:
+    parsed = []
+    for line in str(steps or "").splitlines():
+        text = _STEP_MARKER.sub("", line).strip()
+        if not text:
+            continue
+        parsed.append(text[:200])
+        if len(parsed) == 8:
+            break
+    if not parsed:
+        return "[plan] A plan needs at least one step."
+
+    title = " ".join(str(task or "").split())[:160] or "Untitled plan"
+    change = PlanChange(title, tuple(parsed))
+    if approve is None:
+        return "[plan] Plan refused: this surface cannot approve it."
+    try:
+        approved = approve(change)
+    except Exception as error:
+        return f"[plan] Plan refused: approval failed ({error})."
+    if not approved:
+        return (
+            "[plan] Plan discarded. Do not execute it; reply with a short note "
+            "that the plan was not run."
+        )
+
+    numbered = "\n".join(
+        f"{index}. {step}" for index, step in enumerate(parsed, start=1)
+    )
+    return (
+        "[plan] Approved. Execute the plan now, one step at a time, using the "
+        "available tools. Writes and edits still need approval.\n" + numbered
+    )
+
+
 REGISTRY: Dict[str, Tool] = {
     tool.name: tool
     for tool in [
@@ -650,6 +722,21 @@ REGISTRY: Dict[str, Tool] = {
             {"path": "string"},
             _delete_file,
             requires_approval=True,
+        ),
+        Tool(
+            "remember",
+            "save a durable project memory fact; the user reviews and approves it",
+            {"text": "string"},
+            _remember,
+            requires_approval=True,
+        ),
+        Tool(
+            "plan",
+            "propose a short numbered plan for a multi-step task; the user approves it before you act",
+            {"task": "string?", "steps": "string"},
+            _plan,
+            requires_approval=True,
+            approval_verb="Plan",
         ),
         Tool("web_search", "search the web and return the top results",
              {"query": "string"}, _web_search),
@@ -695,9 +782,12 @@ Available tools:
 After a tool runs you will be given its output and asked to continue. Use a tool
 only when the answer genuinely depends on it — for anything you already know, just
 answer. Never guess a file's contents when you can read it.
+For a task with several steps, call plan first with the steps; do not start
+acting until it is approved.
 """
 
 _CALL = re.compile(r"<tool\s+name=[\"']([\w_]+)[\"']\s*>(.*?)</tool>", re.DOTALL)
+_STEP_MARKER = re.compile(r"^\s*(?:\d+[.)]|[-*•])\s*")
 
 
 def parse_calls(text: str) -> List[Dict[str, Any]]:
@@ -745,6 +835,13 @@ def display_detail(call: Dict[str, Any]) -> str:
         return str(args.get("url") or "")
     if name == "calc":
         return str(args.get("expression") or "")
+    if name == "remember":
+        return str(args.get("text") or "project memory")[:80]
+    if name == "plan":
+        steps = [
+            line for line in str(args.get("steps") or "").splitlines() if line.strip()
+        ]
+        return f"Plan · {min(len(steps), 8)} steps"
     if name in ("write_file", "edit_file", "delete_file"):
         return path
     return ", ".join(f"{key}={value}" for key, value in args.items())
@@ -789,6 +886,16 @@ def ui_payload(call: Dict[str, Any], outcome: str = "") -> Dict[str, Any]:
             payload["search_url"] = f"https://duckduckgo.com/?q={quote_plus(query)}"
     elif name == "fetch_url":
         payload["url"] = str(args.get("url") or "")
+    elif name == "plan":
+        steps = []
+        for line in str(args.get("steps") or "").splitlines():
+            text = _STEP_MARKER.sub("", line).strip()
+            if text:
+                steps.append(text[:200])
+            if len(steps) == 8:
+                break
+        payload["steps"] = steps
+        payload["task"] = " ".join(str(args.get("task") or "").split())[:160]
 
     if name == "write_file":
         content, truncated = _clip_ui(args.get("content"), MAX_UI_CONTENT_CHARS)
@@ -835,6 +942,8 @@ def outcome_failed(name: str, outcome: str) -> bool:
             "Write refused",
             "Delete cancelled",
             "Delete refused",
+            "Plan discarded",
+            "Plan refused",
             "Failed:",
             "Old snippet",
             "File is too large",
@@ -867,8 +976,7 @@ def execute(
         if tool.requires_approval:
             if approve is None:
                 outcome = (
-                    f"[{name}] Write refused: this surface cannot approve "
-                    "file changes."
+                    f"[{name}] {tool.approval_verb} refused: this surface cannot approve it."
                 )
             else:
                 outcome = tool.run(**args, approve=approve)

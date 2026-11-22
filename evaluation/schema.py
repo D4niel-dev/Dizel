@@ -7,7 +7,7 @@ scoring rubrics, and regression tracking.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -82,10 +82,11 @@ class EvalResult:
     expected_output: str
     agent: str
     category: EvalCategory
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     duration_ms: float = 0.0
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    weight: float = 1.0                            # carried from EvalCase
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -108,7 +109,7 @@ class EvalRun:
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:10])
     checkpoint: str = ""                           # model checkpoint name
     results: List[EvalResult] = field(default_factory=list)
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
 
     @property
@@ -129,9 +130,11 @@ class EvalRun:
 
     @property
     def avg_score(self) -> float:
-        if not self.results:
+        """Weighted mean score. `pass_rate` stays a plain count ratio."""
+        total_weight = sum(r.weight for r in self.results)
+        if total_weight <= 0:
             return 0.0
-        return sum(r.score for r in self.results) / len(self.results)
+        return sum(r.score * r.weight for r in self.results) / total_weight
 
     def scores_by_category(self) -> Dict[str, float]:
         """Average score per category."""

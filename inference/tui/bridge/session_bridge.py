@@ -16,8 +16,11 @@ class SessionBridge:
         self.current_messages = []
         return self.app.session_id
         
-    def add_message(self, role: str, content: str) -> None:
-        self.current_messages.append({"role": role, "content": content, "ts": time.time()})
+    def add_message(self, role: str, content: str, display: dict | None = None) -> None:
+        message = {"role": role, "content": content, "ts": time.time()}
+        if display:
+            message["display"] = display
+        self.current_messages.append(message)
         self.save()
         
     def save(self, title: str = None) -> str:

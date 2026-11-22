@@ -1,8 +1,9 @@
 """Terminal palette and Rich styles.
 
-The same ladder as the desktop dark theme in ``inference/gui/src/styles/tokens.css``:
-chat ``#212121``, chrome ``#171717``, panels ``#1c1c1c``, chips ``#2f2f2f``,
-one blue accent ``#0ea5e9``. Signal colours are only used for state: blue for
+OpenCode's palette: a warm near-black with a red undertone (``#201d1d``), warm
+off-white type, and Apple system blue (``#007aff``) as the only accent. This is
+deliberately *not* the desktop ladder — the TUI is its own surface and has been
+since 2026-10-29 (see ``DESIGN.md``). Colours are only used for state: blue for
 live, amber for work in progress, red for failure.
 
 ``cmd_ui.tcss`` mirrors these as CSS variables; keep the two in sync.

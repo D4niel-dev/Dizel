@@ -3,7 +3,7 @@
    Tokens are copied from inference/gui/src/styles/tokens.css; shell metrics and
    component shapes from inference/gui/src/styles/app.css. The demo must read as
    the same product: Gemini-style surface ladder, 232px sidebar, inline welcome
-   composer, model/tier chips.
+   composer, model/mode chips.
    ========================================================================== */
 
 @font-face {
@@ -1777,19 +1777,50 @@ img { display: block; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.chip-mode {
-  display: inline-flex;
-  align-items: center;
-  height: 15px;
-  padding: 0 5px;
-  margin-left: 2px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+/* Thinking effort panel */
+.mode-row { display: flex; align-items: center; gap: 2px; }
+.mode-row .popover-item { flex: 1; }
+.mode-effort-tag {
+  margin-left: auto; padding: 0 6px; border: 1px solid currentColor;
+  border-radius: 999px; font-size: 10px; line-height: 15px;
 }
+.mode-arrow {
+  width: 24px; height: 30px; border-radius: 6px; color: var(--text-dim);
+}
+.mode-arrow:hover { background: var(--bg-hover); color: var(--text); }
+.effort-panel {
+  margin: 6px 4px 4px; padding: 10px 12px 8px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-panel);
+}
+.effort-head {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-dim); margin-bottom: 8px;
+}
+.effort-scale {
+  position: relative; display: flex; align-items: center;
+  justify-content: space-between; padding: 8px 5px 4px;
+}
+.effort-line {
+  position: absolute; left: 12px; right: 12px; top: 15px;
+  height: 2px; background: var(--border);
+}
+.effort-stop {
+  position: relative; z-index: 1; width: 16px; height: 16px;
+  border-radius: 50%; border: 2px solid var(--stop-color);
+  background: var(--bg-panel);
+}
+.effort-stop.active {
+  background: var(--stop-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--stop-color) 25%, transparent);
+}
+.effort-names {
+  display: flex; justify-content: space-between; gap: 6px;
+  font-size: 9px; color: var(--text-dim); padding-top: 2px;
+}
+.effort-names span { white-space: nowrap; }
+.effort-names .is-active { font-weight: 600; }
+.effort-note { margin: 8px 0 0; font-size: 11px; color: var(--text-dim); }
 
 .send-circle {
   width: 34px; height: 34px; border-radius: 50%;

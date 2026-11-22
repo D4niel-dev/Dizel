@@ -17,6 +17,7 @@ PAGES = {
     "guide/index.html",
     "guide/install.html",
     "guide/launch.html",
+    "guide/capabilities.html",
 }
 
 
@@ -97,8 +98,9 @@ def test_home_keeps_real_evidence():
         "435.3M",
         "293.7M",
         "1.1236",
-        "3.4479",
-        "10,500",
+        "3.3158",
+        "16,500",
+        "36.0%",
         "Not published",
     ):
         assert value in text, value
@@ -108,7 +110,7 @@ def test_model_card_has_no_invented_benchmark_table():
     text = read("model.html")
     assert "Downstream benchmarks" in text
     assert "Not published" in text
-    assert "1.1236" in text and "3.4479" in text
+    assert "1.1236" in text and "3.3158" in text
 
 
 def test_docs_have_real_commands_and_no_dead_controls():
@@ -234,3 +236,33 @@ def test_releases_page_matches_the_current_app_version():
     text = read("releases.html")
     assert f"v{__version__}" in text
     assert "v2.0.1" not in text
+
+
+def test_docs_chrome_and_demo_match_the_current_app_version():
+    from dizel_core.version import __version__
+
+    for name in PAGES:
+        text = read(name)
+        assert "v2.0.1" not in text, name
+        assert f"v{__version__}" in text, name
+    demo_js = (DOCS / "js" / "demo.js").read_text(encoding="utf-8")
+    assert f"{__version__} (desktop shell)" in demo_js
+
+
+def test_capabilities_page_is_generated_from_the_manifest():
+    from dizel_core import capabilities
+
+    text = read("guide/capabilities.html")
+    rows = capabilities.load()
+    both = sum(1 for row in rows if row.tui and row.gui)
+    assert f"{both} of {len(rows)} capabilities" in text
+    for row in rows:
+        assert f'data-capability-row="{row.id}"' in text, row.id
+        for surface in ("gui", "tui"):
+            entry = row.entry(surface)
+            if entry:
+                assert entry.label in text, (row.id, surface)
+    gaps = sum(
+        1 for row in rows for surface in ("gui", "tui") if row.entry(surface) is None
+    )
+    assert text.count('class="s-cap-gap"') == gaps

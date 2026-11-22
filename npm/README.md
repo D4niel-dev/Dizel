@@ -22,6 +22,7 @@ or `~/.local/share/dizel` (Linux).
 - `dizel gui` to open the installed desktop app;
 - `dizel deps` to create a virtualenv and install the Python requirements;
 - `dizel doctor` to check Node, Python, installed files, and model paths;
+  add `--runtime` for the Python-side checks (packages, config, history, provider);
 - `dizel update` to refresh the terminal archive from the latest release.
 
 ## Requirements
@@ -49,7 +50,7 @@ dizel install --yes           # launch the GUI installer without asking
 dizel tui [args...]           # run the terminal client
 dizel gui                     # launch the installed desktop app
 dizel deps                    # create the managed virtualenv and pip install requirements
-dizel doctor [--json]         # diagnostics
+dizel doctor [--json] [--runtime]   # install + runtime diagnostics
 dizel update                  # refresh the terminal archive from latest
 dizel model                   # model setup pointers
 dizel version

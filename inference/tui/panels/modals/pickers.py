@@ -6,11 +6,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from dizel_core.token_budget import get_model_profile
 from inference.tui.constants import (
+    MODE_COLORS,
     MODE_DETAILS,
+    MODE_GLYPHS,
     MODES,
-    TIER_DETAILS,
-    TIERS,
+    THINKING_EFFORTS,
+    THINKING_EFFORT_COLORS,
+    THINKING_EFFORT_LABELS,
 )
 from inference.tui.panels.modals.common import (
     PickerItem,
@@ -148,44 +152,66 @@ class ModePickerModal(PickerModal):
 
     def _after_mount(self) -> None:
         current = self.app.active_mode
-        items = [
-            PickerItem(
-                mode,
-                mode,
-                MODE_DETAILS[mode],
-                trailing="current" if mode == current else "",
-                active=mode == current,
+        effort = getattr(self.app, "active_thinking_effort", "medium")
+        items = []
+        for mode in MODES:
+            color = MODE_COLORS.get(mode, "")
+            trailing = "current" if mode == current else ""
+            if mode == "Thinking":
+                color = THINKING_EFFORT_COLORS.get(effort, "")
+                effort_label = THINKING_EFFORT_LABELS.get(effort, "Medium")
+                trailing = effort_label + (" · current" if mode == current else "")
+            items.append(
+                PickerItem(
+                    mode,
+                    mode,
+                    MODE_DETAILS[mode],
+                    trailing=trailing,
+                    active=mode == current,
+                    glyph=MODE_GLYPHS[mode],
+                    color=color,
+                )
             )
-            for mode in MODES
-        ]
         self.set_items(items, subtitle=f"Active · {current}")
 
 
-class TierPickerModal(PickerModal):
-    """The model family: Flash or Pro. Modes sit underneath the tier."""
+class ThinkingEffortPickerModal(PickerModal):
+    """The five thinking depths; each row carries its own color."""
 
     def __init__(self) -> None:
         super().__init__(
-            "Tier",
+            "Thinking effort",
             [],
-            subtitle="Model family for the next reply",
-            placeholder="Search tiers…",
+            subtitle="Prompt depth, temperature, and output budget",
+            placeholder="Search efforts…",
             footer="↑↓ move · enter apply · esc close",
         )
 
     def _after_mount(self) -> None:
-        current = self.app.active_tier
-        items = [
-            PickerItem(
-                tier,
-                tier,
-                TIER_DETAILS[tier],
-                trailing="current" if tier == current else "",
-                active=tier == current,
+        current = getattr(self.app, "active_thinking_effort", "medium")
+        family = getattr(self.app, "model_family", "") or "Generic"
+        items = []
+        for effort in THINKING_EFFORTS:
+            profile = get_model_profile(family, "Thinking", effort)
+            detail = (
+                f"temp {profile.sampling.temperature:.2f} · "
+                f"budget ×{profile.budget_multiplier:.2f}"
             )
-            for tier in TIERS
-        ]
-        self.set_items(items, subtitle=f"Active · {current}")
+            items.append(
+                PickerItem(
+                    effort,
+                    THINKING_EFFORT_LABELS[effort],
+                    detail,
+                    trailing="current" if effort == current else "",
+                    active=effort == current,
+                    glyph="●",
+                    color=THINKING_EFFORT_COLORS[effort],
+                )
+            )
+        self.set_items(
+            items,
+            subtitle=f"Active · {THINKING_EFFORT_LABELS.get(current, 'Medium')}",
+        )
 
 
 def _human_size(size: int) -> str:

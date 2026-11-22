@@ -23,14 +23,19 @@ function SessionRowInner({ session, active }: SessionRowProps) {
   const togglePin = useChat((s) => s.togglePin);
   const archiveSession = useChat((s) => s.archiveSession);
   const renameSession = useChat((s) => s.renameSession);
+  const setSessionTags = useChat((s) => s.setSessionTags);
+  const openInTerminal = useChat((s) => s.openInTerminal);
   const removeSession = useChat((s) => s.removeSession);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
+  const [editingTags, setEditingTags] = useState(false);
+  const [tagDraft, setTagDraft] = useState(session.tags.join(", "));
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [confirming, setConfirming] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +45,13 @@ function SessionRowInner({ session, active }: SessionRowProps) {
       inputRef.current?.select();
     }
   }, [editing]);
+
+  useEffect(() => {
+    if (editingTags) {
+      tagInputRef.current?.focus();
+      tagInputRef.current?.select();
+    }
+  }, [editingTags]);
 
   // Close on outside click. Checking the ref keeps the mousedown that opens an
   // item from closing the menu before the click lands. The portal lives at the
@@ -96,6 +108,16 @@ function SessionRowInner({ session, active }: SessionRowProps) {
     run();
   };
 
+  /** Tags are edited as one comma-separated line, not a chip editor. */
+  const commitTags = () => {
+    const tags = tagDraft
+      .split(",")
+      .map((tag) => tag.trim().replace(/^#/, ""))
+      .filter(Boolean);
+    setEditingTags(false);
+    void setSessionTags(session.id, tags);
+  };
+
   /** Writes the session to a JSON file the user picks. */
   const exportChat = async () => {
     try {
@@ -136,6 +158,31 @@ function SessionRowInner({ session, active }: SessionRowProps) {
     );
   }
 
+  if (editingTags) {
+    return (
+      <div className="sb-row editing">
+        <input
+          ref={tagInputRef}
+          className="sb-row-input"
+          value={tagDraft}
+          maxLength={160}
+          spellCheck={false}
+          placeholder="tags, comma separated"
+          aria-label="Tags"
+          onChange={(event) => setTagDraft(event.target.value)}
+          onBlur={commitTags}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitTags();
+            if (event.key === "Escape") {
+              setTagDraft(session.tags.join(", "));
+              setEditingTags(false);
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={active ? "sb-row active" : "sb-row"}>
       {session.pinned && (
@@ -154,6 +201,16 @@ function SessionRowInner({ session, active }: SessionRowProps) {
         title={session.title}
       >
         {session.title}
+        {session.tags.slice(0, 2).map((tag) => (
+          <span className="sb-row-tag" key={tag}>
+            #{tag}
+          </span>
+        ))}
+        {session.tags.length > 2 && (
+          <span className="sb-row-tag" title={session.tags.slice(2).join(", ")}>
+            +{session.tags.length - 2}
+          </span>
+        )}
       </button>
 
       <span className="sb-row-actions">
@@ -203,6 +260,19 @@ function SessionRowInner({ session, active }: SessionRowProps) {
             >
               Rename
             </button>
+            <button
+              role="menuitem"
+              className="row-menu-item"
+              data-capability="sessions.tags"
+              onClick={() =>
+                act(() => {
+                  setTagDraft(session.tags.join(", "));
+                  setEditingTags(true);
+                })
+              }
+            >
+              {session.tags.length ? "Edit tags…" : "Add tags…"}
+            </button>
             <button role="menuitem" className="row-menu-item" onClick={() => act(() => void togglePin(session.id))}>
               {session.pinned ? "Unpin" : "Pin"}
             </button>
@@ -216,6 +286,16 @@ function SessionRowInner({ session, active }: SessionRowProps) {
             <button role="menuitem" className="row-menu-item" onClick={() => act(() => void exportChat())}>
               Export JSON…
             </button>
+            {window.dizel?.openInTerminal && (
+              <button
+                role="menuitem"
+                className="row-menu-item"
+                data-capability="sessions.handoff"
+                onClick={() => act(() => void openInTerminal(session.id))}
+              >
+                Continue in terminal
+              </button>
+            )}
             <div className="row-menu-sep" role="separator" />
             <button
               role="menuitem"

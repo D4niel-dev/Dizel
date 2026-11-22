@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ChatView } from "./components/ChatView";
+import { ArtifactsRail } from "./components/ArtifactsRail";
 import { PluginsDialog } from "./components/PluginsDialog";
 import { ToolsSheet } from "./components/ToolsSheet";
 import { CommandPalette } from "./components/CommandPalette";
@@ -16,6 +17,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { StatusBar } from "./components/StatusBar";
 import { DebugPanel, Toast } from "./components/DebugPanel";
 import { ToolApprovalDialog } from "./components/ToolApprovalDialog";
+import { PlanApprovalDialog } from "./components/PlanApprovalDialog";
 import { TitleBar } from "./components/TitleBar";
 import { useChat } from "./store/chatStore";
 import { useUpdates } from "./hooks/useUpdates";
@@ -87,6 +89,8 @@ export default function App() {
   const toggleSidebar = useChat((s) => s.toggleSidebar);
   const attachPaths = useChat((s) => s.attachPaths);
   const handoff = useChat((s) => s.handoff);
+  const artifactsOpen = useChat((s) => s.artifactsOpen);
+  const toggleArtifacts = useChat((s) => s.toggleArtifacts);
   const debug = useChat((s) => s.debug);
   const messages = useChat((s) => s.messages);
   const updateState = useUpdates();
@@ -166,6 +170,15 @@ export default function App() {
     return () => off?.();
   }, [newChat]);
 
+  // A second launch — `dizel://session/<id>` or `--session=<id>` — hands the
+  // running window a chat instead of opening a duplicate app.
+  useEffect(() => {
+    const off = window.dizel?.onOpenSession?.((sessionId) => {
+      void useChat.getState().openSession(sessionId);
+    });
+    return () => off?.();
+  }, []);
+
   // Global shortcuts. Listed in Settings → Shortcuts.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -190,6 +203,13 @@ export default function App() {
           void state.stop();
           state.notify("Stopped generation.");
         }
+      } else if (event.shiftKey && key === "a") {
+        // Ctrl+Shift+A would otherwise be "select all" in the composer; the
+        // artifacts rail only exists once there is a transcript to draw from.
+        if (state.messages.length > 0) {
+          event.preventDefault();
+          state.toggleArtifacts();
+        }
       } else if (key === "n") {
         event.preventDefault();
         newChat();
@@ -211,7 +231,17 @@ export default function App() {
   }, [newChat, toggleSidebar, openSettings]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    if (theme !== "system") {
+      document.documentElement.dataset.theme = theme;
+      return;
+    }
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme = media.matches ? "dark" : "light";
+    };
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
   }, [theme]);
 
   // Drag files anywhere onto the window to attach them.
@@ -334,6 +364,7 @@ export default function App() {
               {messages.length > 0 && (
               <button
                 className="hdr-btn"
+                data-capability="app.export"
                 onClick={() => {
                   const firstUser = messages.find((m) => m.role === "user");
                   const title = (firstUser?.content ?? "").trim().split("\n")[0].slice(0, 60);
@@ -350,6 +381,16 @@ export default function App() {
               )}
               <button
                 className="hdr-btn"
+                data-capability="artifacts"
+                onClick={toggleArtifacts}
+                title={artifactsOpen ? "Hide artifacts" : "Artifacts: files and code from this chat"}
+                aria-label="Artifacts"
+                aria-pressed={artifactsOpen}
+              >
+                <Icon name="folder" size={14} />
+              </button>
+              <button
+                className="hdr-btn"
                 onClick={toggleStatusBar}
                 title={statusBarOpen ? "Hide status bar" : "Show status bar"}
                 aria-label={statusBarOpen ? "Hide status bar" : "Show status bar"}
@@ -358,6 +399,7 @@ export default function App() {
               </button>
               <button
                 className="hdr-btn"
+                data-capability="settings.open"
                 onClick={() => openSettings()}
                 title="Settings"
                 aria-label="Settings"
@@ -440,6 +482,7 @@ export default function App() {
             </div>
 
             <AttachmentPreview />
+            <ArtifactsRail />
           </div>
           <div className={statusBarOpen ? "statusbar-wrap is-open" : "statusbar-wrap"}>
             <StatusBar />
@@ -453,6 +496,7 @@ export default function App() {
       <ProfileDialog />
       <PluginsDialog />
       <ToolApprovalDialog />
+      <PlanApprovalDialog />
 
       {dragging && (
         <div className="drop-overlay">

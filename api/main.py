@@ -32,9 +32,11 @@ from api.routes import (  # noqa: E402
     models,
     nova,
     profile,
+    project,
     providers,
     session,
     skills,
+    usage,
 )
 from api.security import TokenAuthMiddleware, allowed_origins, api_token  # noqa: E402
 from dizel_core.version import __version__  # noqa: E402
@@ -67,6 +69,8 @@ app.include_router(profile.router, prefix="/api", tags=["profile"])
 app.include_router(memory.router, prefix="/api", tags=["memory"])
 app.include_router(feedback.router, prefix="/api", tags=["feedback"])
 app.include_router(skills.router, prefix="/api", tags=["skills"])
+app.include_router(usage.router, prefix="/api", tags=["usage"])
+app.include_router(project.router, prefix="/api", tags=["project"])
 
 
 @app.on_event("startup")

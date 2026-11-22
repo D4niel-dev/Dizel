@@ -464,6 +464,12 @@ def main() -> int:
     parser.add_argument("--device", "-d", type=str, default="cpu", choices=["cpu", "cuda"])
     parser.add_argument("--prompt", "-p", type=str, default="", help="Run one prompt headlessly and exit")
     parser.add_argument("--resume", action="store_true", help="Open the most recent saved chat")
+    parser.add_argument(
+        "--session",
+        type=str,
+        default="",
+        help="Open a specific chat by id (used by the desktop app's handoff)",
+    )
     args = parser.parse_args()
     argv = sys.argv[1:]
 
@@ -506,7 +512,9 @@ def main() -> int:
         _warm_local_runtime(args.checkpoint, repo_root)
         preloaded = _preload_local_model(args.checkpoint, args.device)
         resume_session = ""
-        if args.resume:
+        if args.session:
+            resume_session = args.session
+        elif args.resume:
             try:
                 from dizel_core.history_manager import list_sessions
 

@@ -82,6 +82,19 @@ class SessionRenameRequest(BaseModel):
     title: str
 
 
+class SessionTagsRequest(BaseModel):
+    tags: List[str]
+
+
+@router.post("/{session_id}/tags")
+def set_tags(session_id: str, req: SessionTagsRequest) -> Dict[str, Any]:
+    """Replace a session's tags. The whole list is sent, so removal is explicit."""
+    tags = SessionService.set_tags(session_id, req.tags)
+    if tags is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session_id": session_id, "tags": tags}
+
+
 @router.post("/{session_id}/rename")
 def rename_session(session_id: str, req: SessionRenameRequest) -> Dict[str, str]:
     """Rename a saved session."""

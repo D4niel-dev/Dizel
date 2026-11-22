@@ -2,10 +2,12 @@ import { create } from "zustand";
 
 import type {
   Attachment,
+  AttachedSkill,
   ChatStatus,
   Fork,
   Message,
   ModelEntry,
+  PlanApproval,
   Prefs,
   ProfileDetails,
   ProviderInfo,
@@ -16,6 +18,7 @@ import type {
   StreamEvent,
   ToolApproval,
   ToolCall,
+  Verbosity,
   WorkspaceView,
 } from "../types";
 import {
@@ -32,17 +35,34 @@ import { startRecording } from "../services/audio";
 import { modelName } from "../services/model";
 import type { Recorder } from "../services/audio";
 import { CATEGORY_ORDER, DEBUG_COMMAND_NAMES } from "../services/commands";
+import {
+  normalizeEffort,
+  normalizeSpeed,
+  type FastSpeed,
+  type ThinkingEffort,
+} from "../services/modes";
 import { LATEST_VERSION } from "../services/releaseNotes";
 
-export type ThemeName = "dark" | "light" | "dark-blue";
+export type ThemeName = "dark" | "light" | "dark-blue" | "system";
 export type MicState = "idle" | "recording" | "transcribing";
 
 const THEME_KEY = "dizel.theme";
 const PROMPTS_KEY = "dizel.prompts";
 const RECENT_ATTACHMENTS_KEY = "dizel.recent-attachments";
-const THEMES: ThemeName[] = ["dark", "light", "dark-blue"];
-// Local SKILL.md packs can be many KB; half of a 2k-token window is worth flagging.
-const LARGE_SKILL_CHARS = 4000;
+const THEMES: ThemeName[] = ["dark", "light", "dark-blue", "system"];
+
+/** The model sees the skill bodies; the transcript keeps them as chips. */
+function composeSkillContent(prompts: string[], text: string): string {
+  const body = prompts.map((prompt) => prompt.trim()).filter(Boolean).join("\n\n");
+  return body && text ? `${body}\n\n${text}` : body || text;
+}
+
+function localProfileFamily(status: ChatStatus | null): string {
+  const name = modelName(status).toLowerCase();
+  if (/^dizel\b/.test(name)) return "Dizel";
+  if (/^mila\b/.test(name)) return "Mila";
+  return "Generic";
+}
 
 function loadRecentAttachments(): string[] {
   try {
@@ -454,18 +474,31 @@ interface ChatState {
   sidebarCollapsed: boolean;
   showRecent: boolean;
   draft: string;
+  /** Skills expanded at attach time and held beside the draft. */
+  attachedSkills: AttachedSkill[];
   username: string;
 
   models: ModelEntry[];
   recentModels: RecentModelEntry[];
   profiles: Record<string, string[]>;
-  variant: string;
   mode: string;
+  /** short | normal | detailed — sent with each turn, saved to settings.json. */
+  verbosity: Verbosity;
+  setVerbosity: (value: Verbosity) => void;
+  thinkingEffort: ThinkingEffort;
+  fastSpeed: FastSpeed;
+  setThinkingEffort: (effort: ThinkingEffort) => Promise<void>;
+  setFastSpeed: (speed: FastSpeed | string) => Promise<void>;
   attachments: Attachment[];
   /** Paths of the last text files attached, newest first. */
   recentPaths: string[];
   /** The file whose contents are open in the side panel, if any. */
   preview: Attachment | null;
+  /** The artifacts rail: what this conversation wrote and produced. */
+  artifactsOpen: boolean;
+  openArtifacts: () => void;
+  closeArtifacts: () => void;
+  toggleArtifacts: () => void;
   /** Bumped by every newChat. A counter, not a boolean, because "already empty"
    *  is a real state — pressing New Chat there must still count as a fresh start. */
   chatEpoch: number;
@@ -524,6 +557,10 @@ interface ChatState {
   toast: string | null;
   approval: ToolApproval | null;
   resolveApproval: (decision: string) => Promise<void>;
+  planApproval: PlanApproval | null;
+  /** The active mode's clause, shown beneath the base prompt in Settings. */
+  modePrompt: string;
+  resolvePlan: (approved: boolean) => Promise<void>;
   trust: TrustState | null;
   refreshTrust: () => Promise<void>;
   setPersistentTrust: (enabled: boolean) => Promise<void>;
@@ -533,6 +570,9 @@ interface ChatState {
   skillsDir: string;
   skillsProjectDir: string;
   loadSkills: () => Promise<void>;
+  attachSkill: (skill: SkillInfo, args?: string) => Promise<void>;
+  detachSkill: (index: number) => void;
+  clearAttachedSkills: () => void;
   toggleDebug: () => void;
   notify: (message: string) => void;
   closeDebugPanel: () => void;
@@ -559,8 +599,14 @@ interface ChatState {
   closePlugins: () => void;
   setBudgetOverride: (value: number | null) => void;
   renameSession: (id: string, title: string) => Promise<void>;
+  setSessionTags: (id: string, tags: string[]) => Promise<void>;
+  /** Open one saved chat in the terminal client and keep this window open. */
+  openInTerminal: (id: string) => Promise<void>;
   removeSession: (id: string) => Promise<void>;
-  send: (text: string) => Promise<void>;
+  send: (
+    text: string,
+    options?: { content?: string; displayText?: string },
+  ) => Promise<void>;
   regenerate: () => Promise<void>;
   showSibling: (id: string, delta: number) => void;
   commitFork: () => void;
@@ -576,7 +622,6 @@ interface ChatState {
   dismissError: () => void;
 
   switchModel: (path: string) => Promise<void>;
-  setVariant: (variant: string) => Promise<void>;
   setMode: (mode: string) => Promise<void>;
   addFiles: () => Promise<void>;
   addFolder: () => Promise<void>;
@@ -627,16 +672,20 @@ export const useChat = create<ChatState>((set, get) => ({
   sidebarCollapsed: false,
   showRecent: true,
   draft: "",
+  attachedSkills: [],
   username: "You",
 
   models: [],
   recentModels: [],
   profiles: {},
-  variant: "Dizel",
   mode: "Fast",
+  verbosity: "normal",
+  thinkingEffort: "medium",
+  fastSpeed: "fast",
   attachments: [],
   recentPaths: loadRecentAttachments(),
   preview: null,
+  artifactsOpen: false,
   pendingFork: null,
   pendingContinue: null,
   chatEpoch: 0,
@@ -661,6 +710,8 @@ export const useChat = create<ChatState>((set, get) => ({
   debugPanel: null,
   toast: null,
   approval: null,
+  planApproval: null,
+  modePrompt: "",
   trust: null,
   skills: [],
   skillsDir: "",
@@ -682,6 +733,20 @@ export const useChat = create<ChatState>((set, get) => ({
     const next = { ...get().prefs, ...patch };
     applyPrefs(next);
     set({ prefs: next });
+  },
+
+  setVerbosity: (value) => {
+    if (value === get().verbosity) return;
+    set({ verbosity: value });
+    // Persisted under token_budget, the key the engine already reads when a
+    // request omits the parameter — and the same one /verbosity writes in the
+    // terminal, so both surfaces settle on one answer after a restart.
+    void api
+      .saveConfig({ token_budget: { verbosity: value } })
+      // The clause lives in system_content(), so the live manager must re-read
+      // config before the next /chat/context or prompt reflects this choice.
+      .then(() => api.reloadSettings())
+      .catch(() => undefined);
   },
 
   setDraft: (draft) => set({ draft }),
@@ -718,6 +783,27 @@ export const useChat = create<ChatState>((set, get) => ({
       void get().loadProviderModels();
       void get().loadRecent();
       void get().loadSkills();
+
+      // A chat handed over from the terminal (`--session=` or dizel://…): open
+      // it once the store has boots and sessions are readable.
+      void window.dizel
+        ?.pendingSession?.()
+        .then((sessionId) => {
+          if (sessionId) void get().openSession(sessionId);
+        })
+        .catch(() => undefined);
+
+      // Reply length is a config value, not a client preference: the terminal
+      // writes the same key, so opening the window must not ignore it.
+      const budget = (config.token_budget ?? {}) as Record<string, unknown>;
+      const savedVerbosity = budget.verbosity;
+      if (
+        savedVerbosity === "short" ||
+        savedVerbosity === "normal" ||
+        savedVerbosity === "detailed"
+      ) {
+        set({ verbosity: savedVerbosity });
+      }
 
       // Debug mode survives restarts; it's a client preference, not config.
       try {
@@ -847,6 +933,19 @@ export const useChat = create<ChatState>((set, get) => ({
               m.role === "assistant" ? "assistant" : m.role === "system" ? "system" : "user",
             content: m.content,
             createdAt: Date.now(),
+            display:
+              m.display && typeof m.display.text === "string" && Array.isArray(m.display.skills)
+                ? {
+                    text: m.display.text,
+                    skills: m.display.skills
+                      .filter((skill) => skill && typeof skill.name === "string")
+                      .map((skill) => ({
+                        name: skill.name,
+                        title: String(skill.title ?? skill.name),
+                        ...(skill.args ? { args: skill.args } : {}),
+                      })),
+                  }
+                : undefined,
           })),
           loadVariants(session.id),
         ),
@@ -874,14 +973,41 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
-  beginEdit: (id: string) => {
+  beginEdit: async (id: string) => {
     const message = get().messages.find((item) => item.id === id);
     if (!message || message.role !== "user") return;
-    set({ editingId: id, draft: message.content });
+    const display = message.display;
+    set({
+      editingId: id,
+      draft: display?.text ?? message.content,
+      attachedSkills: [],
+    });
+    if (display?.skills?.length) {
+      const restored: AttachedSkill[] = [];
+      for (const skill of display.skills) {
+        try {
+          const expanded = await api.expandSkill(skill.name, skill.args ?? "");
+          restored.push({
+            name: skill.name,
+            title: skill.title,
+            args: skill.args ?? "",
+            prompt: expanded.prompt,
+          });
+        } catch {
+          // The skill file may be gone; the message still carries its body.
+        }
+      }
+      if (restored.length === display.skills.length) {
+        set({ attachedSkills: restored });
+      } else {
+        set({ draft: message.content, attachedSkills: [] });
+        get().notify("Couldn't restore an attached skill; showing the full prompt.");
+      }
+    }
     document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
   },
 
-  cancelEdit: () => set({ editingId: null, draft: "" }),
+  cancelEdit: () => set({ editingId: null, draft: "", attachedSkills: [] }),
 
   /**
    * Fetches the Whisper checkpoint the first time dictation is used.
@@ -1005,6 +1131,22 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
+  resolvePlan: async (approved) => {
+    const plan = get().planApproval;
+    if (!plan) return;
+    if (plan.synthetic) {
+      set({ planApproval: null });
+      get().notify(approved ? "Debug plan approved." : "Debug plan discarded.");
+      return;
+    }
+    try {
+      await api.resolvePlanApproval(plan.id, approved);
+      set({ planApproval: null });
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
   refreshTrust: async () => {
     try {
       set({ trust: await api.trustState(get().sessionId) });
@@ -1053,6 +1195,214 @@ export const useChat = create<ChatState>((set, get) => ({
 
     // Skills and the plugin runner are always available; debug commands still
     // need debug mode.
+    if (lower === "doctor") {
+      try {
+        const report = await api.doctor();
+        const lines = [
+          `${report.counts.ok} ok · ${report.counts.warn} warn · ${report.counts.fail} fail`,
+          "",
+          ...report.checks.map((row) => `[${row.status}] ${row.label} — ${row.detail}`),
+        ];
+        panel("Runtime doctor", lines.join("\n"));
+      } catch (error) {
+        panel("Runtime doctor", (error as Error).message);
+      }
+      return true;
+    }
+
+    if (lower === "scorecard") {
+      const format = (card: {
+        passed: number;
+        total: number;
+        avg_score: number;
+        tok_per_s?: number;
+        evaluated_at?: string;
+        by_category?: Record<string, number>;
+      }) =>
+        [
+          `${card.passed}/${card.total} cases passed · avg ${Number(card.avg_score).toFixed(2)}`,
+          `~${Number(card.tok_per_s ?? 0).toFixed(1)} tok/s · evaluated ${card.evaluated_at ?? "unknown"}`,
+          "",
+          "By category:",
+          ...Object.entries(card.by_category ?? {})
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([name, score]) => `  ${name.padEnd(14)} ${Number(score).toFixed(2)}`),
+        ].join("\n");
+
+      const target = arg.trim();
+      if (target === "run") {
+        try {
+          const started = await api.startScorecardRun();
+          if (!started.started) {
+            panel("Scorecard", started.error ?? "Could not start the evaluation.");
+            return true;
+          }
+          panel("Scorecard", `Evaluating… 0/${started.total ?? "?"}`);
+          const poll = async () => {
+            try {
+              const state = await api.scorecardRunStatus();
+              if (state.running) {
+                set({
+                  debugPanel: {
+                    title: "Scorecard",
+                    body: `Evaluating… ${state.done}/${state.total}`,
+                  },
+                });
+                window.setTimeout(() => void poll(), 800);
+                return;
+              }
+              if (state.error) {
+                panel("Scorecard", state.error);
+                return;
+              }
+              panel(
+                "Scorecard",
+                state.scorecard
+                  ? `Saved.\n\n${format(state.scorecard)}`
+                  : "Finished — no card was saved.",
+              );
+            } catch (error) {
+              panel("Scorecard", (error as Error).message);
+            }
+          };
+          window.setTimeout(() => void poll(), 400);
+        } catch (error) {
+          panel("Scorecard", (error as Error).message);
+        }
+        return true;
+      }
+
+      try {
+        const card = target
+          ? await api.getScorecard(target)
+          : await api.getCurrentScorecard();
+        panel("Scorecard", format(card));
+      } catch (error) {
+        panel("Scorecard", (error as Error).message);
+      }
+      return true;
+    }
+
+    if (lower === "cost") {
+      try {
+        const report = await api.usageReport();
+        const lines = [
+          `${report.window_hours}-hour window`,
+          "",
+          ...report.providers.map((row) => {
+            const cost =
+              row.estimated_cost === null
+                ? "—"
+                : `$${Number(row.estimated_cost).toFixed(2)}`;
+            const reset =
+              row.resets_in_seconds > 0
+                ? `${Math.floor(row.resets_in_seconds / 60)}m`
+                : "now";
+            return (
+              `${row.provider}${row.active ? " *" : ""}  ` +
+              `${Math.round(row.used)}/${Math.round(row.capacity)} (${row.percent}%)  ` +
+              `reset ${reset}  ~${cost}`
+            );
+          }),
+          "",
+          "* active provider — costs are list-price estimates, not billing.",
+          "Local models are free; only the tracked window is counted.",
+        ];
+        panel("Usage & cost", lines.join("\n"));
+      } catch (error) {
+        panel("Usage & cost", (error as Error).message);
+      }
+      return true;
+    }
+
+    if (lower === "memory") {
+      const target = arg.trim();
+      const show = async () => {
+        const data = await api.projectMemory();
+        const lines = [
+          `Project: ${data.project}`,
+          "",
+          data.rules_summary,
+          "",
+          `Memory — ${data.entries.length} entries`,
+          ...data.entries.map((row) => `  ${row.id}  ${row.text}`),
+          ...(data.entries.length ? [] : ["  (empty — /memory add <text>)"]),
+          "",
+          "Commands: /memory add <text> · remove <id|index> · clear · rules",
+        ];
+        panel("Project memory", lines.join("\n"));
+      };
+      try {
+        if (target === "rules") {
+          const data = await api.projectMemory();
+          const lines = [
+            data.rules_summary,
+            "",
+            ...data.rules.map((row) => `${row.name} — ${row.chars.toLocaleString()} chars`),
+          ];
+          panel("Project rules", lines.join("\n"));
+        } else if (target.startsWith("add ")) {
+          await api.addMemory(target.slice(4));
+          await show();
+        } else if (target.startsWith("remove ")) {
+          await api.removeMemory(target.slice(7).trim());
+          await show();
+        } else if (target === "clear") {
+          const { removed } = await api.clearMemory();
+          panel(
+            "Project memory",
+            `Cleared ${removed} entr${removed === 1 ? "y" : "ies"}.`,
+          );
+        } else {
+          await show();
+        }
+      } catch (error) {
+        panel("Project memory", (error as Error).message);
+      }
+      return true;
+    }
+
+    if (lower === "review" || lower === "commit") {
+      const staged = lower === "commit";
+      try {
+        const change = await api.gitDiff(staged ? "staged" : "review");
+        if (change.error) {
+          panel(staged ? "Commit draft" : "Review", change.error);
+          return true;
+        }
+        if (!change.prompt || !change.display) {
+          panel(staged ? "Commit draft" : "Review", "The diff could not be prepared.");
+          return true;
+        }
+        await get().send("", {
+          content: change.prompt,
+          displayText: change.display,
+        });
+      } catch (error) {
+        panel(staged ? "Commit draft" : "Review", (error as Error).message);
+      }
+      return true;
+    }
+
+    if (lower === "plan") {
+      const task = arg.trim();
+      if (!task) {
+        panel("Plan", "Usage: /plan <task>");
+        return true;
+      }
+      const shown = task.length > 60 ? `${task.slice(0, 59)}…` : task;
+      await get().setMode("Planning");
+      await get().send("", {
+        content:
+          "Draft a short numbered plan for this task. Call the plan tool with a " +
+          "short task line and the numbered steps; do not execute anything yet. " +
+          "If tools are unavailable, reply with the numbered plan only.\n\n" +
+          `Task: ${task}`,
+        displayText: `Plan · ${shown}`,
+      });
+      return true;
+    }
+
     if (lower === "plugins") {
       get().openPlugins();
       return true;
@@ -1140,18 +1490,8 @@ export const useChat = create<ChatState>((set, get) => ({
     );
     // A skill may not shadow a debug command while debug is on.
     if (skill && !(get().debug && DEBUG_COMMAND_NAMES.has(lower))) {
-      try {
-        const expanded = await api.expandSkill(skill.name, arg);
-        set({ draft: expanded.prompt });
-        get().requestComposerFocus();
-        if (expanded.prompt.length > LARGE_SKILL_CHARS) {
-          get().notify(
-            `Large skill — ~${Math.round(expanded.prompt.length / 4)} tokens. Trim it before sending.`,
-          );
-        }
-      } catch (error) {
-        panel("Skills", (error as Error).message);
-      }
+      await get().attachSkill(skill, arg);
+      get().requestComposerFocus();
       return true;
     }
 
@@ -1175,6 +1515,7 @@ export const useChat = create<ChatState>((set, get) => ({
             "/markdown         append every markdown style (render test)",
             "/thought          append a Thought panel with every markdown style",
             "/tooltest         append inspectable tool results and a synthetic write approval",
+            "/plantest         append a synthetic plan approval",
             "/filler <n>       append n words of filler (scroll test)",
             "/error <text>     raise the error banner (UI test)",
             "/simulate <state>  loading | error | streaming | off",
@@ -1232,7 +1573,7 @@ export const useChat = create<ChatState>((set, get) => ({
             `params     ${info.params ?? "—"}`,
             `context    ${info.ctx_len ?? "—"}`,
             `device     ${info.device ? String(info.device).toUpperCase() : "—"}`,
-            `tier/mode  ${get().variant} · ${get().mode}`,
+            `mode       ${get().mode}`,
             `session    ${get().sessionId ?? "unsaved"}`,
             `messages   ${get().messages.length}`,
           ].join("\n"),
@@ -1317,6 +1658,18 @@ export const useChat = create<ChatState>((set, get) => ({
           "Thought",
           "Appended a fake reply with a full-markdown Thought panel (not saved).",
         );
+        return true;
+
+      case "plantest":
+        set({
+          debugPanel: null,
+          planApproval: {
+            id: `debug-plan-${Date.now()}`,
+            task: "Ship the release checklist",
+            steps: ["Tag the release", "Publish the changelog", "Smoke-test the installer"],
+            synthetic: true,
+          },
+        });
         return true;
 
       case "tooltest": {
@@ -1715,7 +2068,7 @@ export const useChat = create<ChatState>((set, get) => ({
             `ctx          ${info.ctx_len ?? "—"}${info.ctx_assumed ? " (assumed)" : ""}`,
             `session      ${st.sessionId ?? "unsaved"}`,
             `messages     ${st.messages.length}`,
-            `tier / mode  ${st.variant} / ${st.mode}`,
+            `mode         ${st.mode}`,
             `debug        ${st.debug}`,
             `budget ovr   ${st.budgetOverride ?? "off"}`,
             `dictation    ${st.dictationReady ? "ready" : "not downloaded"}`,
@@ -1791,13 +2144,13 @@ export const useChat = create<ChatState>((set, get) => ({
         const bundle = {
           generated: new Date().toISOString(),
           app: { version: window.dizel ? "desktop" : "web" },
+          doctor: await api.doctor().catch(() => null),
           model: {
             name: modelName(get().status),
             params: info.params,
             ctx: info.ctx_len,
             device: info.device,
           },
-          tier: get().variant,
           mode: get().mode,
           provider: get().status?.provider,
           session: get().sessionId,
@@ -1836,6 +2189,32 @@ export const useChat = create<ChatState>((set, get) => ({
       /* the sidecar may still be starting; a direct /skill call retries */
     }
   },
+
+  attachSkill: async (skill, args = "") => {
+    try {
+      const expanded = await api.expandSkill(skill.name, args);
+      set((state) => ({
+        attachedSkills: [
+          ...state.attachedSkills,
+          {
+            name: skill.name,
+            title: skill.title || skill.name,
+            args,
+            prompt: expanded.prompt,
+          },
+        ],
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  detachSkill: (index) =>
+    set((state) => ({
+      attachedSkills: state.attachedSkills.filter((_, i) => i !== index),
+    })),
+
+  clearAttachedSkills: () => set({ attachedSkills: [] }),
 
   /**
    * Carries the current conversation into a fresh chat.
@@ -1878,6 +2257,31 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
+  setSessionTags: async (id: string, tags: string[]) => {
+    try {
+      const result = await api.setSessionTags(id, tags);
+      // Patch the row in place: reloading the list would close the row's editor
+      // and drop focus mid-edit.
+      set((state) => ({
+        sessions: state.sessions.map((session) =>
+          session.id === id ? { ...session, tags: result.tags } : session,
+        ),
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  openInTerminal: async (id: string) => {
+    if (!window.dizel?.openInTerminal) {
+      set({ error: "The terminal handoff needs the desktop app." });
+      return;
+    }
+    const result = await window.dizel.openInTerminal(id);
+    if (result.ok) get().notify("Opening this chat in the terminal…");
+    else set({ error: result.error ?? "Could not open the terminal." });
+  },
+
   removeSession: async (id: string) => {
     try {
       await api.deleteSession(id);
@@ -1889,9 +2293,11 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
-  send: async (text: string) => {
+  send: async (text: string, options) => {
     const trimmed = text.trim();
-    if (!trimmed || get().streaming) return;
+    const attached = options?.content ? [] : get().attachedSkills;
+    if ((!trimmed && attached.length === 0 && !options?.content) || get().streaming)
+      return;
 
     // Edit-and-resend: rewind the saved session so the replaced message and
     // everything after it are gone before the new text goes out.
@@ -1923,8 +2329,22 @@ export const useChat = create<ChatState>((set, get) => ({
     }
 
     const attachments = get().attachments;
+    const content =
+      options?.content ?? composeSkillContent(attached.map((skill) => skill.prompt), trimmed);
+    const display = options?.displayText
+      ? { text: options.displayText, skills: [] }
+      : attached.length
+        ? {
+            text: trimmed,
+            skills: attached.map(({ name, title, args }) => ({
+              name,
+              title,
+              ...(args ? { args } : {}),
+            })),
+          }
+        : undefined;
     const visionReady = Boolean(get().status?.model_info?.vision);
-    const payload = composePrompt(trimmed, attachments, visionReady);
+    const payload = composePrompt(content, attachments, visionReady);
     const imagePayload = visionReady
       ? attachments
           .map((file) => file.previewUrl)
@@ -1950,8 +2370,9 @@ export const useChat = create<ChatState>((set, get) => ({
     const userMessage: Message = {
       id: uid(),
       role: "user",
-      content: trimmed,
+      content,
       createdAt: Date.now(),
+      display,
       // Kept for display only — composePrompt already folded the text into the
       // payload the model receives.
       attachments: attachments.length ? attachments.map((file) => ({ ...file })) : undefined,
@@ -1972,6 +2393,7 @@ export const useChat = create<ChatState>((set, get) => ({
       approval: null,
       draft: "",
       attachments: [],
+      attachedSkills: options?.content ? state.attachedSkills : [],
       preview: null,
     }));
 
@@ -2061,9 +2483,19 @@ export const useChat = create<ChatState>((set, get) => ({
                 })),
               }));
               break;
+            case "plan":
+              set({
+                planApproval: {
+                  id: event.id,
+                  task: event.task,
+                  steps: event.steps,
+                },
+              });
+              break;
             case "done":
               set((state) => ({
                 approval: null,
+                planApproval: null,
                 messages: patchLast(state.messages, (m) => ({
                   ...m,
                   content: event.text || m.content,
@@ -2097,6 +2529,7 @@ export const useChat = create<ChatState>((set, get) => ({
               set((state) => ({
                 error: event.message,
                 approval: null,
+                planApproval: null,
                 messages: patchLast(state.messages, (m) => ({
                   ...m,
                   streaming: false,
@@ -2117,6 +2550,8 @@ export const useChat = create<ChatState>((set, get) => ({
         controller.signal,
         Boolean(get().pendingContinue),
         imagePayload,
+        display,
+        get().verbosity,
       );
     } catch (error) {
       const aborted = (error as Error).name === "AbortError";
@@ -2137,7 +2572,7 @@ export const useChat = create<ChatState>((set, get) => ({
       }));
     } finally {
       controller = null;
-      set({ streaming: false, approval: null });
+      set({ streaming: false, approval: null, planApproval: null });
       get().commitFork();
       get().commitContinue();
       void get().refreshStatus();
@@ -2359,11 +2794,15 @@ export const useChat = create<ChatState>((set, get) => ({
       error: null,
       streaming: false,
       attachments: [],
+      attachedSkills: [],
       editingId: null,
       serverUsage: null,
       // New chat belongs to the chat surface, not whichever workspace panel
       // happened to be open when it was pressed.
       workspaceView: null,
+      // An empty conversation has no artifacts; a rail that can only say "no
+      // files yet" is 360px of nothing.
+      artifactsOpen: false,
     });
   },
 
@@ -2397,19 +2836,49 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
-  setVariant: async (variant: string) => {
-    set({ variant });
+  setMode: async (mode: string) => {
+    set({ mode });
     try {
-      await api.applyProfile(variant, get().mode);
+      const applied = await api.applyProfile(
+        localProfileFamily(get().status),
+        mode,
+        get().thinkingEffort,
+        get().fastSpeed,
+      );
+      set({ modePrompt: applied.mode_prompt ?? "" });
     } catch (error) {
       set({ error: (error as Error).message });
     }
   },
 
-  setMode: async (mode: string) => {
-    set({ mode });
+  setThinkingEffort: async (effort) => {
+    const next = normalizeEffort(effort);
+    set({ thinkingEffort: next });
+    if (get().mode !== "Thinking") return;
     try {
-      await api.applyProfile(get().variant, mode);
+      const applied = await api.applyProfile(
+        localProfileFamily(get().status),
+        "Thinking",
+        next,
+      );
+      set({ modePrompt: applied.mode_prompt ?? "" });
+    } catch (error) {
+      set({ error: (error as Error).message });
+    }
+  },
+
+  setFastSpeed: async (speed) => {
+    const next = normalizeSpeed(speed);
+    set({ fastSpeed: next });
+    if (get().mode !== "Fast") return;
+    try {
+      const applied = await api.applyProfile(
+        localProfileFamily(get().status),
+        "Fast",
+        get().thinkingEffort,
+        next,
+      );
+      set({ modePrompt: applied.mode_prompt ?? "" });
     } catch (error) {
       set({ error: (error as Error).message });
     }
@@ -2478,13 +2947,30 @@ export const useChat = create<ChatState>((set, get) => ({
     );
   },
 
-  setPreview: (attachment) => set({ preview: attachment }),
+  setPreview: (attachment) =>
+    // The two right-hand rails are exclusive: both open would squeeze the
+    // transcript to a column of hyphens on a 1280px window.
+    set(attachment ? { preview: attachment, artifactsOpen: false } : { preview: null }),
+
+  openArtifacts: () => set({ artifactsOpen: true, preview: null }),
+  closeArtifacts: () => set({ artifactsOpen: false }),
+  toggleArtifacts: () =>
+    set((state) =>
+      state.artifactsOpen
+        ? { artifactsOpen: false }
+        : { artifactsOpen: true, preview: null },
+    ),
 
   removeAttachment: (id) =>
     set((state) => ({ attachments: state.attachments.filter((a) => a.id !== id) })),
 
-  openSettings: (tab) =>
-    set({ settingsOpen: true, settingsTab: tab || "Chat", settingsError: null }),
+  openSettings: (tab) => {
+    set({ settingsOpen: true, settingsTab: tab || "Chat", settingsError: null });
+    void api
+      .getPrompts()
+      .then((prompts) => set({ modePrompt: prompts.mode_prompt ?? "" }))
+      .catch(() => undefined);
+  },
 
   closeSettings: () => set({ settingsOpen: false }),
 

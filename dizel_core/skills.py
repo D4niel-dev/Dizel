@@ -217,3 +217,32 @@ def expand_skill(skill: Skill, args: str = "") -> str:
     return body
 
 
+def compose_prompt(prompts, text: str) -> str:
+    """Join expanded skill prompts ahead of the text the user typed.
+
+    The result is exactly what the model sees; the attached skills stay view
+    metadata and never replace this string in a saved session.
+    """
+    parts = [str(prompt).strip() for prompt in prompts if str(prompt or "").strip()]
+    typed = (text or "").strip()
+    if parts and typed:
+        return "\n\n".join([*parts, typed])
+    return "\n\n".join(parts) or typed
+
+
+def display_metadata(text: str, skills) -> Optional[dict]:
+    """The view-only record stored beside a user message that carried skills."""
+    rows = []
+    for skill in skills:
+        name = skill.get("name")
+        if not name:
+            continue
+        row = {"name": str(name), "title": str(skill.get("title") or name)}
+        if skill.get("args"):
+            row["args"] = str(skill["args"])
+        rows.append(row)
+    if not rows:
+        return None
+    return {"text": (text or "").strip(), "skills": rows}
+
+

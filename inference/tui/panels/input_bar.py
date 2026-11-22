@@ -20,6 +20,7 @@ from inference.tui.theme import (
     TEXT_3,
     WARN,
 )
+from dizel_core import skills as skills_core
 
 PLACEHOLDERS = (
     'Ask anything...  "Fix a TODO in the codebase"',
@@ -72,6 +73,16 @@ class PromptInput(Input):
     def action_page_down_pressed(self) -> None:
         self.post_message(self.PageDownPressed())
 
+    async def _on_key(self, event: events.Key) -> None:
+        # Backspace on an empty prompt deletes the newest attached skill, the
+        # same way it would delete a character.
+        if event.key == "backspace" and not self.value:
+            remove = getattr(self.app, "remove_last_skill", None)
+            if remove is not None and remove():
+                event.stop()
+                return
+        await super()._on_key(event)
+
 
 class InputBar(Container):
     """The composer. State and model live in the header and status line, so
@@ -84,6 +95,7 @@ class InputBar(Container):
         self._placeholder_idx = 0
 
     def compose(self) -> ComposeResult:
+        yield Static("", id="input-skills")
         with Horizontal(id="input-row"):
             yield Static("❯", id="prompt-icon")
             yield PromptInput(
@@ -100,12 +112,13 @@ class InputBar(Container):
 
     def on_mount(self) -> None:
         self.refresh_footer()
+        self.refresh_skills()
         self.set_interval(4.5, self._rotate_placeholder)
         for prop in (
             "active_model",
             "active_provider",
-            "active_tier",
             "active_mode",
+            "active_thinking_effort",
             "context_tokens",
             "budget_tokens",
             "generation_state",
@@ -124,6 +137,24 @@ class InputBar(Container):
             return
         self._placeholder_idx = (self._placeholder_idx + 1) % len(PLACEHOLDERS)
         inp.placeholder = PLACEHOLDERS[self._placeholder_idx]
+
+    def refresh_skills(self) -> None:
+        """Render the attached-skill chips above the prompt."""
+        try:
+            row = self.query_one("#input-skills", Static)
+        except Exception:
+            return
+        skills = list(getattr(self.app, "attached_skills", []))
+        row.display = bool(skills)
+        if not skills:
+            row.update("")
+            return
+        chips = "   ".join(
+            f"[{ACCENT}]▣ {escape(str(skill.get('title') or skill.get('name') or 'skill'))}[/]"
+            f" [{TEXT_3}]×[/]"
+            for skill in skills
+        )
+        row.update(f"{chips}   [{TEXT_3}]backspace removes[/]")
 
     @staticmethod
     def _clip(value: str, limit: int) -> str:
@@ -150,7 +181,7 @@ class InputBar(Container):
         compact = width < 88
         narrow = width < 64
         hide_stats = width < 54
-        agent = getattr(app, "response_label", app.active_tier) or "Fast"
+        agent = getattr(app, "response_label", app.active_mode) or "Fast"
         model = self._clip(
             display_model(app.active_model or "no model", agent),
             16 if narrow else (18 if compact else 34),
@@ -196,8 +227,9 @@ class InputBar(Container):
             hint = f"[{TEXT_3}]shift+tab mode[/]"
 
         try:
+            color = getattr(app, "response_color", ACCENT)
             self.query_one("#input-agent", Static).update(
-                f"[bold {ACCENT_INK} on {ACCENT}]  {escape(agent)}  [/]"
+                f"[bold {ACCENT_INK} on {color}]  {escape(agent)}  [/]"
             )
             model_markup = f"[{TEXT}]{escape(model)}[/]"
             if not compact:
@@ -310,6 +342,7 @@ class InputBar(Container):
     @on(Input.Submitted, "#prompt-input")
     async def on_submit(self, event: Input.Submitted) -> None:
         text = event.value.strip()
+        attached = list(getattr(self.app, "attached_skills", []))
         from_editor = isinstance(event, PromptInput.SubmittedFromEditor)
         compose_mode = not chat_pref(self.app, "enter_to_send", True)
         drawer = self._drawer()
@@ -319,7 +352,7 @@ class InputBar(Container):
             if picked is not None:
                 # Enter runs what is highlighted, not what was half-typed.
                 text = f"/{picked.name}"
-        if not text:
+        if not text and not attached:
             if compose_mode and not from_editor:
                 self.app.action_multiline_input(send=True)
             return
@@ -331,7 +364,7 @@ class InputBar(Container):
             self.app.action_multiline_input(send=True)
             return
 
-        if not self.history or self.history[-1] != text:
+        if text and (not self.history or self.history[-1] != text):
             self.history.append(text)
         self.history_idx = len(self.history)
 
@@ -360,13 +393,19 @@ class InputBar(Container):
             workspace.add_system_message("Still generating — press esc to stop first.", "error")
             return
 
+        content = skills_core.compose_prompt(
+            [skill["prompt"] for skill in attached], text
+        )
+        display = skills_core.display_metadata(text, attached)
+
         event.input.value = ""
         self.app.clear_reply_metrics()
         self.app.generation_state = "THINKING"
-        workspace.add_user_message(text)
-        self.app.session_bridge.add_message("user", text)
+        workspace.add_user_message(text, display)
+        self.app.session_bridge.add_message("user", content, display)
+        self.app.clear_attached_skills()
         self.app.refresh_tabs()
-        self.app.tool_bridge.run_tools_and_send(text)
+        self.app.tool_bridge.run_tools_and_send(content, display)
 
     # ── History navigation ───────────────────────────────────────────
     @on(PromptInput.UpPressed)

@@ -16,6 +16,7 @@
  */
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const os = require("node:os");
 const path = require("node:path");
 
@@ -41,7 +42,10 @@ env.DIZEL_DEBUG = "1";
 env.DIZEL_SHOT = shot;
 env.DIZEL_SHOT_DELAY = argOf("delay", "12000");
 env.DIZEL_SHOT_SIZE = argOf("size", "1280x900");
-env.DIZEL_SHOT_JS_FILE = path.join(__dirname, "smoke.js");
+
+// The renderer cannot read files; a composed script hands it the capability
+// manifest plus the checkpoint that carries a seeded scorecard.
+const repoRoot = path.resolve(root, "..", "..");
 
 // The sidecar inherits this env (electron/main.cjs spreads process.env), so
 // trust writes during smoke land in a throwaway config dir, never the user's
@@ -51,7 +55,6 @@ env.DIZEL_CONFIG_DIR = configDir;
 
 // Deterministic checkpoint history for the composer's "Recently loaded"
 // section: one real checkpoint and one whose file no longer exists.
-const repoRoot = path.resolve(root, "..", "..");
 fs.writeFileSync(
   path.join(configDir, "settings.json"),
   JSON.stringify({
@@ -61,6 +64,58 @@ fs.writeFileSync(
     ],
   }),
 );
+
+// History and scorecards are isolated too. Seed one fresh card for the real
+// checkpoint so the switcher badge and /scorecard are exercised.
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dizel-smoke-data-"));
+env.DIZEL_DATA_DIR = dataDir;
+const scoredCheckpoint = path.join(repoRoot, "checkpoints", "Dizel-1.5-SFT.gguf");
+let hasScorecard = false;
+try {
+  const stat = fs.statSync(scoredCheckpoint);
+  const key = crypto
+    .createHash("sha1")
+    .update(path.resolve(scoredCheckpoint).toLowerCase())
+    .digest("hex");
+  const scorecardsDir = path.join(dataDir, "scorecards");
+  fs.mkdirSync(scorecardsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(scorecardsDir, `${key}.json`),
+    JSON.stringify({
+      version: 1,
+      suite: "core",
+      suite_version: 1,
+      checkpoint: path.basename(scoredCheckpoint),
+      name: path.basename(scoredCheckpoint),
+      path: path.resolve(scoredCheckpoint),
+      size: stat.size,
+      mtime: Math.floor(stat.mtimeMs / 1000),
+      evaluated_at: "2026-11-18T12:00:00",
+      total: 15,
+      passed: 12,
+      pass_rate: 0.8,
+      avg_score: 0.83,
+      tok_per_s: 41.2,
+      by_category: { coding: 0.9, reasoning: 0.7 },
+      cases: [],
+    }),
+  );
+  hasScorecard = true;
+} catch {
+  /* a clean CI box may not have the checkpoint; the checks report it */
+}
+
+const manifestPath = path.resolve(root, "..", "..", "capabilities.json");
+const composedScript = path.join(os.tmpdir(), `dizel-smoke-script-${Date.now()}.js`);
+fs.writeFileSync(
+  composedScript,
+  `window.__CAPABILITY_MANIFEST = ${fs.readFileSync(manifestPath, "utf8")};\n` +
+    `window.__SCORECARD_PATH = ${
+      hasScorecard ? JSON.stringify(scoredCheckpoint) : "null"
+    };\n` +
+    fs.readFileSync(path.join(__dirname, "smoke.js"), "utf8"),
+);
+env.DIZEL_SHOT_JS_FILE = composedScript;
 
 const TIMEOUT_MS = Number(argOf("timeout", "360000"));
 
@@ -83,6 +138,8 @@ child.on("close", (code) => {
 
   try {
     fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(dataDir, { recursive: true, force: true });
+    fs.rmSync(composedScript, { force: true });
   } catch {
     /* temp dir cleanup is best-effort */
   }

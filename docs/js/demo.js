@@ -11,12 +11,38 @@
   "use strict";
 
   const KEY = "dizel-demo-v5";
-  const TIERS = ["Flash", "Pro"];
-  const MODES = ["Fast", "Planning", "Coding", "Thinking", "Deep Think"];
+  const MODES = ["Fast", "Planning", "Coding", "Thinking"];
+  const THINKING_EFFORTS = [
+    { id: "low", label: "Low", color: "#60a5fa", note: "Answers straight away with minimal reasoning. Fastest and cheapest — good for simple questions, lookups and small edits." },
+    { id: "medium", label: "Medium", color: "#a78bfa", note: "Thinks briefly before answering: weighs the obvious options and checks the usual pitfalls. The default balance of speed and care." },
+    { id: "high", label: "High", color: "#f472b6", note: "Works the problem properly — compares approaches, checks edge cases and verifies the answer before writing it." },
+    { id: "xhigh", label: "X-High", color: "#fb923c", note: "Breaks the task into parts, weighs the alternatives against each other and reviews its own reasoning before committing." },
+    { id: "deep", label: "Max", color: "#f43f5e", note: "Maximum effort. Explores several routes, stress-tests the answer against failure modes and spends the whole budget getting it right." },
+  ];
+  const FAST_SPEEDS = [
+    { id: "fast", label: "Fast", color: "#38bdf8", note: "A direct answer without preamble or filler. The default." },
+    { id: "turbo", label: "Turbo", color: "#4fd6be", note: "A larger reply budget and a stronger prompt to answer promptly." },
+    { id: "ultrafast", label: "Ultrafast", color: "#fb923c", note: "The largest budget and the strongest prompt to answer immediately." },
+  ];
+  const MODE_COLORS = { Fast: "#38bdf8", Planning: "#f59e0b", Coding: "#34d399" };
+  const MODE_GLYPHS = { Fast: "↯", Planning: "☰", Coding: "{}", Thinking: "✦" };
+  const effortInfo = (id) =>
+    THINKING_EFFORTS.find((item) => item.id === id) || THINKING_EFFORTS[1];
+  const speedInfo = (id) =>
+    FAST_SPEEDS.find((item) => item.id === id) || FAST_SPEEDS[0];
+  const modeColor = (mode, effort, speed = "fast") => {
+    if (mode === "Fast") return speedInfo(speed).color;
+    return mode === "Thinking" ? effortInfo(effort).color : MODE_COLORS[mode] || "#9aa6b2";
+  };
+  const modeLabel = (mode, effort, speed = "fast") => {
+    if (mode === "Fast") return speedInfo(speed).label;
+    return mode === "Thinking" ? effortInfo(effort).label : mode;
+  };
   const THEMES = [
     ["dark", "Dark"],
     ["light", "Light"],
     ["dark-blue", "Dark blue"],
+    ["system", "System"],
   ];
   const SPEECH_MODELS = [
     ["tiny", "tiny · 39M"],
@@ -274,8 +300,9 @@
     const now = Date.now();
     return {
       theme: "dark",
-      tier: "Flash",
       mode: "Fast",
+      thinkingEffort: "medium",
+      fastSpeed: "fast",
       enterToSend: true,
       username: "Daniel",
       systemPrompt: "You are Dizel, a capable assistant. Be direct, use Markdown when it helps.",
@@ -475,8 +502,17 @@
       merged.speech.task = SPEECH_DEFAULTS.task;
     }
     merged.speech.prompt = String(merged.speech.prompt || "").slice(0, 400);
-    if (!TIERS.includes(merged.tier)) merged.tier = "Flash";
+    if (merged.mode === "Deep Think") {
+      merged.mode = "Thinking";
+      merged.thinkingEffort = "deep";
+    }
     if (!MODES.includes(merged.mode)) merged.mode = "Fast";
+    if (!THINKING_EFFORTS.some((item) => item.id === merged.thinkingEffort)) {
+      merged.thinkingEffort = "medium";
+    }
+    if (!FAST_SPEEDS.some((item) => item.id === merged.fastSpeed)) {
+      merged.fastSpeed = "fast";
+    }
     if (!THEMES.some(([value]) => value === merged.theme)) merged.theme = "dark";
     if (merged.view && !VIEW_TITLES[merged.view]) merged.view = null;
     const activeSession = merged.sessions.find((session) => session.id === merged.activeId);
@@ -816,7 +852,7 @@
       ].join("\n");
     }
 
-    if (mode === "Deep Think") {
+    if (mode === "Thinking" && state.thinkingEffort === "deep") {
       return [
         "## Working it through",
         "",
@@ -1242,8 +1278,22 @@
     el.send.setAttribute("title", busy ? "Stop generating" : "Send");
   }
 
+  function renderedTheme() {
+    if (state.theme !== "system") return state.theme;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+  if (window.matchMedia) {
+    window
+      .matchMedia("(prefers-color-scheme: dark)")
+      .addEventListener("change", () => {
+        if (state.theme === "system") render();
+      });
+  }
+
   function render() {
-    document.documentElement.dataset.theme = state.theme;
+    document.documentElement.dataset.theme = renderedTheme();
     el.sidebar.classList.toggle("collapsed", state.collapsed);
     el.statusbarWrap.classList.toggle("is-open", state.showStatusbar);
 
@@ -1253,11 +1303,10 @@
     statusToggle.setAttribute("title", state.showStatusbar ? "Hide status bar" : "Show status bar");
 
     $("#model-label").textContent = MODEL.name;
-    $("#tier-label").textContent = state.tier;
-    const modeChip = $("#tier-mode");
-    modeChip.hidden = state.mode === "Fast";
-    modeChip.textContent = state.mode;
-    $("#btn-tier").classList.toggle("is-armed", state.mode !== "Fast");
+    const activeColor = modeColor(state.mode, state.thinkingEffort, state.fastSpeed);
+    $("#mode-label").textContent = modeLabel(state.mode, state.thinkingEffort, state.fastSpeed);
+    $("#btn-mode").style.color = activeColor;
+    $("#btn-mode").classList.toggle("is-armed", state.mode !== "Fast");
 
     $("#sb-avatar").textContent = state.username.slice(0, 1).toUpperCase();
     $("#sb-user").textContent = state.username;
@@ -1873,14 +1922,6 @@
       };
     });
 
-    el.popover.querySelectorAll("[data-tier]").forEach((button) => {
-      button.onclick = () => {
-        state.tier = button.dataset.tier;
-        closePopover();
-        render();
-      };
-    });
-
     el.popover.querySelectorAll("[data-mode]").forEach((button) => {
       button.onclick = () => {
         state.mode = button.dataset.mode;
@@ -1888,6 +1929,68 @@
         render();
       };
     });
+
+    const bindEffortStops = (host) => {
+      host.querySelectorAll("[data-effort]").forEach((stop) => {
+        stop.onclick = () => {
+          state.mode = "Thinking";
+          state.thinkingEffort = stop.dataset.effort;
+          render();
+          closePopover();
+        };
+      });
+    };
+
+    el.popover.querySelectorAll("[data-effort-open]").forEach((button) => {
+      button.onclick = (event) => {
+        event.stopPropagation();
+        const host = button.closest(".popover");
+        if (!host || host.querySelector(".effort-panel")) return;
+        host.insertAdjacentHTML("beforeend", effortHtml());
+        bindEffortStops(host);
+      };
+    });
+
+    const bindSpeedStops = (host) => {
+      host.querySelectorAll("[data-speed]").forEach((stop) => {
+        stop.onclick = () => {
+          state.mode = "Fast";
+          state.fastSpeed = stop.dataset.speed;
+          render();
+          closePopover();
+        };
+      });
+    };
+
+    el.popover.querySelectorAll("[data-speed-open]").forEach((button) => {
+      button.onclick = (event) => {
+        event.stopPropagation();
+        const host = button.closest(".popover");
+        if (!host || host.querySelector(".speed-panel")) return;
+        host.insertAdjacentHTML("beforeend", speedHtml());
+        bindSpeedStops(host);
+      };
+    });
+
+    const thinkingRow = el.popover.querySelector("[data-effort-row]");
+    if (thinkingRow) {
+      thinkingRow.onmouseenter = () => {
+        const host = thinkingRow.closest(".popover");
+        if (!host || host.querySelector(".effort-panel")) return;
+        host.insertAdjacentHTML("beforeend", effortHtml());
+        bindEffortStops(host);
+      };
+    }
+
+    const fastRow = el.popover.querySelector("[data-speed-row]");
+    if (fastRow) {
+      fastRow.onmouseenter = () => {
+        const host = fastRow.closest(".popover");
+        if (!host || host.querySelector(".speed-panel")) return;
+        host.insertAdjacentHTML("beforeend", speedHtml());
+        bindSpeedStops(host);
+      };
+    }
 
     el.popover.querySelectorAll("[data-manage]").forEach((button) => {
       button.onclick = () => {
@@ -1986,22 +2089,70 @@
       <button class="popover-item" role="menuitem" data-manage><span class="popover-item-main">Manage models…</span></button>`;
   }
 
-  function tierHtml() {
-    return `<div class="popover-label">Tier</div>
-      ${TIERS.map(
-        (name) => `<button class="popover-item ${state.tier === name ? "active" : ""}" role="menuitem" data-tier="${name}">
-          <span class="popover-item-main">${name}</span>
-          ${state.tier === name ? icon("check", 13) : ""}
-        </button>`,
-      ).join("")}
-      <div class="popover-sep"></div>
-      <div class="popover-label">Mode</div>
-      ${MODES.map(
-        (name) => `<button class="popover-item ${state.mode === name ? "active" : ""}" role="menuitem" data-mode="${name}">
-          <span class="popover-item-main">${name}</span>
-          ${state.mode === name ? icon("check", 13) : ""}
-        </button>`,
-      ).join("")}`;
+  function modeHtml() {
+    return `<div class="popover-label">Mode</div>
+      ${MODES.map((name) => {
+        const color = modeColor(name, state.thinkingEffort, state.fastSpeed);
+        const active = state.mode === name;
+        const tier = name === "Thinking"
+          ? effortInfo(state.thinkingEffort).label
+          : name === "Fast" && state.fastSpeed !== "fast"
+            ? speedInfo(state.fastSpeed).label
+            : null;
+        const tag = tier
+          ? `<span class="mode-effort-tag" style="color:${color}">${tier}</span>`
+          : "";
+        const arrow =
+          name === "Thinking"
+            ? `<button type="button" class="mode-arrow" data-effort-open aria-label="Thinking effort">›</button>`
+            : name === "Fast"
+              ? `<button type="button" class="mode-arrow" data-speed-open aria-label="Fast speed">›</button>`
+              : "";
+        return `<div class="mode-row">
+          <button class="popover-item mode-item ${active ? "active" : ""}" role="menuitem" data-mode="${name}" ${name === "Thinking" ? "data-effort-row" : name === "Fast" ? "data-speed-row" : ""}>
+            <span class="popover-item-main"><span class="mode-glyph" style="color:${color}">${MODE_GLYPHS[name]}</span><span ${active ? `style="color:${color}"` : ""}>${name}</span>${tag}</span>
+            ${active ? icon("check", 13) : ""}
+          </button>
+          ${arrow}
+        </div>`;
+      }).join("")}`;
+  }
+
+  function effortHtml() {
+    return `<div class="effort-panel">
+      <div class="effort-head"><span>Thinking effort</span><b style="color:${effortInfo(state.thinkingEffort).color}">${effortInfo(state.thinkingEffort).label}</b></div>
+      <div class="effort-scale">
+        <div class="effort-line"></div>
+        ${THINKING_EFFORTS.map(
+          (item) =>
+            `<button type="button" class="effort-stop ${item.id === state.thinkingEffort ? "active" : ""}" style="--stop-color:${item.color}" data-effort="${item.id}" aria-label="${item.label}" aria-pressed="${item.id === state.thinkingEffort}"></button>`,
+        ).join("")}
+      </div>
+      <div class="effort-names">${THINKING_EFFORTS.map(
+        (item) =>
+          `<span class="${item.id === state.thinkingEffort ? "is-active" : ""}" ${item.id === state.thinkingEffort ? `style="color:${item.color}"` : ""}>${item.label}</span>`,
+      ).join("")}</div>
+      <p class="effort-note">${effortInfo(state.thinkingEffort).note}</p>
+    </div>`;
+  }
+
+  function speedHtml() {
+    const info = speedInfo(state.fastSpeed);
+    return `<div class="effort-panel speed-panel">
+      <div class="effort-head"><span>Reply speed</span><b style="color:${info.color}">${info.label}</b></div>
+      <div class="effort-scale">
+        <div class="effort-line"></div>
+        ${FAST_SPEEDS.map(
+          (item) =>
+            `<button type="button" class="effort-stop ${item.id === state.fastSpeed ? "active" : ""}" style="--stop-color:${item.color}" data-speed="${item.id}" aria-label="${item.label}" aria-pressed="${item.id === state.fastSpeed}"></button>`,
+        ).join("")}
+      </div>
+      <div class="effort-names">${FAST_SPEEDS.map(
+        (item) =>
+          `<span class="${item.id === state.fastSpeed ? "is-active" : ""}" ${item.id === state.fastSpeed ? `style="color:${item.color}"` : ""}>${item.label}</span>`,
+      ).join("")}</div>
+      <p class="effort-note">${info.note} Higher speeds allow a larger reply budget and cost more tokens. Tokens per second is unchanged.</p>
+    </div>`;
   }
 
   /* ── Settings ──────────────────────────────────────────────────────────── */
@@ -2010,7 +2161,7 @@
 
   const HINTS = {
     Chat: "How the assistant is framed, and how Enter behaves.",
-    Model: "Tier and response mode. The desktop app also picks a checkpoint here.",
+    Model: "Response mode. The desktop app also picks a checkpoint here.",
     Appearance: "Three themes, ported from the desktop tokens.",
     Speech: "Whisper model, language, task and vocabulary. Stored in this browser.",
     Shortcuts: "Global shortcuts, as listed in the desktop app.",
@@ -2115,10 +2266,6 @@
 
     if (tab === "Model") {
       body += `<div class="field">
-          <label>Tier</label>
-          ${segmentedHtml("seg-tier", TIERS.map((name) => [name, name]), state.tier, "tier", "Model tier")}
-        </div>
-        <div class="field">
           <label>Mode</label>
           ${segmentedHtml("seg-mode", MODES.map((name) => [name, name]), state.mode, "mode", "Response mode")}
         </div>
@@ -2201,7 +2348,7 @@
 
     if (tab === "About") {
       body += `<dl class="kv">
-        <dt>Version</dt><dd>2.0.1 (desktop shell)</dd>
+        <dt>Version</dt><dd>2.0.3 (desktop shell)</dd>
         <dt>Shell</dt><dd>Electron 33 · React 18 · Vite 5</dd>
         <dt>Engine</dt><dd>Python sidecar · ChatManager</dd>
         <dt>Models</dt><dd>Dizel 1.5 Distill · Dizel 1.6 Flash Preview (unpublished)</dd>
@@ -2272,11 +2419,6 @@
       render();
     });
 
-    bindSegmented("seg-tier", "tier", (value) => {
-      state.tier = value;
-      render();
-    });
-
     bindSegmented("seg-mode", "mode", (value) => {
       state.mode = value;
       render();
@@ -2337,9 +2479,9 @@
     openPopover(event.currentTarget, modelHtml());
   };
 
-  $("#btn-tier").onclick = (event) => {
+  $("#btn-mode").onclick = (event) => {
     event.stopPropagation();
-    openPopover(event.currentTarget, tierHtml());
+    openPopover(event.currentTarget, modeHtml());
   };
 
   $("#btn-mic").onclick = () => {

@@ -103,7 +103,11 @@ export function Sidebar() {
   const reachedSearchLimit = !searching && hiddenCount > 0 && visibleLimit >= MAX_LIMIT;
 
   return (
-    <aside ref={asideRef} className={collapsed ? "sidebar collapsed" : "sidebar"}>
+    <aside
+      ref={asideRef}
+      className={collapsed ? "sidebar collapsed" : "sidebar"}
+      data-capability="sessions.open"
+    >
       <div className="sb-brand">
         <span className="sb-brand-text">
           <span className="sb-title">Dizel</span>

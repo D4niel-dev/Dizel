@@ -157,6 +157,34 @@ function resolvePython() {
   return null;
 }
 
+// ── Session handoff ─────────────────────────────────────────────────────────
+// The terminal client can hand a chat to this window and vice versa. A session
+// is just a JSON file both clients already know how to read, so the handoff is
+// only ever an id: `dizel --session <id>` in one direction, `dizel://session/<id>`
+// (or a `--session=` argument) in the other.
+
+function sessionFromArgs(argv) {
+  for (const arg of argv || []) {
+    const flag = /^--session=(.+)$/.exec(arg);
+    if (flag) return decodeURIComponent(flag[1]);
+    const url = /^dizel:\/\/session\/(.+?)\/?$/.exec(arg);
+    if (url) return decodeURIComponent(url[1]);
+  }
+  return "";
+}
+
+let pendingSession = sessionFromArgs(process.argv.slice(1));
+
+function deliverSession(sessionId) {
+  if (!sessionId) return;
+  pendingSession = sessionId;
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  win.webContents.send("app:open-session", sessionId);
+}
+
 // ── Sidecar lifecycle ────────────────────────────────────────────────────────
 
 function findFreePort() {
@@ -704,13 +732,22 @@ function createWindow() {
 
 // ── App wiring ───────────────────────────────────────────────────────────────
 
-const gotLock = app.requestSingleInstanceLock();
+// A headless capture must not be mistaken for a second launch: taking the lock
+// would either hand the run to the window the user already has open (and exit
+// with no screenshot) or, worse, steal focus there. Captures are their own
+// process and their own window.
+const gotLock = HEADLESS_CAPTURE || app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_event, argv) => {
+    // A second launch is a handoff request: the running window takes the chat
+    // instead of opening a second copy of the app.
+    const requested = sessionFromArgs(argv);
+    if (requested) deliverSession(requested);
     if (!win) return;
     if (win.isMinimized()) win.restore();
+    if (requested) win.show();
     win.focus();
   });
 
@@ -773,7 +810,26 @@ function showWindow() {
   win.focus();
 }
 
+// macOS delivers dizel:// links here rather than through argv.
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  deliverSession(sessionFromArgs([url]));
+});
+
 app.whenReady().then(async () => {
+    // dizel://session/<id> — the terminal's /open and any external link use it.
+    // Unpackaged runs need the entry script passed explicitly on Windows.
+    try {
+      if (process.defaultApp && process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient("dizel", process.execPath, [
+          path.resolve(process.argv[1]),
+        ]);
+      } else {
+        app.setAsDefaultProtocolClient("dizel");
+      }
+    } catch {
+      /* registry/protocol setup is best-effort */
+    }
     // Strict CSP for the packaged renderer only — the Vite dev server needs a
     // looser policy for its inline HMR preamble.
     if (!IS_DEV) {
@@ -885,6 +941,46 @@ ipcMain.on("app:attention", () => {
 });
 
 ipcMain.handle("clipboard:read-text", () => clipboard.readText());
+
+ipcMain.handle("app:pending-session", () => {
+  // Read once: a handed-off chat should open on this launch and not again on
+  // the next reload.
+  const sessionId = pendingSession;
+  pendingSession = "";
+  return sessionId;
+});
+
+ipcMain.handle("app:open-in-terminal", (_event, sessionId) => {
+  const id = String(sessionId || "").trim();
+  if (!/^[\w.-]+$/.test(id)) return { ok: false, error: "Invalid session id." };
+
+  const python = resolvePython();
+  if (!python) {
+    return { ok: false, error: "No Python with the Dizel dependencies was found." };
+  }
+
+  const args = [...(python.args || []), "-m", "inference.tui.main", "--session", id];
+  try {
+    if (process.platform === "win32") {
+      // `start` gives the terminal client its own console; without it the TUI
+      // would have no TTY to draw into.
+      spawn("cmd.exe", ["/c", "start", "", python.exe, ...args], {
+        cwd: REPO_ROOT,
+        detached: true,
+        windowsHide: true,
+      }).unref();
+    } else {
+      const terminal = process.env.TERMINAL || "x-terminal-emulator";
+      spawn(terminal, ["-e", python.exe, ...args], {
+        cwd: REPO_ROOT,
+        detached: true,
+      }).unref();
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
 
 ipcMain.handle("app:open-external", async (_event, url) => {
   if (typeof url === "string" && /^https?:\/\//i.test(url)) {

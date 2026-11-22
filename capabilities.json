@@ -1,133 +1,42 @@
 {
-  "$comment": "Single source of truth for what each surface can do. `null` means the surface does not have it — that is the point of the file: gaps are recorded rather than discovered. Values are what a user would actually press or type.",
-  "version": 1,
-  "surfaces": ["tui", "gui"],
+  "$comment": "Single source of truth for what each surface can do. `null` means the surface does not have it — that is the point of the file: gaps are recorded rather than discovered. Entries are display labels; a `check` names how the entry is verified: terminal commands and bindings by tests/test_capabilities.py, desktop palette entries and DOM controls by tests/test_gui_capabilities.py (markup) and inference/gui/scripts/smoke.js (mounted app). No check means verified by hand.",
+  "version": 2,
+  "surfaces": ["tui","gui"],
   "capabilities": [
-    {
-      "id": "chat.send",
-      "name": "Send a message",
-      "tui": "Enter",
-      "gui": "Enter"
-    },
-    {
-      "id": "chat.newline",
-      "name": "New line without sending",
-      "tui": "Ctrl+Y",
-      "gui": "Shift+Enter"
-    },
-    {
-      "id": "chat.stop",
-      "name": "Stop generating",
-      "tui": "Ctrl+C",
-      "gui": "Stop button"
-    },
-    {
-      "id": "chat.new",
-      "name": "Start a new chat",
-      "tui": "/session new",
-      "gui": "Ctrl+N"
-    },
-    {
-      "id": "chat.copy",
-      "name": "Copy a reply",
-      "tui": "/export",
-      "gui": "Copy button"
-    },
-    {
-      "id": "chat.feedback",
-      "name": "Rate a reply",
-      "tui": null,
-      "gui": "Thumb up/down"
-    },
-    {
-      "id": "chat.edit",
-      "name": "Edit and resend a message",
-      "tui": null,
-      "gui": "Edit button"
-    },
-    {
-      "id": "chat.regenerate",
-      "name": "Regenerate the last reply",
-      "tui": "/reload",
-      "gui": "Regenerate button"
-    },
-    {
-      "id": "sessions.open",
-      "name": "Open the session list",
-      "tui": "Ctrl+T",
-      "gui": "Sidebar"
-    },
-    {
-      "id": "sessions.search",
-      "name": "Search sessions",
-      "tui": "Ctrl+K",
-      "gui": "Search box"
-    },
-    {
-      "id": "commands.palette",
-      "name": "Command palette",
-      "tui": "Ctrl+K",
-      "gui": null
-    },
-    {
-      "id": "context.rail",
-      "name": "Context rail / panel",
-      "tui": "Ctrl+R",
-      "gui": "Context rail"
-    },
-    {
-      "id": "artifacts",
-      "name": "Artifacts panel",
-      "tui": "Ctrl+A",
-      "gui": "Artifacts panel"
-    },
-    {
-      "id": "tools.toggle",
-      "name": "Turn model tool calls on or off",
-      "tui": "/tools tools on",
-      "gui": "/tools"
-    },
-    {
-      "id": "usage.window",
-      "name": "Inspect the 12-hour usage window",
-      "tui": "/usage",
-      "gui": "/usage"
-    },
-    {
-      "id": "model.switch",
-      "name": "Switch model or variant",
-      "tui": "/model",
-      "gui": "Model picker"
-    },
-    {
-      "id": "settings.open",
-      "name": "Open settings",
-      "tui": "/settings",
-      "gui": "Ctrl+,"
-    },
-    {
-      "id": "debug.panel",
-      "name": "Debug output panel",
-      "tui": "/history",
-      "gui": "Debug panel"
-    },
-    {
-      "id": "app.export",
-      "name": "Export a conversation",
-      "tui": "/export",
-      "gui": null
-    },
-    {
-      "id": "app.recover",
-      "name": "Recover from a dead model process",
-      "tui": null,
-      "gui": "Restart button"
-    },
-    {
-      "id": "app.update",
-      "name": "Check for and install updates",
-      "tui": "/update",
-      "gui": "Settings → About"
-    }
+    {"id": "chat.send", "name": "Send a message", "tui": {"label": "Enter"}, "gui": {"label": "Enter"}},
+    {"id": "chat.newline", "name": "New line without sending", "tui": {"label": "Ctrl+Y", "check": {"kind": "binding", "value": "ctrl+y"}}, "gui": {"label": "Shift+Enter"}},
+    {"id": "chat.stop", "name": "Stop generating", "tui": {"label": "Ctrl+C", "check": {"kind": "binding", "value": "ctrl+c"}}, "gui": {"label": "Stop button"}},
+    {"id": "chat.new", "name": "Start a new chat", "tui": {"label": "/session new", "check": {"kind": "command", "value": "session"}}, "gui": {"label": "Ctrl+N"}},
+    {"id": "chat.copy", "name": "Copy a reply", "tui": {"label": "/copy", "check": {"kind": "command", "value": "copy"}}, "gui": {"label": "Copy button", "check": {"kind": "control", "value": "chat.copy"}}},
+    {"id": "chat.feedback", "name": "Rate a reply", "tui": null, "gui": {"label": "Thumb up/down"}},
+    {"id": "chat.edit", "name": "Edit and resend a message", "tui": {"label": "/edit", "check": {"kind": "command", "value": "edit"}}, "gui": {"label": "Edit button"}},
+    {"id": "chat.compare", "name": "Compare reply versions", "tui": null, "gui": {"label": "Compare button"}},
+    {"id": "session.digest", "name": "Where you left off on a long chat", "tui": null, "gui": {"label": "Top of chat", "check": {"kind": "control", "value": "session.digest"}}},
+    {"id": "chat.regenerate", "name": "Regenerate the last reply", "tui": {"label": "/reload", "check": {"kind": "command", "value": "reload"}}, "gui": {"label": "Regenerate button"}},
+    {"id": "sessions.open", "name": "Open the session list", "tui": {"label": "Ctrl+T", "check": {"kind": "binding", "value": "ctrl+t"}}, "gui": {"label": "Sidebar", "check": {"kind": "control", "value": "sessions.open"}}},
+    {"id": "sessions.search", "name": "Search sessions", "tui": {"label": "Ctrl+K", "check": {"kind": "binding", "value": "ctrl+k"}}, "gui": {"label": "Search box"}},
+    {"id": "chat.verbosity", "name": "Choose how long replies run", "tui": {"label": "/verbosity", "check": {"kind": "command", "value": "verbosity"}}, "gui": {"label": "+ menu › Response length", "check": {"kind": "control", "value": "chat.verbosity"}}},
+    {"id": "sessions.search_transcript", "name": "Search inside a conversation", "tui": {"label": "/find", "check": {"kind": "command", "value": "find"}}, "gui": {"label": "Ctrl+F", "check": {"kind": "control", "value": "sessions.search_transcript"}}},
+    {"id": "sessions.tags", "name": "Tag a chat", "tui": {"label": "/tag", "check": {"kind": "command", "value": "tag"}}, "gui": {"label": "Chat menu › Tags", "check": {"kind": "control", "value": "sessions.tags"}}},
+    {"id": "sessions.handoff", "name": "Continue a chat in the other client", "tui": {"label": "/open", "check": {"kind": "command", "value": "open"}}, "gui": {"label": "Chat menu › Continue in terminal", "check": {"kind": "control", "value": "sessions.handoff"}}},
+    {"id": "commands.palette", "name": "Command palette", "tui": {"label": "Ctrl+K", "check": {"kind": "binding", "value": "ctrl+k"}}, "gui": {"label": "Ctrl+K", "check": {"kind": "control", "value": "commands.palette"}}},
+    {"id": "context.rail", "name": "Context rail / panel", "tui": {"label": "Ctrl+R", "check": {"kind": "binding", "value": "ctrl+r"}}, "gui": {"label": "Status bar › Context", "check": {"kind": "control", "value": "context.rail"}}},
+    {"id": "artifacts", "name": "Artifacts panel", "tui": {"label": "Ctrl+A", "check": {"kind": "binding", "value": "ctrl+a"}}, "gui": {"label": "Artifacts rail", "check": {"kind": "control", "value": "artifacts"}}},
+    {"id": "tools.toggle", "name": "Turn model tool calls on or off", "tui": {"label": "/tools tools on", "check": {"kind": "command", "value": "tools"}}, "gui": {"label": "/tools", "check": {"kind": "palette", "value": "tools"}}},
+    {"id": "usage.window", "name": "Inspect the 12-hour usage window", "tui": {"label": "/debug usage", "check": {"kind": "command", "value": "debug"}}, "gui": {"label": "/usage", "check": {"kind": "palette", "value": "usage"}}},
+    {"id": "model.switch", "name": "Switch model", "tui": {"label": "/model", "check": {"kind": "command", "value": "model"}}, "gui": {"label": "Model picker", "check": {"kind": "control", "value": "model.switch"}}},
+    {"id": "settings.open", "name": "Open settings", "tui": {"label": "/settings", "check": {"kind": "command", "value": "settings"}}, "gui": {"label": "Ctrl+,", "check": {"kind": "control", "value": "settings.open"}}},
+    {"id": "debug.panel", "name": "Debug output panel", "tui": {"label": "/history", "check": {"kind": "command", "value": "history"}}, "gui": {"label": "Debug panel"}},
+    {"id": "app.export", "name": "Export a conversation", "tui": {"label": "/export", "check": {"kind": "command", "value": "export"}}, "gui": {"label": "Export button", "check": {"kind": "control", "value": "app.export"}}},
+    {"id": "app.recover", "name": "Recover from a dead model process", "tui": null, "gui": {"label": "Restart button"}},
+    {"id": "app.update", "name": "Check for and install updates", "tui": {"label": "/update", "check": {"kind": "command", "value": "update"}}, "gui": {"label": "Settings → About"}},
+    {"id": "app.doctor", "name": "Run offline runtime checks", "tui": {"label": "/doctor", "check": {"kind": "command", "value": "doctor"}}, "gui": {"label": "/doctor", "check": {"kind": "palette", "value": "doctor"}}},
+    {"id": "app.scorecard", "name": "Inspect a checkpoint's scorecard", "tui": {"label": "/scorecard", "check": {"kind": "command", "value": "scorecard"}}, "gui": {"label": "/scorecard", "check": {"kind": "palette", "value": "scorecard"}}},
+    {"id": "app.cost", "name": "Estimate provider usage and cost", "tui": {"label": "/cost", "check": {"kind": "command", "value": "cost"}}, "gui": {"label": "/cost", "check": {"kind": "palette", "value": "cost"}}},
+    {"id": "app.plan", "name": "Plan before executing", "tui": {"label": "/plan", "check": {"kind": "command", "value": "plan"}}, "gui": {"label": "/plan", "check": {"kind": "palette", "value": "plan"}}},
+    {"id": "chat.read_aloud", "name": "Read a reply aloud", "tui": null, "gui": {"label": "Speaker button"}},
+    {"id": "project.memory", "name": "View and edit project memory", "tui": {"label": "/memory", "check": {"kind": "command", "value": "memory"}}, "gui": {"label": "/memory", "check": {"kind": "palette", "value": "memory"}}},
+    {"id": "git.review", "name": "Review the working-tree diff", "tui": {"label": "/review", "check": {"kind": "command", "value": "review"}}, "gui": {"label": "/review", "check": {"kind": "palette", "value": "review"}}},
+    {"id": "git.commit", "name": "Draft a commit message (never commits)", "tui": {"label": "/commit", "check": {"kind": "command", "value": "commit"}}, "gui": {"label": "/commit", "check": {"kind": "palette", "value": "commit"}}}
   ]
 }

@@ -54,19 +54,19 @@ class ToolBridge:
         self._ui(deliver)
 
     # ── Tool run ─────────────────────────────────────────────────────
-    def run_tools_and_send(self, text: str) -> None:
+    def run_tools_and_send(self, text: str, display: dict | None = None) -> None:
         if self._busy:
             self._post(self.app.chat_bridge.SystemLog("A tool run is already in progress."))
             return
         self._busy = True
         self.app.run_worker(
-            lambda: self._run(text),
+            lambda: self._run(text, display),
             thread=True,
             exclusive=True,
             exit_on_error=False,
         )
 
-    def _run(self, text: str) -> None:
+    def _run(self, text: str, display: dict | None = None) -> None:
         try:
             states = getattr(self.app, "_tool_states", {})
             web_results = ""
@@ -96,7 +96,7 @@ class ToolBridge:
                 self._post(self.app.chat_bridge.SystemLog(blocked))
                 return
             self._ui(self._start_assistant)
-            self.app.chat_bridge.send(final_text)
+            self.app.chat_bridge.send(final_text, display)
         except Exception as error:
             self._post(self.ToolFailed("tool run", str(error)))
             self._post(self.app.chat_bridge.GenerationError(str(error)))

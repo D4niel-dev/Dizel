@@ -11,41 +11,31 @@ top of it, talking over a local HTTP sidecar.
 
 ---
 
-## Design parity
+## Design
 
-The shell is matched against the **real** PySide6 app, not against a description
-of it. `design-reference-pyside.png` is that app, rendered offscreen; `preview.png`
-is this one. Every colour below was sampled from the reference rather than guessed:
+The shell has three themes, and each has its own accent (all in
+`src/styles/tokens.css`, which is the source of truth — older notes that quote
+the PySide6 palette are history, not specification):
 
-| Token | Value | Where |
-|---|---|---|
-| chat surface | `#212121` | main column |
-| chrome | `#171717` | title bar, sidebar, status pill |
-| accent | `#0ea5e9` | send button, active chip, assistant name, status dot |
-| border | `#303030` | composer, dividers |
-| user bubble | `#2f2f2f` | right-aligned card |
-| primary text | `#ececec` | body |
-| dim text | `#939393` | hints, meta |
+| Theme | Ground | Accent | Lineage |
+|---|---|---|---|
+| dark (default) | `#171717` chat, `#0e0e0f` chrome, seven-step ladder to `#222327` cards | `#8ab4f8` | Gemini's web surface ladder |
+| light | `#ffffff` chat, `#f1f5f9` panels | `#0ea5e9` | slate ladder |
+| dark-blue | `#0f1725` chat, `#06090f` chrome | `#38bdf8` | deep navy |
 
-Type is Segoe UI, matching `theme/fonts.py`. Sizes follow the real app: 15px nav,
-19px wordmark, 32px greeting, 14px body, 13.5px session rows.
+Type is Segoe UI Variable for prose and Cascadia Mono for data, with Outfit
+reserved for the wordmark and the welcome display line.
 
-Reproduce the reference capture with:
-
-```bash
-QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR="C:\Windows\Fonts" \
-  python scripts/grab-pyside.py out.png
-```
-
-The font directory is not optional — the offscreen Qt backend ships no font
-config, so without it every glyph renders as tofu.
+The original PySide6 app is no longer the reference for any of this. It still
+ships in `inference/dizel_gui/` for the legacy desktop build, and the Python
+engine it owns is what this app talks to.
 
 ---
 
 ## Run it
 
 ```bash
-cd desktop
+cd inference/gui
 npm install
 
 npm run dev      # Vite dev server + Electron with hot reload
@@ -235,6 +225,25 @@ Cycle with the sparkles button in the title bar.
 - **Keyboard shortcuts** — `Ctrl+N` new chat, `Ctrl+K` focus composer, `Ctrl+B`
   toggle sidebar, `Ctrl+,` settings, `Esc` closes dialogs. All listed in
   Settings → Shortcuts.
+- **Artifacts rail** — the header's folder button (or `Ctrl+Shift+A`) opens what
+  this conversation produced: every file it wrote, read or edited with the diff
+  that was applied, plus the code blocks from finished replies. Files open into
+  the existing tool drawer; nothing is re-read from disk, so what you see is
+  what the model actually sent or received. It shares the right-hand slot with
+  the attachment preview — opening one closes the other — and its width is
+  dragged and remembered like the preview's.
+- **Response length** — Short / Normal / Detailed in the `+` menu, sent with the
+  turn as `verbosity` and stored in `token_budget.verbosity`, the same key the
+  terminal's `/verbosity` writes. The `+` carries an accent dot whenever it is
+  not Normal, and the status bar repeats the current value.
+- **Chat tags** — "Tags…" in a chat's row menu edits a comma-separated list;
+  the first two tags show on the row, the rest behind a count. Stored by
+  `history_manager.set_session_tags`, so the terminal sees them too.
+- **Continue in terminal** — the same row menu hands the chat id to
+  `python -m inference.tui.main --session <id>` in a new console, leaving this
+  window open. The reverse direction is `dizel://session/<id>` (or
+  `--session=<id>`), which the running window picks up through the
+  single-instance lock instead of opening a second copy.
 - Sidebar wordmark carries the release tag reported by `/models/info` (`v1.5`
   today), so a new checkpoint updates it without a code change. The collapse
   button swaps between panel-collapse and panel-expand icons, and collapsing hides
@@ -333,7 +342,7 @@ Honest audit. "Partial" means it exists but is thinner than the original.
 | Local inference (.gguf) | Yes — verified |
 | Local inference (.pt, .safetensors) | Wired through the same backend, **untested** |
 | 12 API providers + custom | UI + encrypted key storage yes; **no live call tested** (needs a key) |
-| Model listing per provider | No — type the model id by hand |
+| Model listing per provider | Yes — the model picker lists them per provider |
 | Markdown, code blocks, copy | Yes |
 | Collapsible `<think>` blocks | Yes |
 | Copy / Regenerate | Yes |
@@ -346,12 +355,12 @@ Honest audit. "Partial" means it exists but is thinner than the original.
 | Slash commands (`/sh`, `/read`, `/py`, `/fetch`) | Backend has them; blocked over HTTP, no UI |
 | Sessions: save / load / open | Yes |
 | Rename, pin, tag sessions | **No** (backend supports pin) |
-| Export chat | **No** (import yes) |
+| Export chat | Yes — header button, Markdown |
 | Nova dictation | Yes |
 | Waveform + silence auto-submit | **No** |
-| Command palette (Ctrl+K) | **No** |
+| Command palette (Ctrl+K) | Yes |
 | First-run tutorial | **No** |
-| Drag & drop attachments | **No** |
+| Drag & drop attachments | Yes — anywhere on the window |
 | Profile dialog / avatar upload | Yes |
 | Usage meter / 12-hour budget UI | **No** (backend still budgets) |
 | Context trimming | Yes, automatic in the backend |
@@ -393,6 +402,15 @@ in the renderer first and logs whatever it returns — `check-chat.js` waits for
 the model, sends a real message, and reports the result. `DIZEL_DEBUG=1`
 exposes the store as `window.__dizel` for that script to drive.
 
+`check-new-ui.js` needs no model: it installs fixture turns, then reports whether
+the artifacts rail, reply length, tags, handoff entry and streaming markdown all
+behave. Use it after touching any of those. `check-settings-context.js` stubs
+only the project-memory request, so both the populated and the empty Settings →
+Chat → Project context states can be inspected in one run.
+
+**Remember to `unset ELECTRON_RUN_AS_NODE`.** With it set, Electron runs as plain
+Node and dies on `app.isPackaged` before the window exists.
+
 ---
 
 ## Gotchas
@@ -401,6 +419,9 @@ exposes the store as `window.__dizel` for that script to drive.
   Electron ran as plain Node. Unset `ELECTRON_RUN_AS_NODE` before launching.
 - **`DIZEL_PROD=1`** loads the built `dist/` instead of the dev server. Needed
   when testing a production build unpackaged.
+- A `DIZEL_SHOT` capture skips the single-instance lock, so it renders its own
+  window even while the app is open. Without that, the run hands itself to the
+  running window and exits with no screenshot.
 - The renderer loads from `file://` in production, so `vite.config.ts` sets
   `base: './'`. Absolute asset paths will 404.
 - CSP is only injected in packaged builds; the Vite dev server needs a looser

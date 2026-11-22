@@ -348,6 +348,12 @@ textarea {
   justify-content: center;
   padding: 0;
 }
+/* Collapsed, the tray is just the portrait: centre it and drop the name's
+   reserved space so the hover fill stays a clean square. */
+.sidebar.collapsed .sb-foot {
+  justify-content: center;
+  padding: 6px;
+}
 /* Only the text label collapses — the icons are spans too, so target the class. */
 .sidebar.collapsed .nav-label {
   display: none;
@@ -444,6 +450,17 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Tags ride after the title inside the row label: one quiet word each, never
+   a second line. Showing all six would make the sidebar a wall of chips. */
+.sb-row-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.sb-row.active .sb-row-tag {
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-dim));
 }
 
 /* Row actions appear on hover so the list stays quiet at rest. */
@@ -584,48 +601,48 @@ textarea {
   color: var(--text-muted);
 }
 
+/* The profile is a tray that floats over the recent list, not a strip glued to
+   the sidebar floor. A rounded fill plus a shadow that follows that radius gives
+   the separation; the old version drew a rectangular black gradient above a
+   square-edged band, which cut the last chat row across the middle and read as
+   a hard horizontal seam. */
 .sb-foot {
   position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px;
+  margin: 8px 0 2px;
+  padding: 7px 9px;
   flex-shrink: 0;
-  /* Flush with the sidebar: no fill, border, or radius, so it inherits the
-     sidebar surface exactly. The depth comes only from the shadow above. */
   overflow: visible;
   white-space: nowrap;
   text-align: left;
-  background: none;
+  /* Same surface as the sidebar: no extra panel, no seam. At rest the tray is
+     only a shape you can land on — the rounded fill appears on hover, which is
+     when it needs to be a target. */
+  background: var(--bg-sidebar);
   border: 0;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
   z-index: 2;
+  transition:
+    background-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
-/* Shadow only along the footer's top edge — content fades as it scrolls
-   under, and nothing wraps the sides or bottom. */
-.sb-foot::before {
-  content: "";
-  position: absolute;
-  /* Reach both sidebar edges so the shadow spans the pane, not the card. */
-  left: -10px;
-  right: -10px;
-  top: -26px;
-  height: 26px;
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, #000 70%, transparent),
-    color-mix(in srgb, #000 30%, transparent) 45%,
-    transparent
-  );
+/* On a near-black pane a shadow has nothing to darken, so the tray shows
+   nothing at rest. On porcelain it does, and a shadow keeps the rounded shape
+   legible without tinting the surface. */
+:root[data-theme="light"] .sb-foot {
+  box-shadow:
+    0 1px 2px rgba(31, 31, 31, 0.06),
+    0 10px 22px -18px rgba(15, 23, 42, 0.35);
 }
-:root[data-theme="light"] .sb-foot::before {
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--text-primary) 9%, transparent),
-    color-mix(in srgb, var(--text-primary) 3%, transparent) 48%,
-    transparent
-  );
+.sb-foot:hover {
+  background: color-mix(in srgb, var(--text-primary) 7%, var(--bg-sidebar));
+}
+.sb-foot:active {
+  background: color-mix(in srgb, var(--text-primary) 9%, var(--bg-sidebar));
 }
 .sb-foot:focus-visible {
   outline: 2px solid var(--accent-ring);
@@ -863,6 +880,80 @@ textarea {
 
 /* A column, not a row: the attachment chips and the action row both sit above
    and below the bubble. As a row they ended up beside it. */
+/* A reading aid, deliberately not styled like a message: no avatar, no role
+   colour and no bubble, so it can never be mistaken for model output. */
+.digest-card {
+  width: min(680px, 100%);
+  margin: 10px auto 20px;
+  padding: 13px 15px 10px;
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-panel) 70%, transparent);
+}
+
+.digest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.digest-close {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.digest-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.digest-row {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.digest-row span {
+  flex: 0 0 88px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.digest-row b {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.digest-foot {
+  margin-top: 9px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
 .msg.user {
   display: flex;
   flex-direction: column;
@@ -1094,29 +1185,47 @@ textarea {
 .composer {
   position: relative;
   z-index: 1;
+  /* Local token so the focus ring can size itself to this radius without
+     repeating the number in two places. */
+  --composer-radius: 24px;
   background: var(--bg-panel);
-  background: color-mix(in srgb, var(--bg-panel) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, var(--border));
-  border-radius: 22px;
+  /* A touch more surface than glass: on a dark page a shadow alone has little to
+     catch, so the panel needs a hair more body to read as elevated. */
+  background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+  /* The edge is a hairline against the panel, not a highlight: text-primary at
+     15% drew a light grey outline around a field this wide. Keeping the edge a
+     step above the panel is enough to hold the shape. */
+  border: 1px solid color-mix(in srgb, var(--border) 74%, var(--bg-panel));
+  border-radius: var(--composer-radius);
   padding: 12px 12px 8px 14px;
   backdrop-filter: blur(20px) saturate(1.12);
   -webkit-backdrop-filter: blur(20px) saturate(1.12);
+  /* Google's search box recipe: a tight contact shadow under a wide soft one, with
+     no colour in it. Focus adds the colour (see the focus block below). */
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 1px 2px rgba(0, 0, 0, 0.52),
+    0 8px 24px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14);
   transition:
     background-color var(--dur) var(--ease),
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
 }
 :root[data-theme="light"] .composer {
+  /* On porcelain the border token is already the quiet edge; dimming it toward
+     the panel would erase it. */
+  border-color: var(--border);
   box-shadow:
-    0 18px 50px rgba(15, 23, 42, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 1px 2px rgba(31, 31, 31, 0.12),
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.04);
 }
-.composer:focus-within {
-  border-color: var(--accent);
-}
+
+
+
+
 
 .composer textarea {
   width: 100%;
@@ -2239,6 +2348,73 @@ textarea {
   margin-bottom: 8px;
 }
 
+/* Attached skills: a quiet pill that reads as part of the prompt row. */
+.skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  max-width: 260px;
+  padding: 0 5px 0 8px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.skill-mark {
+  color: var(--accent);
+  font-size: 10px;
+}
+.skill-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-x {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+.skill-x:hover {
+  color: var(--text);
+  background: var(--border);
+}
+.msg-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px 14px;
+}
+.msg-skill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 21px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--text-secondary);
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -2537,7 +2713,11 @@ textarea {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.55);
+  /* Every dialog sits on the same surface; blurring the page behind it makes the
+     elevation read even for modals whose contents are mostly plain forms. */
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 .modal {
@@ -2547,9 +2727,11 @@ textarea {
   display: flex;
   flex-direction: column;
   background: var(--bg-chat);
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, var(--border));
   border-radius: var(--radius-xl);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
   animation: rise 160ms var(--ease);
 }
@@ -3522,6 +3704,9 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 11.5px;
   line-height: 1.4;
   color: var(--text-dim);
+  /* Hints can be several authored lines (one per rule file); keep the breaks.
+     A collapsed list reads as a run-on sentence with the file names glued. */
+  white-space: pre-line;
 }
 
 .set-row-control {
@@ -3647,6 +3832,48 @@ input[type="range"]::-webkit-slider-thumb {
   outline: none;
   resize: none;
 }
+.set-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* The mode prompt is derived, not typed — it reads as a quote of what will be
+   appended rather than as another field the user is expected to edit. */
+.prompt-mode-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.prompt-mode-head label {
+  margin: 0;
+}
+
+.prompt-mode-tag {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.set-readonly {
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--text-primary) 18%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 
 .set-textarea:focus {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
@@ -4804,6 +5031,152 @@ input[type="range"]::-webkit-slider-thumb {
   overflow: hidden;
   flex-shrink: 0;
 }
+/* The meter is the trigger: it is the thing the user is already reading when they
+   wonder where the window went. */
+.ctx-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctx-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.ctx-trigger:hover > span:first-child {
+  color: var(--text-primary);
+}
+
+.ctx-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ctx-panel {
+  /* Position is set inline from the trigger's rect; it mounts on the body. */
+  z-index: 60;
+  width: 266px;
+  padding: 12px 13px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  animation: popover-in 150ms var(--ease) both;
+}
+
+/* Points back at the meter it belongs to. A rotated square, not a border
+   triangle, so its two borders meet the panel edge without a seam. */
+.ctx-panel::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: var(--ctx-caret, 50%);
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: var(--bg-panel);
+  /* The panel's own border is too faint to read at this size against a dark
+     page, so the tail gets a brighter edge of its own. */
+  border-right: 1px solid color-mix(in srgb, var(--text-primary) 34%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 34%, var(--border));
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.35);
+  transform: rotate(45deg);
+}
+
+.ctx-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.ctx-panel-head b {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One bar, segments in the order they enter the prompt. */
+.ctx-stack {
+  display: flex;
+  gap: 1px;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.ctx-stack-seg,
+.ctx-stack-free {
+  display: block;
+  min-width: 0;
+}
+
+.ctx-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 10px 0 8px;
+}
+
+.ctx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.ctx-row.is-child {
+  padding-left: 14px;
+}
+
+.ctx-row i {
+  flex: 0 0 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.ctx-row span {
+  flex: 1;
+}
+
+.ctx-row b {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ctx-panel-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.ctx-panel-trim {
+  color: var(--warn);
+}
+
+.ctx-panel-task {
+  color: var(--accent);
+}
+
 .ctx-fill {
   display: block;
   height: 100%;
@@ -5412,6 +5785,22 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--bg-active);
 }
 
+.act.is-speaking {
+  color: var(--accent);
+}
+
+.model-score {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+}
+
 .model-row-icon {
   display: grid;
   place-items: center;
@@ -5992,21 +6381,6 @@ input[type="range"]::-webkit-slider-thumb {
   .asst-head.is-live .asst-name {
     animation: none;
   }
-}
-
-/* Active response mode, shown inline on the tier chip */
-.chip-mode {
-  display: inline-flex;
-  align-items: center;
-  height: 15px;
-  padding: 0 5px;
-  margin-left: 2px;
-  border-radius: 999px;
-  background: var(--accent-soft, rgba(14, 165, 233, 0.16));
-  color: var(--accent);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
 }
 
 .bar-chip.is-armed {
@@ -6941,24 +7315,138 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: auto;
 }
 
-/* ── Composer focus glow ───────────────────────────────────────────────── */
-
-.composer {
-  transition:
-    border-color var(--dur) var(--ease),
-    box-shadow var(--dur) var(--ease);
+/* The list dissolves as it slides under the tray. A mask fades the row itself
+   instead of painting a black band over it, so a half-scrolled chat fades out
+   rather than being cut by a horizontal line. */
+.sb-list {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
 }
 
+/* ── Composer focus ────────────────────────────────────────────────────── */
+/* Focus is carried by light, not by an outline. The edge takes one dim step of
+   accent and then gets out of the way; the rest is light — a corner of accent in
+   the glass, a warm ambient cast around the field, and one pass across the
+   surface as focus lands. That pass fires once, so nothing moves under the caret
+   while you type. */
+
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  /* One dim step of accent in the edge, not a stroke of full accent: enough to
+     say the field is live, quiet enough to disappear into the panel. The real
+     focus signal is the light around it (see the shadows below). */
+  border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+  transform: translateY(-1px);
+  /* The glass clears as it takes focus, and a corner of accent light sits in
+     the surface itself: the field reads as lit, not outlined. */
+  background: color-mix(in srgb, var(--bg-panel) 97%, transparent);
+  background-image: radial-gradient(
+    130% 170% at 16% -30%,
+    rgb(from var(--accent) r g b / 0.1),
+    transparent 58%
+  );
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent),
-    0 10px 28px color-mix(in srgb, var(--accent) 10%, transparent);
+    0 2px 8px 1px rgba(0, 0, 0, 0.58),
+    /* Light spilling onto the page from the field: wide, deep and offset, so the
+       page around it is lit rather than outlined. */
+    0 4px 16px -8px color-mix(in srgb, var(--accent) 30%, transparent),
+    0 20px 52px -26px color-mix(in srgb, var(--accent) 62%, transparent),
+    0 -6px 20px -16px color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+:root[data-theme="light"] .composer:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+  background: color-mix(in srgb, var(--bg-panel) 99%, transparent);
+  background-image: radial-gradient(
+    130% 170% at 16% -30%,
+    rgb(from var(--accent) r g b / 0.07),
+    transparent 60%
+  );
+  box-shadow:
+    0 2px 6px 1px rgba(64, 60, 67, 0.2),
+    /* On porcelain the same light reads as a tinted shadow rather than as
+       brightness, so it has to be denser to carry the same signal. */
+    0 8px 20px -14px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 22px 46px -28px color-mix(in srgb, var(--accent) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05);
+}
+
+/* The arrival: one pass of light across the glass as focus lands. A specular
+   sweep is a material cue — light crossing a surface it can reflect in — not a
+   shimmer for its own sake, and it fires once per focus so the field is still
+   while you type. */
+.composer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Narrow, bright core: a wash reads as a lighter panel, a streak reads as
+     light passing. The hue is the accent pulled toward white so it reads as
+     reflection rather than as a second accent surface. */
+  --sheen: rgb(from color-mix(in srgb, var(--accent) 58%, #fff) r g b / 0.62);
+  background-image: linear-gradient(
+    104deg,
+    transparent 44%,
+    var(--sheen) 50%,
+    transparent 56%
+  );
+  background-repeat: no-repeat;
+  background-size: 46% 200%;
+  background-position: -70% 0;
+  opacity: 0;
+}
+:root[data-theme="light"] .composer::after {
+  --sheen: rgb(from var(--accent) r g b / 0.3);
+}
+
+.composer:focus-within::after {
+  animation: composer-sheen 760ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@keyframes composer-sheen {
+  0% {
+    background-position: -70% 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 170% 0;
+    opacity: 0;
+  }
+}
+
+/* The browser parts that belong to no design system: the caret takes the accent
+   while you type, so the field and the light agree about what has focus. */
+.composer textarea {
+  caret-color: var(--accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .composer {
+  .composer,
+  .composer:focus-within {
     transition: none;
+  }
+  /* Keep the state, drop the travel: the rim tint and elevation still mark
+     focus, which is the information the animation was carrying. */
+  /* No travel, no lift: the rim tint, the firmer surface and the coloured
+     elevation still say "focused", which is all the animation was carrying. */
+  .composer:focus-within {
+    transform: none;
+  }
+  .composer::after {
+    display: none;
   }
 }
 
@@ -8092,8 +8580,296 @@ body.is-resizing-panel {
   cursor: default;
 }
 
-/* ── Updates ───────────────────────────────────────────────────────────── */
+/* ── Artifacts rail ────────────────────────────────────────────────────── */
+/* The same right-hand slot as the file panel, holding what the conversation
+   produced instead of what went into it. Files first: a written file is the
+   artifact people come back for. */
+.art-panel {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  animation: att-slide var(--dur) var(--ease);
+}
 
+.art-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.art-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.art-count {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.art-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  margin-left: auto;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.art-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.art-tab > span {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.art-tab:hover {
+  color: var(--text-primary);
+}
+
+.art-tab.is-on {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.art-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.art-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.art-row {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.art-row.is-open {
+  border-color: var(--border);
+  background: var(--bg-card);
+}
+
+.art-row-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.art-row-head:hover {
+  background: var(--bg-hover);
+}
+
+.art-kind {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  color: var(--text-secondary);
+}
+
+.art-kind.is-running {
+  color: var(--accent);
+}
+
+.art-kind.is-failed {
+  color: var(--danger);
+}
+
+.art-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.art-row-name {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.art-row-meta {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.art-stats {
+  display: inline-flex;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.art-stats .is-add {
+  color: #3fb950;
+}
+
+.art-stats .is-del {
+  color: #f85149;
+}
+
+.art-row-body {
+  padding: 4px 6px 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Inside the rail the drawer is already framed; drop the inner ring. */
+.art-row-body .tool-drawer {
+  border: 0;
+  background: transparent;
+}
+
+/* Code cards: one folded line until opened, so ten snippets stay scannable. */
+.art-code {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.art-code-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+}
+
+.art-code-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.art-code-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.art-code-lang {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: lowercase;
+}
+
+.art-code-folded {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.art-code-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.art-code-body {
+  border-top: 1px solid var(--border-soft);
+  max-height: 340px;
+  overflow: auto;
+}
+
+.art-tool {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 5px;
+  color: var(--text-dim);
+}
+
+.art-tool:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.art-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 44px 22px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.art-empty strong {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.art-empty span {
+  font-size: 11.5px;
+  line-height: 1.5;
+  max-width: 30ch;
+}
+
+/* ── Updates ───────────────────────────────────────────────────────────── */
 .sb-update {
   display: flex;
   align-items: center;
@@ -9110,5 +9886,578 @@ body.is-resizing-panel {
   .tool-open,
   .tool-open svg {
     transition: none;
+  }
+}
+
+/* ── Plan approval ─────────────────────────────────────────────────────── */
+.plan-approval-backdrop {
+  z-index: 61;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.plan-approval {
+  width: min(560px, 92vw);
+  /* The header glow is the one bit of motion here: a plan is a decision point,
+     not a place for busy animation. */
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.plan-approval-head {
+  gap: 10px;
+}
+
+.plan-approval-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: auto;
+}
+
+.plan-approval-title svg {
+  color: var(--warn);
+}
+
+.plan-approval-head h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.plan-approval-body {
+  padding: 18px 20px 4px;
+}
+
+/* Task gets its own card so it reads as the thing being approved, with the
+   numbered steps beneath it as the detail. */
+.plan-approval-task {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--warn) 20%, var(--border));
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+}
+
+.plan-approval-task-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.plan-approval-task p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Native list markers look like an unstyled page. A numbered chip per step keeps
+   the order explicit and gives each item a comfortable target-sized row. */
+.plan-approval-steps {
+  counter-reset: plan-step;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+
+.plan-approval-steps li {
+  counter-increment: plan-step;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 28px;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.plan-approval-steps li::before {
+  content: counter(plan-step);
+  flex: 0 0 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warn) 20%, transparent);
+  color: var(--warn);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-approval-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.plan-approval-warning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.plan-approval-actions .plan-approval-hint {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ── Compare versions ──────────────────────────────────────────────────── */
+.compare-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 4vh 3vw;
+}
+
+.compare-panel {
+  width: min(1100px, 94vw);
+  height: min(720px, 88vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.compare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-head h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.compare-columns {
+  flex: 1;
+  display: flex;
+  gap: 1px;
+  overflow-x: auto;
+  background: var(--border);
+}
+
+.compare-col {
+  flex: 1 0 420px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.compare-col.is-current {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.compare-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-current-tag {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.compare-col-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.compare-tools {
+  padding: 6px 16px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Mode rows and the Thinking effort panel ──────────────────────────── */
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mode-row .popover-item {
+  flex: 1;
+}
+
+.mode-item .popover-item-main {
+  flex: 1;
+}
+
+.mode-effort-tag {
+  margin-left: auto;
+  /* Without align-self it stretches to the row height, and at 38x32 a 999px
+     radius draws a circle around a word. */
+  align-self: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 15px;
+  opacity: 0.9;
+}
+
+.mode-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.mode-arrow:hover,
+.mode-arrow[aria-expanded="true"] {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.effort-panel {
+  position: fixed;
+  z-index: 70;
+  width: 320px; /* keep in step with `width` in ModePicker.tsx */
+  padding: 13px 14px 11px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: popover-in 150ms var(--ease) both;
+}
+
+/* Response length: compact and sized to its three options. It deliberately does
+   not use the tall .effort-panel shell — that left a large empty band. */
+.verbosity-panel {
+  position: fixed;
+  z-index: 70;
+  width: 236px;
+  padding: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  animation: popover-in 150ms var(--ease) both;
+}
+
+.verbosity-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+}
+
+.verbosity-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.verbosity-option:hover {
+  background: var(--bg-hover);
+}
+
+.verbosity-option.active {
+  border-color: var(--border-soft);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.verbosity-option-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.verbosity-option-top b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.verbosity-factor {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.verbosity-note {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.effort-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.effort-head b {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── Track ──────────────────────────────────────────────────────────────── */
+/* Geometry follows ChatGPT's stepped slider: their `.Root` is a pill with a 4px
+   `.Track` inside and a `.Thumb` as tall as the container. A bare 2px line reads
+   as a chart axis, not something you can grab. */
+.effort-scale {
+  /* The travel is inset by half a thumb at each end, so the thumb's edge — not
+     its centre — reaches the end of the track. Every position below derives from
+     these two values; changing the thumb size moves everything with it. */
+  --thumb: 28px;
+  position: relative;
+  height: 28px;
+  border-radius: 999px;
+  /* No fill here: `.effort-line` is now the full height of the pill, so it *is*
+     the surface. The inset shadow is what still reads as the outline. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 9%, transparent);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.effort-line,
+.effort-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* The groove fills the pill, so the unfilled track is the pill's own surface and
+   the fill reads as progress rather than as a line drawn inside a container. */
+.effort-line {
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+/* left/width are set inline — the stops live in equal grid columns, so only the
+   component knows where the first and last centres land. */
+.effort-fill {
+  left: 0;
+  /* Runs under the whole thumb, not just to its centre: stopping halfway across
+     the knob made the coloured line look shorter than the circle. At maximum it
+     now reaches the track's end exactly. */
+  width: calc(var(--thumb) + var(--progress) * (100% - var(--thumb)));
+  /* A vertical gradient so the bar has some roundness instead of flat colour. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fill-color) 86%, #fff) 0%,
+    var(--fill-color) 55%,
+    color-mix(in srgb, var(--fill-color) 84%, #000) 100%
+  );
+  overflow: hidden;
+  /* At Low the component sets opacity: 0 — zero effort simply has no fill. */
+  transition: width 180ms var(--ease), background 180ms var(--ease),
+    opacity 180ms var(--ease);
+}
+
+/* A slow highlight crossing the fill, so the bar reads as live rather than as a
+   static progress bar. Clipped to the fill's own rounded shape. */
+.effort-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  animation: effort-sheen 3.6s linear infinite;
+}
+
+@keyframes effort-sheen {
+  from {
+    background-position: 170% 0;
+  }
+  to {
+    background-position: -70% 0;
+  }
+}
+
+/* ── Stops and thumb ────────────────────────────────────────────────────── */
+.effort-stop {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--thumb) / 2 + var(--p) * (100% - var(--thumb)));
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 34%, transparent);
+  transition:
+    width 160ms var(--ease),
+    height 160ms var(--ease),
+    background 160ms var(--ease),
+    box-shadow 160ms var(--ease),
+    transform 160ms var(--ease);
+}
+
+/* Lifts slightly while held, the way a physical knob would. */
+.effort-scale.is-dragging .effort-stop.active {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+/* Ticks already behind the thumb brighten, so the travel is legible at a glance. */
+.effort-stop.is-passed {
+  background: color-mix(in srgb, var(--text-primary) 58%, transparent);
+}
+
+.effort-stop:hover {
+  background: color-mix(in srgb, var(--text-primary) 62%, transparent);
+}
+
+/* The selected stop becomes the thumb, the way ChatGPT's stepped thumb fills its
+   track height. White, not the effort colour: the colour is already carried by
+   the fill and the header, and a white thumb reads as the thing you are holding. */
+.effort-stop.active {
+  width: 28px;
+  height: 28px;
+  /* translate comes from the base rule; the size change keeps the thumb centred
+     on its own travel position. */
+  background: #ffffff;
+  /* The glow is offset-free and colour-matched to the effort, so the knob reads
+     as lit by the bar rather than as a sticker on top of it. */
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 16%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.32),
+    0 0 14px color-mix(in srgb, var(--stop-color) 48%, transparent);
+}
+
+.effort-stop.active:hover {
+  background: #ffffff;
+}
+
+.effort-stop:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 3px;
+}
+
+/* ── Labels ─────────────────────────────────────────────────────────────── */
+/* The same column grid as the stops, so every label centres under its own tick
+   instead of drifting with its text width, so a long label cannot shove the row. */
+.effort-names {
+  --thumb: 28px;
+  position: relative;
+  height: 15px;
+  margin-top: 7px;
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+
+.effort-names span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+  transition: color 160ms var(--ease);
+}
+
+/* The end labels anchor to the panel edges: centring a wide label on a stop that
+   now sits flush with the track would push it past the panel. */
+.effort-names span:first-child {
+  left: 0;
+}
+
+.effort-names span:last-child {
+  right: 0;
+}
+
+.effort-names span:not(:first-child):not(:last-child) {
+  left: calc(var(--thumb) / 2 + var(--p) * (100% - var(--thumb)));
+  transform: translateX(-50%);
+}
+
+.effort-names .is-active {
+  font-weight: 600;
+}
+
+.effort-note {
+  margin: 9px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  /* Three lines reserved: the descriptions are a sentence or two now, and the
+     panel would jump in height as you drag past a longer one. */
+  min-height: 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort-panel,
+  .effort-stop,
+  .effort-fill {
+    animation: none;
+    transition: none;
+  }
+
+  .effort-fill::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .effort-scale.is-dragging .effort-stop.active {
+    transform: translate(-50%, -50%);
   }
 }

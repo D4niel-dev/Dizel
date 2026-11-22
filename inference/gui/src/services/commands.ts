@@ -44,6 +44,55 @@ export const PLUGINS_COMMAND: CommandEntry = {
   aliases: [],
 };
 
+export const DOCTOR_COMMAND: CommandEntry = {
+  name: "doctor",
+  hint: "Run offline runtime checks: packages, config, history, provider",
+  kind: "system",
+  aliases: [],
+};
+
+export const SCORECARD_COMMAND: CommandEntry = {
+  name: "scorecard",
+  hint: "Show a checkpoint's scorecard; '/scorecard run' evaluates the loaded model",
+  kind: "system",
+  aliases: [],
+};
+
+export const COST_COMMAND: CommandEntry = {
+  name: "cost",
+  hint: "Estimate provider usage and cost for the current 12-hour window",
+  kind: "system",
+  aliases: [],
+};
+
+export const MEMORY_COMMAND: CommandEntry = {
+  name: "memory",
+  hint: "View, add, remove, or clear this project's durable memory",
+  kind: "system",
+  aliases: [],
+};
+
+export const REVIEW_COMMAND: CommandEntry = {
+  name: "review",
+  hint: "Ask the model to review the working-tree diff (read-only)",
+  kind: "system",
+  aliases: [],
+};
+
+export const COMMIT_COMMAND: CommandEntry = {
+  name: "commit",
+  hint: "Draft a commit message for the staged diff; never commits",
+  kind: "system",
+  aliases: [],
+};
+
+export const PLAN_COMMAND: CommandEntry = {
+  name: "plan",
+  hint: "Draft a numbered plan before executing",
+  kind: "system",
+  aliases: [],
+};
+
 function debug(name: string, hint: string, aliases: string[] = []): CommandEntry {
   return { name, hint, kind: "debug", aliases };
 }
@@ -60,6 +109,7 @@ export const DEBUG_COMMANDS: CommandEntry[] = [
   debug("markdown", "Append every markdown style", ["md"]),
   debug("thought", "Append a Thought fixture", ["think"]),
   debug("tooltest", "Append inspectable tool results and an approval card"),
+  debug("plantest", "Append a synthetic plan approval"),
   debug("filler", "Append n words of filler"),
   debug("error", "Raise the error banner"),
   debug("simulate", "loading | error | streaming | off"),
@@ -120,6 +170,21 @@ export function buildCommandGroups(skills: SkillInfo[], debugOn: boolean): Comma
   const groups: CommandGroup[] = [
     { label: "Skills", entries: [SKILLS_COMMAND], showCount: false },
     { label: "Plugins", entries: [PLUGINS_COMMAND], showCount: false },
+    {
+      label: "Diagnostics",
+      entries: [DOCTOR_COMMAND, SCORECARD_COMMAND, COST_COMMAND],
+      showCount: false,
+    },
+    {
+      label: "Chat",
+      entries: [PLAN_COMMAND],
+      showCount: false,
+    },
+    {
+      label: "Project",
+      entries: [MEMORY_COMMAND, REVIEW_COMMAND, COMMIT_COMMAND],
+      showCount: false,
+    },
   ];
   for (const category of categories) {
     groups.push({ label: category, entries: buckets.get(category) ?? [] });

@@ -3,6 +3,55 @@
 All notable changes to the Dizel app are recorded here. Release tags use the
 app version from `dizel_core/version.py`.
 
+## [2.0.4] - 2026-11-22
+
+### Added
+
+- A context panel on the status bar. It shows the real tokenizer count for the
+  base prompt, mode instructions, response-length clause, project rules and
+  conversation, with a caret tying the panel to the meter. The renderer no
+  longer guesses tokens by dividing characters by four.
+- A "Where you left off" card at the top of long chats. It is derived from the
+  messages already loaded — where the chat started, what was asked last and
+  the last reply — with no model call and nothing to cache. It hides while a
+  reply is streaming and can be dismissed per session.
+- Fast reply speeds: Fast, Turbo and Ultrafast, nested under the Fast mode
+  alongside Thinking effort. Each tier carries its own clause, colour and reply
+  budget, and the slider can be dragged just like the effort slider.
+- A System colour mode in the desktop and web settings. It follows the OS
+  light/dark preference and changes live when the OS does.
+- The core 15-case benchmark is now documented in the README with its run
+  command and the RFC-0008 warning that it is not a release gate.
+
+### Changed
+
+- Response length now changes the system prompt as well as the reply budget.
+  Short and Detailed add explicit instructions; Normal stays silent. The
+  context panel counts the clause, and the status bar refreshes when any prompt
+  choice changes.
+- The response-length control lives in its own Reply section of the composer's
+  `+` menu. Its flyout lists the three options with their budget multipliers
+  and a short description; Settings → Chat keeps the same control, and both
+  stay in sync.
+- The evaluation framework was modernized: benchmark cases are versioned,
+  custom scorers can be registered, manual cases fail loudly instead of
+  counting as half a pass, case weights affect the score, and timestamps are
+  timezone-aware. The scorecard shape consumed by the apps is unchanged.
+
+### Fixed
+
+- Response length was effectively a no-op: the app sent `short`/`detailed`
+  while the budget table only had `low`/`high`, so all three options produced
+  the same budget.
+- A saved response length had no effect at startup because the clause state was
+  only refreshed by a Settings save.
+- The context panel stayed stale after changing mode, effort, speed or length.
+- The Fast speed slider accepted clicks and arrow keys but could not be
+  dragged; synthetic pointer events also threw an uncaught capture error.
+- Evaluation benchmark JSON was gitignored and `evaluation/suite.py` untracked,
+  so a fresh checkout had no cases to run. The redundant second result store
+  was removed.
+
 ## [2.0.3] - 2026-11-17
 
 ### Added

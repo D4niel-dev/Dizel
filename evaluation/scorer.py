@@ -1,18 +1,26 @@
 """
 evaluation/scorer.py — Automated scoring for eval cases.
 
-Supports exact match, contains, fuzzy similarity, and numeric scoring.
+Supports exact match, contains, fuzzy similarity, numeric and named custom scoring.
 """
 
 import re
 from difflib import SequenceMatcher
-from typing import Optional
+from typing import Callable, Dict, Optional
 
 from .schema import EvalCase, EvalResult, EvalCategory, ScoringMethod
+
+# Programmatic scorers for cases with ScoringMethod.CUSTOM. JSON cases select one
+# with metadata["custom_scorer"] = name; callers register the callable at runtime.
+_CUSTOM_SCORERS: Dict[str, Callable[[EvalCase, str], float]] = {}
 
 
 class Scorer:
     """Scores evaluation results using the method specified in each case."""
+
+    @staticmethod
+    def register_custom(name: str, fn: Callable[[EvalCase, str], float]) -> None:
+        _CUSTOM_SCORERS[str(name)] = fn
 
     def score(self, case: EvalCase, actual: str,
               duration_ms: float = 0.0) -> EvalResult:
@@ -42,6 +50,7 @@ class Scorer:
             agent=case.agent,
             category=case.category,
             duration_ms=duration_ms,
+            weight=case.weight,
         )
 
     def _compute_score(self, case: EvalCase, actual: str) -> float:
@@ -60,8 +69,16 @@ class Scorer:
         elif method == ScoringMethod.NUMERIC:
             return self._numeric_match(expected, actual, case.tolerance)
 
+        elif method == ScoringMethod.CUSTOM:
+            name = str((case.metadata or {}).get("custom_scorer", ""))
+            fn = _CUSTOM_SCORERS.get(name)
+            if fn is None:
+                raise ValueError(f"unregistered custom scorer: {name or '(none)'}")
+            return max(0.0, min(1.0, float(fn(case, actual))))
+
         elif method == ScoringMethod.MANUAL:
-            return 0.5  # placeholder — requires human review
+            # A silent 0.5 counted as a half-pass and inflated pass rates.
+            raise ValueError("manual scoring requires review")
 
         return 0.0
 

@@ -38,7 +38,7 @@ The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in pub
 
 > **Release tags version the app, not the model.** A `v2.x.x` release is the desktop and terminal inference clients plus their shared sidecar — not a model release. The model stays **Dizel 1.5** (with **1.6 Flash Preview** training); model versions live in `model/dizel_info.py` and are tracked separately from the app version.
 
-> **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 10,500 of 45,777. Nothing from v1.6 is a release yet.
+> **Status in one line:** v1.5 is shipped and published as F16. v1.6 Flash Preview is a 435.3M-parameter sparse MoE at step 16,500 of 45,777. Nothing from v1.6 is a release yet.
 
 ---
 
@@ -66,10 +66,10 @@ The app runs **Dizel 1.5** today. **Dizel 1.6 Flash Preview** is training in pub
 | Metric          | Value                                                       |
 | --------------- | ----------------------------------------------------------- |
 | Run             | `dizel-1.6-preview-m1-pretrain`                             |
-| Progress        | 10,500 / 45,777 steps (22.9%)                               |
-| Tokens          | 688.1M / 3B                                                 |
-| Bits per byte   | **1.1236** on the fixed 500-document holdout                |
-| Validation loss | 3.4479                                                      |
+| Progress        | 16,500 / 45,777 steps (36.0%)                               |
+| Tokens          | 1.081B / 3B                                                 |
+| Bits per byte   | **1.1236** on the fixed 500-document holdout (step 10,500)  |
+| Validation loss | 3.3158 at step 16,500                                       |
 | Throughput      | ~21 s/step on the current T4 run                            |
 | Checkpoint      | Best snapshot synced to Drive; local copy in `checkpoints/` |
 
@@ -79,7 +79,7 @@ The local `checkpoints/dizel-1.6-preview-m1-best.pt` is a **pretrain snapshot fo
 
 ## What's new
 
-**Current maintenance release:** v2.0.1 (2026-11-15) adds the terminal update lifecycle, inline tool-result drawers in both clients, the desktop write/edit approval card, and one-command version stamping. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+**Current maintenance release:** v2.0.4 (2026-11-22) adds the context panel, a session digest, Fast reply speeds, a working response-length control, a System theme and a modernized evaluation framework. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ### 1. The desktop app is Electron now (v2.0.0)
 
@@ -744,6 +744,17 @@ python scripts/smoke_test_v16.py
 python scripts/test_model_lifecycle.py
 python scripts/test_inference_backend.py
 ```
+
+The 15-case core suite is the one the app itself displays as a scorecard:
+
+```bash
+python scripts/run_scorecard.py checkpoints/Dizel-1.5-Distill.gguf --device cuda
+```
+
+Its cases live in `evaluation/benchmarks/core_benchmarks.json`, and results are stored
+under `data/scorecards/` keyed by a fingerprint of the checkpoint file. The suite is
+deliberately small: [RFC-0008](plans/RFC/RFC-0008-evaluation-and-release-gates.md)
+forbids using it as a release gate. Use the BPB holdout above for that.
 
 ---
 

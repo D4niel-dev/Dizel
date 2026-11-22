@@ -49,7 +49,8 @@ class StatusBar(Container):
         self.set_interval(0.12, self._tick)
         for prop in (
             "active_mode",
-            "active_tier",
+            "active_thinking_effort",
+            "active_verbosity",
             "active_provider",
             "generation_state",
             "context_tokens",
@@ -166,6 +167,23 @@ class StatusBar(Container):
         )
         if show_context:
             left += f"   [{TEXT_3}]·[/]   [{TEXT_3}]{context}[/]"
+        # The 12-hour window is a policy limit, so it is worth a slot as soon as
+        # it starts moving — not only once it is close to spent.
+        try:
+            meter = getattr(self.app, "usage_manager", None)
+            window = int(meter.percentage) if meter is not None else 0
+            if window > 0 and width >= 104:
+                left += (
+                    f"   [{TEXT_3}]·[/]   [{TEXT_3}]window {window}% "
+                    f"· {meter.time_until_reset()}[/]"
+                )
+        except Exception:
+            pass
+        # Length is a budget modifier, not a state: it earns a slot only when it
+        # is doing something, and only where there is room for the word.
+        verbosity = str(getattr(self.app, "active_verbosity", "normal") or "normal")
+        if verbosity != "normal" and width >= 96:
+            left += f"   [{TEXT_3}]·[/]   [{TEXT_3}]length {verbosity}[/]"
         self.query_one("#status-left").update(left)
 
         tight = bool(metrics) and width < 90

@@ -64,6 +64,9 @@ export interface SavedPrompt {
 
 export type FontScale = "Small" | "Medium" | "Large";
 
+/** How long a reply may run. Scales its token budget on the server. */
+export type Verbosity = "short" | "normal" | "detailed";
+
 /** Display preferences that are actually applied by the UI, not just stored. */
 export type AccentName = "blue" | "teal" | "violet" | "rose";
 export type Density = "comfortable" | "compact";
@@ -194,8 +197,34 @@ export interface ModelEntry {
   kind: string;
 }
 
+export interface ScorecardSummary {
+  passed: number;
+  total: number;
+  pass_rate: number;
+  avg_score: number;
+  tok_per_s: number;
+  evaluated_at: string;
+  by_category: Record<string, number>;
+}
+
+export interface Scorecard extends ScorecardSummary {
+  name: string;
+  path: string;
+  checkpoint: string;
+  suite: string;
+  suite_version: number;
+  cases: {
+    id: string;
+    category: string;
+    passed: boolean;
+    score: number;
+    duration_ms: number;
+  }[];
+}
+
 export interface RecentModelEntry extends ModelEntry {
   exists: boolean;
+  scorecard?: ScorecardSummary | null;
 }
 
 export interface AppConfig {
@@ -270,10 +299,35 @@ export interface ToolApproval {
   synthetic?: boolean;
 }
 
+export interface PlanApproval {
+  id: string;
+  task: string;
+  steps: string[];
+  /** Debug fixture: resolve locally instead of answering a server request. */
+  synthetic?: boolean;
+}
+
 /** One version of a turn: the prompt as edited, and the reply it produced. */
 export interface Fork {
   prompt: string;
   reply: Message | null;
+}
+
+export interface SkillChip {
+  name: string;
+  title: string;
+  args?: string;
+}
+
+/** A skill expanded at attach time and held beside the draft, not in it. */
+export interface AttachedSkill extends SkillChip {
+  prompt: string;
+}
+
+/** View-only record saved with a user message that carried skills. */
+export interface MessageDisplay {
+  text: string;
+  skills: SkillChip[];
 }
 
 export interface Message {
@@ -304,6 +358,8 @@ export interface Message {
   /** Files this message carried. Their text is also folded into `content` for
    *  the model; this copy exists so the transcript can show and open them. */
   attachments?: Attachment[];
+  /** Attached skill chips. `content` stays exactly what the model saw. */
+  display?: MessageDisplay;
   /** Tool calls this turn made, in execution order. */
   tools?: ToolCall[];
 }
@@ -380,5 +436,6 @@ export type StreamEvent =
       additions: number;
       deletions: number;
     }
+  | { type: "plan"; id: string; task: string; steps: string[] }
   | { type: "done"; text: string; session_id: string }
   | { type: "error"; message: string };

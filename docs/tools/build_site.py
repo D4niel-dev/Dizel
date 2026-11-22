@@ -15,6 +15,9 @@ SITE = DOCS / "_site"
 SITE_URL = "https://d4niel-dev.github.io/Dizel/"
 REPO = "https://github.com/D4niel-dev/Dizel"
 
+sys.path.insert(0, str(DOCS.parent))
+from dizel_core import capabilities as capability_manifest  # noqa: E402
+
 PAGE_MAP: Dict[str, Tuple[str, str]] = {
     "index.html": ("index", "public"),
     "model.html": ("model", "public"),
@@ -23,6 +26,7 @@ PAGE_MAP: Dict[str, Tuple[str, str]] = {
     "guide/index.html": ("guide-index", "docs"),
     "guide/install.html": ("guide-install", "docs"),
     "guide/launch.html": ("guide-launch", "docs"),
+    "guide/capabilities.html": ("guide-capabilities", "docs"),
 }
 
 META_RE = re.compile(r"<!--meta\s*(\{.*?\})\s*-->", re.S)
@@ -87,6 +91,29 @@ def toc_links(content: str) -> str:
     return "\n".join(rows)
 
 
+def capabilities_table() -> str:
+    rows = []
+    for row in capability_manifest.load():
+        cells = []
+        for surface in ("gui", "tui"):
+            entry = row.entry(surface)
+            if entry is None:
+                cells.append('<td><span class="s-cap-gap">—</span></td>')
+            else:
+                cells.append(f"<td>{html.escape(entry.label)}</td>")
+        rows.append(
+            f'      <tr data-capability-row="{html.escape(row.id, quote=True)}">'
+            f"<td>{html.escape(row.name)}</td>{cells[0]}{cells[1]}</tr>"
+        )
+    return "\n".join(rows)
+
+
+def capabilities_summary() -> str:
+    rows = capability_manifest.load()
+    both = sum(1 for row in rows if row.tui and row.gui)
+    return f"{both} of {len(rows)} capabilities exist in both clients."
+
+
 def fill(text: str, values: Dict[str, str]) -> str:
     for key, value in values.items():
         text = text.replace("{{" + key + "}}", value)
@@ -101,6 +128,8 @@ def build() -> int:
     sidebar = read(SITE / "partials" / "docs-sidebar.html")
     toc = read(SITE / "partials" / "docs-toc.html")
     theme_init = read(SITE / "partials" / "theme-init.html")
+    cap_table = capabilities_table()
+    cap_summary = capabilities_summary()
 
     urls = []
     for output, (source, layout) in PAGE_MAP.items():
@@ -115,7 +144,9 @@ def build() -> int:
             else ""
         )
 
-        nav_html = mark_nav(nav, str(meta.get("nav", ""))).replace("{{base}}", base)
+        nav_html = mark_nav(nav, str(meta.get("nav", ""))).replace(
+            "{{base}}", base
+        ).replace("{{app_version}}", APP_VERSION)
         footer_html = footer.replace("{{base}}", base).replace(
             "{{app_version}}", APP_VERSION
         )
@@ -128,6 +159,7 @@ def build() -> int:
                 "toc_links": toc_links(content),
                 "edit_url": edit_url,
                 "base": base,
+                "app_version": APP_VERSION,
             },
         )
 
@@ -139,6 +171,7 @@ def build() -> int:
                     "docs_sidebar": sidebar_html,
                     "docs_toc": toc_html,
                     "base": base,
+                    "app_version": APP_VERSION,
                 },
             )
         else:
@@ -158,6 +191,8 @@ def build() -> int:
                 "footer": footer_html,
                 "body": body,
                 "base": base,
+                "capabilities_table": cap_table,
+                "capabilities_summary": html.escape(cap_summary),
             },
         )
 

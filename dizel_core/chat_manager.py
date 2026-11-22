@@ -88,6 +88,23 @@ from .config_manager import ConfigManager
 # ---------------------------------------------------------------------------
 # ChatManager
 # ---------------------------------------------------------------------------
+# A plan approval lifts this turn's tool-round ceiling so the model can carry
+# out the steps it just proposed; the next turn starts from the normal budget.
+PLAN_ROUND_BUDGET = 16
+
+
+def round_limit(max_rounds: int, plan_approved: bool) -> int:
+    return max(max_rounds, PLAN_ROUND_BUDGET) if plan_approved else max_rounds
+
+
+def plan_approved(calls: List[Dict], outcomes: List[str]) -> bool:
+    return any(
+        str(call.get("name") or "") == "plan"
+        and str(outcome or "").startswith("[plan] Approved")
+        for call, outcome in zip(calls, outcomes)
+    )
+
+
 class ChatManager:
     """
     Manages model loading, conversation history, and async generation.
@@ -113,15 +130,32 @@ class ChatManager:
 
         # Load persistent settings
         self._cfg = ConfigManager.load()
+        # Response length carries a prompt clause, so it must be live from the
+        # first turn — not only after a Settings save calls reload_sampling().
+        self.turn_verbosity = self._cfg.get("token_budget", {}).get(
+            "verbosity", "normal"
+        )
 
         # Conversation state
         self.history:         List[Dict] = []
-        self.system_prompt:   str        = self._cfg.get("system_prompt", SYSTEM_PROMPT)
+        # The user owns the base prompt; the mode clause is derived from the active
+        # profile on every apply_profile. Older settings stored the two composed
+        # together, so a trailing mode line is dropped here.
+        from .token_budget import strip_legacy_mode_clause
+
+        self.system_prompt:   str        = strip_legacy_mode_clause(
+            str(self._cfg.get("system_prompt", SYSTEM_PROMPT) or "")
+        )
+        self.mode_prompt:     str        = ""
+        self.profile_base:    str        = ""
+        # Project rules and memory, refreshed before each turn.
+        self.project_context: str        = ""
         self.session_id:      Optional[str] = None
 
         # Active model variant & mode (set via apply_profile)
         self._active_model: str = "Dizel"
         self._active_mode:  str = "Fast"
+        self._active_thinking_effort: str = "medium"
         self._active_profile = None  # ModelProfile, set by apply_profile()
         self.last_budget: int = 0    # tokens granted to the most recent reply
         self.last_task: str = ""     # intent classified for that reply
@@ -191,6 +225,33 @@ class ChatManager:
                     ConfigManager.save(self._cfg)
                     print(f"[ChatManager] Auto-selected model: {m_id}", flush=True)
 
+        self._probe_vision()
+
+    def _probe_vision(self) -> None:
+        """Cache whether the active provider model accepts images.
+
+        Runs here rather than in `model_info` because that property is read on
+        every status poll, and the probe is a network call. A provider that cannot
+        answer leaves the cache empty, and `model_info` falls back to the name
+        heuristic.
+        """
+        if self._provider_slug == "local" or not self._api_model:
+            return
+        from .providers import probe_vision
+
+        flags = getattr(self, "_vision_flags", None)
+        if flags is None:
+            flags = {}
+            self._vision_flags = flags
+        answer = probe_vision(self._api_provider, self._api_model)
+        if answer is None:
+            return
+        flags[(self._provider_slug, self._api_model)] = answer
+        print(
+            f"[ChatManager] Vision {answer} for {self._provider_slug}/{self._api_model}",
+            flush=True,
+        )
+
     def reload_provider(self) -> None:
         """Re-read provider config (called after settings change)."""
         self._cfg = ConfigManager.load()
@@ -203,6 +264,11 @@ class ChatManager:
         new sampling block, so anything that saves settings must call this.
         """
         self._cfg = ConfigManager.load()
+        # Response length now has a prompt clause as well as a budget. Picking it
+        # saves config and calls /chat/reload_settings, which lands here.
+        self.turn_verbosity = self._cfg.get("token_budget", {}).get(
+            "verbosity", "normal"
+        )
         samp = self._cfg.get("sampling", {})
 
         self.temperature = samp.get("temperature", self.temperature)
@@ -210,6 +276,14 @@ class ChatManager:
         self.top_p = samp.get("top_p", self.top_p)
         self.repetition_penalty = samp.get("repetition_penalty", self.repetition_penalty)
         self.max_new_tokens = samp.get("max_new_tokens", self.max_new_tokens)
+
+        # Settings writes the base prompt to disk; without this the edit only took
+        # effect after a restart.
+        from .token_budget import strip_legacy_mode_clause
+
+        self.system_prompt = strip_legacy_mode_clause(
+            str(self._cfg.get("system_prompt", self.system_prompt) or "")
+        )
 
         defaults = ConfigManager._DEFAULTS.get("sampling", {})
         self._sampling_customized = any(
@@ -224,20 +298,35 @@ class ChatManager:
             flush=True,
         )
 
-    def apply_profile(self, model_name: str, mode_name: str) -> None:
+    def apply_profile(
+        self,
+        model_name: str,
+        mode_name: str,
+        thinking_effort: str = "",
+        speed: str = "fast",
+    ) -> None:
         """
-        Apply a model variant + mode profile.
+        Apply a model variant + mode profile, with the Thinking effort when relevant.
 
         Changes the system prompt and stores the profile so that
         _generate_worker can use its sampling overrides and budget multiplier.
         """
-        from .token_budget import get_model_profile
-        profile = get_model_profile(model_name, mode_name)
+        from .token_budget import get_model_profile, normalize_thinking_effort
+
+        effort = normalize_thinking_effort(thinking_effort or "medium")
+        profile = get_model_profile(model_name, mode_name, effort, speed)
 
         self._active_model   = model_name
         self._active_mode    = mode_name
+        self._active_thinking_effort = effort
         self._active_profile = profile
-        self.system_prompt   = profile.system_prompt
+        # Only the mode half comes from the profile. Overwriting system_prompt here
+        # is what silently discarded anything the user typed in Settings.
+        from .token_budget import split_profile_prompt
+
+        base, clause = split_profile_prompt(profile.system_prompt)
+        self.profile_base = base
+        self.mode_prompt = clause
 
         print(f"[ChatManager] Profile applied: {profile.label}", flush=True)
 
@@ -452,13 +541,14 @@ class ChatManager:
     @property
     def model_info(self) -> dict:
         if self._provider_slug != "local" and self._api_provider is not None:
-            from .providers import model_supports_vision
+            from .providers import resolve_vision
 
+            cached = getattr(self, "_vision_flags", {}).get(
+                (self._provider_slug, self._api_model)
+            )
             return {
                 "provider": getattr(self._api_provider, "label", self._provider_slug),
-                "vision": model_supports_vision(
-                    self._provider_slug, self._api_model
-                ),
+                "vision": resolve_vision(self._provider_slug, self._api_model, cached),
             }
         backend = self._current_backend()
         if backend is None or not backend.is_ready:
@@ -500,6 +590,70 @@ class ChatManager:
     def load_history(self, messages: List[Dict]) -> None:
         self.history = list(messages)
 
+    def system_content(self) -> str:
+        """Base prompt, then the active mode clause, then project rules and memory.
+
+        The two prompt halves are kept apart so the mode clause can change without
+        touching what the user wrote.
+        """
+        base = str(self.system_prompt or "").strip()
+        if not base:
+            base = str(getattr(self, "profile_base", "") or "").strip()
+        from .token_budget import verbosity_clause
+
+        blocks = [
+            base,
+            str(getattr(self, "mode_prompt", "") or "").strip(),
+            verbosity_clause(getattr(self, "turn_verbosity", "normal")),
+            str(self.project_context or "").strip(),
+        ]
+        return "\n\n".join(block for block in blocks if block)
+
+    def refresh_project_context(self) -> None:
+        """Re-read DIZEL.md/AGENTS.md and project memory for the next turn."""
+        try:
+            from . import project_context
+
+            self.project_context = project_context.system_blocks(project_context.load())
+        except Exception:
+            self.project_context = ""
+
+    def _record_user_turn(
+        self,
+        user_text: str,
+        attachments: Optional[List[str]] = None,
+        images: Optional[List[str]] = None,
+        display: Optional[Dict] = None,
+    ) -> None:
+        """Append one user turn.
+
+        `display` is view metadata for the clients (skill chips) and is never
+        forwarded to a provider: `_api_messages` copies role/content/images only.
+        """
+        entry: Dict = {"role": "user", "content": user_text}
+        if attachments:
+            entry["attachments"] = attachments
+        if images:
+            entry["images"] = images
+        if display:
+            entry["display"] = display
+        self.history.append(entry)
+
+    def _api_messages(self) -> List[Dict]:
+        messages = []
+        system = self.system_content()
+        if system:
+            messages.append({"role": "system", "content": system})
+        for msg in self.history:
+            item = {
+                "role": msg["role"],
+                "content": msg.get("content", ""),
+            }
+            if msg.get("images"):
+                item["images"] = msg["images"]
+            messages.append(item)
+        return messages
+
     # ── Message sending ────────────────────────────────────────────────
 
     def regenerate_last(
@@ -538,6 +692,7 @@ class ChatManager:
         verbosity:   Optional[str] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
         continuation: bool = False,
+        display: Optional[Dict] = None,
     ) -> None:
         """
         Send a user message and generate a response asynchronously.
@@ -545,6 +700,8 @@ class ChatManager:
         Routes to API provider or local torch inference based on active provider.
         Callbacks are called from the background thread.
         """
+        self.refresh_project_context()
+
         # --- Native Tools Interception ---
         if user_text.startswith("/sh "):
             cmd = user_text[4:].strip()
@@ -631,6 +788,7 @@ class ChatManager:
                         on_error,
                         on_thinking,
                         continuation,
+                        display,
                     ),
                     daemon=True,
                 )
@@ -647,6 +805,7 @@ class ChatManager:
                         verbosity,
                         backend,
                         continuation,
+                        display,
                     ),
                     daemon=True,
                 )
@@ -716,6 +875,7 @@ class ChatManager:
         on_error:  Callable[[str], None],
         on_thinking: Optional[Callable[[str], None]] = None,
         continuation: bool = False,
+        display: Optional[Dict] = None,
     ) -> None:
         """Background thread: stream from an external API provider."""
         full_response: List[str] = []
@@ -741,23 +901,10 @@ class ChatManager:
             # Record user message. Images ride with the turn so follow-ups in
             # the same conversation still give a vision model its context.
             if not continuation:
-                entry = {"role": "user", "content": user_text}
-                if images:
-                    entry["images"] = images
-                self.history.append(entry)
+                self._record_user_turn(user_text, images=images, display=display)
 
             # Build messages for the API (OpenAI format)
-            messages = []
-            if self.system_prompt:
-                messages.append({"role": "system", "content": self.system_prompt})
-            for msg in self.history:
-                item = {
-                    "role": msg["role"],
-                    "content": msg.get("content", ""),
-                }
-                if msg.get("images"):
-                    item["images"] = msg["images"]
-                messages.append(item)
+            messages = self._api_messages()
 
             # Get provider-specific kwargs
             kwargs = {}
@@ -827,6 +974,7 @@ class ChatManager:
         verbosity:   Optional[str] = None,
         backend=None,
         continuation: bool = False,
+        display: Optional[Dict] = None,
     ) -> None:
         """Background thread: runs generation and fires callbacks."""
         import time
@@ -857,11 +1005,10 @@ class ChatManager:
             task_type = classify_task(user_text, has_tools_active=has_tools)
 
             # ── Step 2: Add user turn to history ─────────────────────────
-            msg_dict = {"role": "user", "content": user_text}
-            if attachments:
-                msg_dict["attachments"] = attachments
             if not continuation:
-                self.history.append(msg_dict)
+                self._record_user_turn(
+                    user_text, attachments=attachments, display=display
+                )
             print(f"[ChatManager] Generating response for: {user_text[:60]}...", flush=True)
 
             # ── Step 3: Smart context trimming ───────────────────────────
@@ -879,7 +1026,7 @@ class ChatManager:
             self.last_trimmed = int(n_trimmed)
 
             # ── Step 4: Estimate token counts ────────────────────────────
-            ctx_text = self.system_prompt + "".join([m["content"] for m in trimmed_history])
+            ctx_text = self.system_content() + "".join([m["content"] for m in trimmed_history])
             context_tokens = backend.count_tokens(ctx_text)
             input_token_count = backend.count_tokens(user_text)
             
@@ -990,7 +1137,7 @@ class ChatManager:
             
             full_response = backend.generate(
                 messages=trimmed_history,
-                system_prompt=self.system_prompt,
+                system_prompt=self.system_content(),
                 sampling_params=sampling_params,
                 max_tokens=effective_max,
                 on_token=on_token
@@ -1044,6 +1191,7 @@ class ChatManager:
         approve_tool: Optional[Callable[[object], bool]] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
         continuation: bool = False,
+        display: Optional[Dict] = None,
     ) -> None:
         """Answer a prompt, running any tools the model asks for on the way.
 
@@ -1067,6 +1215,7 @@ class ChatManager:
                 verbosity,
                 on_thinking,
                 continuation,
+                display,
             )
             return
 
@@ -1079,7 +1228,7 @@ class ChatManager:
             + "\n\n"
             + tool_registry.prompt_block(allow_writes=approve_tool is not None)
         )
-        state = {"round": 0, "done": False}
+        state = {"round": 0, "done": False, "plan_approved": False}
 
         def restore() -> None:
             self.system_prompt = original
@@ -1103,16 +1252,18 @@ class ChatManager:
                 on_done(text)
                 return
 
-            if state["round"] >= max_rounds:
+            limit = round_limit(max_rounds, state["plan_approved"])
+            if state["round"] >= limit:
                 state["done"] = True
                 restore()
                 on_done(
                     text
-                    + f"\n\n_[stopped after {max_rounds} tool rounds]_"
+                    + f"\n\n_[stopped after {limit} tool rounds]_"
                 )
                 return
 
             results = []
+            outcomes = []
             for call in calls:
                 if on_tool_start is not None:
                     try:
@@ -1120,6 +1271,7 @@ class ChatManager:
                     except Exception:
                         pass
                 outcome = execute(call, approve=approve_tool)
+                outcomes.append(outcome)
                 if on_tool is not None:
                     try:
                         on_tool(call, outcome)
@@ -1128,6 +1280,9 @@ class ChatManager:
                 results.append(
                     f'<tool_result name="{call.get("name", "")}">\n{outcome}\n</tool_result>'
                 )
+
+            if plan_approved(calls, outcomes):
+                state["plan_approved"] = True
 
             try:
                 self.send_message(
@@ -1144,7 +1299,15 @@ class ChatManager:
                 fail(f"Tool round failed: {error}")
 
         try:
-            self.send_message(user_text, attachments, on_token, round_done, fail, verbosity)
+            self.send_message(
+                user_text,
+                attachments,
+                on_token,
+                round_done,
+                fail,
+                verbosity,
+                display=display,
+            )
         except Exception as error:
             fail(str(error))
 

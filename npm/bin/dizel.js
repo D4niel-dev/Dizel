@@ -541,6 +541,30 @@ function localModels() {
   return models;
 }
 
+function runtimeDoctor(python) {
+  if (!python) return { error: "python not found" };
+  const dir = installedTui();
+  if (!dir) return { error: "terminal client not installed — dizel install --tui" };
+  const code =
+    "import json; from dizel_core import doctor; print(json.dumps(doctor.as_dict()))";
+  const result = spawnSync(python.exe, ["-c", code], {
+    cwd: dir,
+    env: { ...process.env, PYTHONPATH: dir },
+    encoding: "utf8",
+    timeout: 20000,
+  });
+  if (result.error) return { error: result.error.message };
+  if (result.status !== 0) {
+    const first = String(result.stderr || "").trim().split("\n")[0];
+    return { error: first || `python exited with ${result.status}` };
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    return { error: "unreadable doctor output" };
+  }
+}
+
 function doctorCommand(options) {
   const python = findPython();
   const venv = fs.existsSync(venvPythonPath());
@@ -561,6 +585,10 @@ function doctorCommand(options) {
     docs: DOCS_URL,
   };
 
+  if (process.argv.includes("--runtime")) {
+    report.runtime = runtimeDoctor(python);
+  }
+
   if (options.json) {
     print(JSON.stringify(report, null, 2));
     return;
@@ -577,6 +605,18 @@ function doctorCommand(options) {
   print(`  models    ${models.length ? `${models.length} local checkpoint(s)` : "none found"}`);
   if (models.length) {
     for (const model of models.slice(0, 5)) print(`            ${model}`);
+  }
+  if (report.runtime) {
+    print("");
+    if (report.runtime.error) {
+      print(`  runtime   unavailable — ${report.runtime.error}`);
+    } else {
+      const counts = report.runtime.counts || { ok: 0, warn: 0, fail: 0 };
+      print(`  runtime   ${counts.ok} ok · ${counts.warn} warn · ${counts.fail} fail`);
+      for (const row of report.runtime.checks || []) {
+        print(`            [${row.status}] ${row.label} — ${row.detail}`);
+      }
+    }
   }
   print("");
   print("Next:");
@@ -610,7 +650,7 @@ function help() {
   print("  dizel tui [args...]");
   print("  dizel gui");
   print("  dizel deps");
-  print("  dizel doctor [--json]");
+  print("  dizel doctor [--json] [--runtime]");
   print("  dizel update");
   print("  dizel model");
   print("  dizel version");

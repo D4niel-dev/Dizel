@@ -8,8 +8,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
+from dizel_core import scorecards
 from model.naming import model_display_name
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -78,8 +79,54 @@ def recent_models() -> List[Dict[str, Any]]:
             entry["exists"] = True
             entry["size"] = stat.st_size
             entry["modified"] = int(stat.st_mtime)
+        card = scorecards.load(path) if entry["exists"] else None
+        entry["scorecard"] = scorecards.summary(card) if card else None
         items.append(entry)
     return items
+
+
+@router.get("/scorecard")
+def get_scorecard(path: str) -> Dict[str, Any]:
+    """The stored scorecard for one checkpoint, when it is still fresh."""
+    card = scorecards.load(path)
+    if not card:
+        raise HTTPException(
+            status_code=404, detail="No scorecard for this checkpoint (yet)."
+        )
+    return card
+
+
+@router.get("/scorecard/current")
+def current_scorecard() -> Dict[str, Any]:
+    """The scorecard for whatever local checkpoint is loaded right now."""
+    from api.services.chat_service import ChatService
+
+    manager = ChatService.get_manager()
+    path = str(getattr(manager, "checkpoint_path", "") or "")
+    if not path:
+        raise HTTPException(status_code=404, detail="No local checkpoint is loaded.")
+    card = scorecards.load(path)
+    if not card:
+        raise HTTPException(
+            status_code=404, detail="No scorecard for the loaded checkpoint yet."
+        )
+    return card
+
+
+@router.post("/scorecard/run")
+def run_scorecard() -> Dict[str, Any]:
+    """Evaluate the loaded checkpoint in the background."""
+    from api.services.scorecard_service import ScorecardService
+
+    return ScorecardService.start()
+
+
+@router.get("/scorecard/run")
+def scorecard_run_status() -> Dict[str, Any]:
+    """Progress of the current (or last) in-app evaluation."""
+    from api.services.scorecard_service import ScorecardService
+
+    return ScorecardService.state()
 
 
 @router.get("/profiles")

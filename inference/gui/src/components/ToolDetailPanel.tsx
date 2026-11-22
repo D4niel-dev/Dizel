@@ -68,7 +68,7 @@ function parseDiff(diff: string): DiffRow[] {
 }
 
 /** A numbered, syntax-highlighted file body. */
-function CodeView({
+export function CodeView({
   code,
   path,
   startLine = 1,

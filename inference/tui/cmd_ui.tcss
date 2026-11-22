@@ -256,6 +256,14 @@ WorkspacePanel {
 
 WorkspacePanel Static { height: auto; }
 
+/* /find lands on a row; this is the only cue that says "here". It fades on a
+   timer rather than on the next keystroke, so the highlight survives the
+   glance it exists for. */
+WorkspacePanel .-find-hit {
+    background: $accent 22%;
+}
+
+
 EmptyStateBlock {
     width: 1fr;
     height: 1fr;
@@ -493,6 +501,17 @@ InputBar:focus-within {
 }
 
 #input-row { height: 1; layout: horizontal; }
+
+#input-skills {
+    height: auto;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+.skill-chips {
+    height: auto;
+    padding: 1 2 0 2;
+}
 
 #input-foot {
     height: 1;
@@ -768,6 +787,20 @@ ModalScreen {
     border: solid $border;
 }
 .multiline-card TextArea:focus { border: solid $border-hi; }
+
+.modal-notice { height: auto; color: $warn; margin-top: 1; }
+.modal-notice.-danger { color: $danger; text-style: bold; }
+
+.plan-card { width: 78; max-width: 94%; }
+.plan-task { height: auto; color: $text; text-style: bold; margin-top: 1; }
+.plan-steps {
+    height: auto;
+    max-height: 16;
+    margin-top: 1;
+    border: solid $border;
+    padding: 0 1;
+}
+.plan-step { height: auto; color: $text-2; }
 
 /* ── Help browser ───────────────────────────────────────────────────────── */
 .help-card { width: 94; max-width: 96%; height: 82%; }

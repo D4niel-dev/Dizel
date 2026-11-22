@@ -90,6 +90,8 @@ const MAX_WIDTH = 720;
 export function AttachmentPreview() {
   const preview = useChat((s) => s.preview);
   const setPreview = useChat((s) => s.setPreview);
+  // Images reach provider models that can read them; the note has to match.
+  const visionReady = useChat((s) => s.status?.model_info?.vision === true);
 
   const [wrap, setWrap] = useState(false);
   const [copied, setCopied] = useState<"content" | "path" | null>(null);
@@ -328,7 +330,11 @@ export function AttachmentPreview() {
             <Icon name="maximize" size={12} />
           </button>
           <span className="spacer" />
-          <span className="att-zoom-note">Not sent to the model — no vision.</span>
+          <span className="att-zoom-note">
+            {visionReady
+              ? "Sent to the model as an image."
+              : "This model can't read images."}
+          </span>
         </footer>
       ) : (
         <footer className="att-panel-foot">
