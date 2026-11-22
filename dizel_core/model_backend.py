@@ -100,23 +100,11 @@ def _chat_contract(ckpt: dict, fmt: str, model_cfg, pretrain_only: bool = False)
 # Please provide me with the task you asked for." A compact identity line is
 # the one instruction it follows reliably, so long prompts collapse to it and
 # short custom instructions keep it as a prefix.
-_V15_IDENTITY = (
-    "You are Dizel, an AI assistant created by the Dizel team. "
-    "Answer the user's request directly and accurately."
+from .system_prompt import (  # re-exported; callers use model_backend._v15_system_prompt
+    _V15_IDENTITY,
+    _V15_SYSTEM_PROMPT_MAX_CHARS,
+    _v15_system_prompt,
 )
-_V15_SYSTEM_PROMPT_MAX_CHARS = 240
-
-
-def _v15_system_prompt(system_prompt: str) -> str:
-    """Compact a system turn to what a v1.5 checkpoint can follow."""
-    text = " ".join(str(system_prompt or "").split())
-    if not text:
-        return ""
-    if len(text) > _V15_SYSTEM_PROMPT_MAX_CHARS:
-        return _V15_IDENTITY
-    if "dizel" in text.lower():
-        return text
-    return f"{_V15_IDENTITY} {text}"
 
 
 def _role_end_messages(

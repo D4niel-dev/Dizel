@@ -9,7 +9,7 @@ from __future__ import annotations
 import unittest
 
 from dizel_core.chat_manager import ChatManager
-from dizel_core.model_backend import _V15_SYSTEM_PROMPT_MAX_CHARS, _v15_system_prompt
+from dizel_core.system_prompt import _V15_SYSTEM_PROMPT_MAX_CHARS, _v15_system_prompt
 from dizel_core.token_budget import (
     VERBOSITY_CLAUSES,
     VERBOSITY_MULTIPLIERS,
