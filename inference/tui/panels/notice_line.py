@@ -13,7 +13,10 @@ from textual.widgets import Static
 
 from inference.tui.theme import TEXT_2, ACCENT, DANGER, TEXT_3
 
-_NOTICE_TTL = 1.4
+# Well inside the one-and-a-half-second fade contract the tests assert. The
+# extra slack matters on loaded CI runners, where timer callbacks can arrive
+# late even though the notice itself was shown on time.
+_NOTICE_TTL = 1.0
 
 
 class NoticeLine(Static):
