@@ -1,0 +1,99 @@
+<!--meta
+{
+  "title": "Sessions & context — Dizel Docs",
+  "description": "Save, resume, rename, archive, and delete chats; understand context counts, trimming, compaction, project rules, and durable memory.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "sessions"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Controls</span><span>/</span><span>Sessions &amp; context</span></div>
+<h1>Sessions &amp; context</h1>
+<p class="s-docs-lede">A saved session is a transcript on disk. Context is the material the model can use for its next reply. Resetting one does not always mean deleting the other.</p>
+
+<div class="s-callout"><b>Reset context, keep history.</b> Starting a new chat clears the active model context while leaving saved sessions on disk. Permanent deletion is a separate, explicit action.</div>
+
+<section class="s-docs-section">
+  <h2 id="manage-sessions">Manage saved sessions</h2>
+  <p>Desktop: choose <strong>New chat</strong> to start fresh, or open <strong>Chats</strong> to search and resume saved conversations. A session is saved after its first message.</p>
+  <ul>
+    <li>Open a row to resume it; double-click its title to rename it.</li>
+    <li>Use the row menu to edit tags, pin, archive, export JSON, or continue in the terminal.</li>
+    <li>Archive removes a chat from the active list but keeps it on disk; choose <strong>Restore</strong> to bring it back.</li>
+    <li>Delete asks for a second click. It is permanent and never auto-approved.</li>
+  </ul>
+  <p>The desktop's <strong>Where you left off</strong> digest is generated locally from the saved session, makes no model call, and does not populate the model cache. It stays hidden during streaming and can be dismissed for that session.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="terminal-sessions">Terminal session commands</h2>
+  <p>Run <code>/session</code> for the manager, or use an action directly. Opening accepts a unique session-ID prefix.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/session
+/session list
+/session open 20261118
+/session rename Release notes
+/session pin
+/session delete 20261118 confirm</code></pre>
+  </div>
+  <p><code>list</code> also accepts <code>ls</code>; <code>open</code> accepts <code>load</code>. Deletion requires <code>confirm</code>, <code>yes</code>, or <code>--yes</code> after the target ID. Without that word, the command only shows what would be deleted.</p>
+  <p>The launcher can also resume a saved chat with <code>dizel --session &lt;session-id&gt;</code>. See <a href="launch.html#handoff">moving a chat between clients</a> for the desktop handoff.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="reset-and-clear">Reset versus clear</h2>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Action</th><th scope="col">Visible transcript</th><th scope="col">Model context</th><th scope="col">Saved sessions</th></tr></thead>
+      <tbody>
+        <tr><td><code>/reset</code></td><td>Cleared</td><td>Cleared</td><td>Kept</td></tr>
+        <tr><td><code>/clear</code></td><td>Cleared</td><td>Kept</td><td>Kept</td></tr>
+        <tr><td><code>/session delete … confirm</code></td><td>Removed if current</td><td>Current session replaced</td><td>Target permanently deleted</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><code>/reset</code> asks for confirmation; <code>/reset force</code>, <code>yes</code>, or <code>-y</code> bypasses that prompt. Use <code>/clear</code> only when you want a clean workspace without making the model forget the conversation.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="context">Read the context panel</h2>
+  <p>The desktop context panel counts the active system prompt, project context, conversation, and reserved reply space on the server with the model's tokenizer. In the terminal, <code>/context</code> reports current tokens, capacity, and the allocated reply budget.</p>
+  <p>The usage meter is different: it uses a policy estimate to meter a provider's 12-hour bucket. Its percentage is not an exact tokenizer count and is not the vendor's billing total.</p>
+  <ul>
+    <li><strong>Routine trimming</strong> drops the oldest eligible turns when the model's real context budget is exceeded, preserving recent messages and protected attachment/tool context.</li>
+    <li><strong>Usage compaction</strong> starts at 84% of the active provider's policy bucket. It replaces older turns with a short extractive summary and keeps the latest four messages; it makes no model call.</li>
+    <li>Each provider window permits five compactions. After that, start a new chat or wait for the 12-hour window to reset.</li>
+  </ul>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/context</code></pre>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="project-rules">Project rules and durable memory</h2>
+  <p>At the project root, <code>DIZEL.md</code> and <code>AGENTS.md</code> are loaded into the system prompt. Their combined input is capped at <strong>12,000 characters</strong>. Keep durable instructions there rather than repeating them in every chat.</p>
+  <p>Project memory is separate: it is keyed by the resolved project path and stored in the app data directory, not written into your repository. Dizel injects up to <strong>6,000 characters</strong> of memory into the system prompt. Treat every saved entry as visible to the model.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/memory
+/memory rules
+/memory add Uses CRLF for .cmd files
+/memory remove &lt;id-or-index&gt;
+/memory clear</code></pre>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="storage">Where the data lives</h2>
+  <p>By default, sessions are JSON files under <code>data/history</code>, and project memory is under <code>data/memory</code>. Packaged builds can point history at Electron's user-data directory. Set <code>DIZEL_DATA_DIR</code> to override the shared data root.</p>
+  <p>Provider keys and preferences live separately in <code>settings.json</code>; <code>DIZEL_CONFIG_DIR</code> overrides that settings location. Back up both roots deliberately, and exclude them from source control when they contain private conversations or credentials.</p>
+</section>
+
+<div class="s-next">
+  <a href="providers.html"><small>Previous</small>Providers</a>
+  <a href="plugins.html"><small>Next</small>MCP plugins →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>

@@ -94,6 +94,8 @@
 
   --sans: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "Geist Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --text-micro: 11px;
+  --text-small: 11.5px;
   --shell: 1220px;
   --gutter: clamp(18px, 4vw, 44px);
   --section-y: clamp(48px, 5.2vw, 72px);
@@ -252,7 +254,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 .s-word { font-size: 17px; font-weight: 600; letter-spacing: -0.025em; line-height: 1 }
-.s-edition{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:0.06em;
+.s-edition{display:inline-block;font-family:var(--mono);font-size:var(--text-micro);letter-spacing:0.06em;
   color:var(--ink-3);border:1px solid var(--line);border-radius:2px;padding:2px 5px;line-height:1.3;white-space:nowrap}
 .s-nav-links { display: flex; align-items: center; gap: 24px; margin-left: 8px }
 .s-nav-links a {
@@ -274,7 +276,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   align-items: center;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-2);
@@ -376,7 +378,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   gap: 0;
   border-bottom: 1px solid var(--i-line);
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--i-ink-3);
@@ -433,7 +435,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   gap: 6px 18px;
   margin-top: 26px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--i-ink-3);
@@ -456,7 +458,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   justify-content: space-between;
   gap: 12px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--i-ink-3);
@@ -464,8 +466,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-panel-head { border-bottom: 1px solid var(--i-line) }
 .s-panel-head b { color: var(--i-ink-2); font-weight: 400; letter-spacing: 0.1em }
-.s-panel-foot { border-top: 1px solid var(--i-line); font-size: 9.5px }
-.s-panel-foot .s-mono { color: var(--i-ink-2); font-size: 9.5px; letter-spacing: 0.04em }
+.s-panel-foot { border-top: 1px solid var(--i-line); font-size: var(--text-micro) }
+.s-panel-foot .s-mono { color: var(--i-ink-2); font-size: var(--text-micro); letter-spacing: 0.04em }
 .s-live { display: inline-flex; align-items: center; gap: 6px; color: var(--i-ok) }
 .s-live i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor }
 .s-route.is-routing + .s-panel-foot .s-live i,
@@ -515,7 +517,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transition: background-color var(--dur-base) var(--ease), border-color var(--dur-base) var(--ease);
 }
 .s-node b { font-family: var(--mono); font-size: 11.5px; font-weight: 400; color: var(--i-ink); line-height: 1.3 }
-.s-node small { font-family: var(--mono); font-size: 8.5px; color: var(--i-ink-3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px }
+.s-node small { font-family: var(--mono); font-size: var(--text-micro); color: var(--i-ink-3); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 2px }
 .s-node.is-token b { font-size: 13px; overflow-wrap: anywhere }
 .s-node.is-router { background: var(--i-surface-2); text-align: center; align-items: center }
 .s-wire {
@@ -544,7 +546,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(255, 255, 255, 0.03);
   padding: 8px;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: var(--text-small);
   color: var(--i-ink-3);
   display: flex;
   align-items: center;
@@ -572,14 +574,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-readout-cell:last-child { border-right: 0; margin-right: 0 }
 .s-cell-k { font-size: 12.5px; color: var(--i-ink); line-height: 1.3; display: flex; flex-direction: column; gap: 2px }
-.s-cell-k small { font-family: var(--mono); font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--i-ink-3) }
+.s-cell-k small { font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.07em; text-transform: uppercase; color: var(--i-ink-3) }
 .s-cell-v { font-family: var(--mono); font-size: 17px; letter-spacing: -0.01em; color: var(--i-ink); font-variant-numeric: tabular-nums }
 .s-tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -593,7 +595,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-instrument .s-tag.is-muted { color: var(--i-ink-3) }
 .s-readout-note {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--text-micro);
   letter-spacing: 0.03em;
   line-height: 1.7;
   color: var(--i-ink-3);
@@ -631,7 +633,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-rail {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -653,7 +655,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-matrix { width: 100%; border-collapse: collapse; font-size: 13.5px }
 .s-matrix thead th {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   font-weight: 400;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -673,13 +675,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-matrix.is-log tbody th { width: 200px }
 .s-matrix.is-log tbody td { padding-right: 48px; line-height: 1.62 }
 .s-matrix tbody th b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2 }
-.s-matrix tbody th small { display: block; font-family: var(--mono); font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin-top: 5px }
+.s-matrix tbody th small { display: block; font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); margin-top: 5px }
 .s-matrix td { color: var(--ink-2) }
 .s-matrix td .s-tag { color: var(--ink-3) }
 .s-matrix td .s-tag.is-ok { color: var(--ok) }
 .s-matrix td .s-tag.is-warn { color: var(--warn) }
 .s-matrix .num { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ink) }
-.s-matrix .num small { display: block; font-size: 9px; color: var(--ink-3); margin-top: 2px; letter-spacing: 0.04em }
+.s-matrix .num small { display: block; font-size: var(--text-micro); color: var(--ink-3); margin-top: 2px; letter-spacing: 0.04em }
 .s-matrix a {
   color: var(--ink);
   font-size: 12.5px;
@@ -721,7 +723,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-links-list a:hover { background: var(--surface) }
 .s-links-list a:hover::before { transform: scaleY(1) }
-.s-num { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.06em; color: var(--ink-3); align-self: start; padding-top: 4px }
+.s-num { font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.06em; color: var(--ink-3); align-self: start; padding-top: 4px }
 .s-link-title { display: block; font-size: 15px; font-weight: 500; color: var(--ink); line-height: 1.3; letter-spacing: -0.01em }
 .s-link-desc { display: block; font-size: 12px; line-height: 1.45; color: var(--ink-3); margin-top: 3px }
 .s-arrow{display:inline-block;font-family:var(--mono);font-size:14px;color:var(--ink-3);transition:transform .15s,color .15s}
@@ -751,7 +753,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--i-bg);
   border-bottom: 1px solid var(--i-line);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--i-ink-3);
@@ -772,7 +774,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-facts span.k { font-size: 12px; color: var(--ink-2) }
 .s-facts dd,
 .s-facts span.v { margin: 0; font-family: var(--mono); font-size: 11.5px; color: var(--ink); text-align: right; font-variant-numeric: tabular-nums }
-.s-facts small { display: block; font-size: 9px; color: var(--ink-3); margin-top: 2px }
+.s-facts small { display: block; font-size: var(--text-micro); color: var(--ink-3); margin-top: 2px }
 .s-specs .s-text-link { display: inline-block; margin-top: 16px }
 
 /* ── limitations ─────────────────────────────────────────────────────── */
@@ -810,9 +812,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-foot-brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--i-ink) }
 .s-foot-brand .s-word { font-size: 17px }
 .s-foot-note { margin-top: 12px; font-size: 12px; line-height: 1.6; color: var(--i-ink-3); max-width: 32ch }
-.s-foot-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--i-ok) }
+.s-foot-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 16px; font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--i-ok) }
 .s-foot-status i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: inline-block }
-.s-foot-col h3 { font-family: var(--mono); font-size: 9px; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: var(--i-ink-3); margin: 0 0 12px; padding-bottom: 9px; border-bottom: 1px solid var(--i-line) }
+.s-foot-col h3 { font-family: var(--mono); font-size: var(--text-micro); font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: var(--i-ink-3); margin: 0 0 12px; padding-bottom: 9px; border-bottom: 1px solid var(--i-line) }
 .s-foot-col a { display: block; font-size: 12.5px; color: var(--i-ink-2); text-decoration: none; padding: 4px 0; transition: color var(--dur-fast) var(--ease) }
 .s-foot-col a:hover { color: var(--i-accent) }
 .s-foot-bottom {
@@ -824,7 +826,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding-top: 16px;
   border-top: 1px solid var(--i-line);
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-micro);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--i-ink-3);
@@ -837,7 +839,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-doc-head { padding: clamp(28px, 3.6vw, 44px) 0 24px; border-bottom: 1px solid var(--line) }
 .s-crumb {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -855,7 +857,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   gap: 6px 16px;
   margin-top: 18px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -876,7 +878,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-paper-rail .s-rail-title,
 .s-docs-toc .s-side-title {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-micro);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -936,7 +938,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-table-scroll .s-paper-table { margin: 0 }
 .s-paper-table th {
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: var(--text-micro);
   font-weight: 400;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -951,7 +953,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-paper-table td { padding: 9px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top }
 .s-paper-table td.num { font-family: var(--mono); font-size: 11.5px; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums }
 .s-paper-table tr:last-child td { border-bottom: 0 }
-.s-paper-table .s-tag { font-size: 8.5px; color: var(--ink-3) }
+.s-paper-table .s-tag { font-size: var(--text-micro); color: var(--ink-3) }
 .s-paper-table .s-tag.is-ok { color: var(--ok) }
 .s-paper-table .s-tag.is-warn { color: var(--warn) }
 .s-arch {
@@ -967,7 +969,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-arch span {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: var(--text-micro);
   line-height: 1.4;
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -976,7 +978,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--ink-2);
 }
 .s-arch span.hot { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover) }
-.s-arch em { font-style: normal; color: var(--line-2); font-family: var(--mono); font-size: 10px }
+.s-arch em { font-style: normal; color: var(--line-2); font-family: var(--mono); font-size: var(--text-micro) }
 .s-arch-note { font-size: 11px; line-height: 1.55; color: var(--ink-3); margin-top: 0 }
 .s-callout {
   border: 1px solid var(--line-2);
@@ -995,7 +997,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-rail-list { list-style: none; margin: 0; padding: 0 }
 .s-rail-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line) }
 .s-rail-list .k { color: var(--ink-3); font-size: 11.5px }
-.s-rail-list .v { font-family: var(--mono); font-size: 10.5px; color: var(--ink); text-align: right }
+.s-rail-list .v { font-family: var(--mono); font-size: var(--text-small); color: var(--ink); text-align: right }
 .s-paper-rail .s-callout { padding: 10px 11px; font-size: 11px; margin: 16px 0 }
 .s-paper-rail .s-source { display: block; font-size: 11.5px; color: var(--ink-2); text-decoration: none; padding: 4px 0 }
 .s-paper-rail .s-source:hover { color: var(--accent) }
@@ -1012,7 +1014,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-paper-foot a { text-decoration: none; color: var(--ink-2) }
 .s-paper-foot a:hover { color: var(--accent) }
 .s-paper-foot a:last-child { text-align: right }
-.s-paper-foot small { display: block; font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px }
+.s-paper-foot small { display: block; font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px }
 
 /* ── code ────────────────────────────────────────────────────────────── */
 .s-code {
@@ -1036,7 +1038,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(255, 255, 255, 0.06);
   color: #cfd3d8;
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 5px 7px;
@@ -1058,7 +1060,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-docs-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink); text-decoration: none }
 .s-docs-label {
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: var(--text-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -1069,7 +1071,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-docs-version {
   margin-left: auto;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: var(--text-micro);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -1083,7 +1085,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .s-docs-side { font-size: 12.5px; position: sticky; top: 78px }
 .s-side-group { margin-bottom: 22px }
-.s-side-title { font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px }
+.s-side-title { font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px }
 .s-docs-side a {
   display: block;
   padding: 4px 0 4px 10px;
@@ -1123,7 +1125,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-docs-main a:not(.s-text-link) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2) }
 .s-docs-main a:not(.s-text-link):hover { color: var(--accent); text-decoration-color: var(--accent) }
 .s-step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; margin-top: 22px }
-.s-step-n { font-family: var(--mono); font-size: 9.5px; color: var(--accent); padding-top: 3px }
+.s-step-n { font-family: var(--mono); font-size: var(--text-micro); color: var(--accent); padding-top: 3px }
 .s-step h3 { margin: 0 0 6px; font-family: var(--sans); font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em }
 .s-step p { font-size: 13px; line-height: 1.65; color: var(--ink-2) }
 .s-tabs {
@@ -1170,13 +1172,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .s-next a { text-decoration: none; font-size: 13px; color: var(--ink-2) }
 .s-next a:hover { color: var(--accent) }
 .s-next a:last-child { text-align: right }
-.s-next small { display: block; font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px }
+.s-next small { display: block; font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 3px }
 .s-docs-toc { position: sticky; top: 78px; font-size: 11.5px; border-top: 1px solid var(--line-2); padding-top: 10px }
 .s-docs-toc .s-side-title { margin-bottom: 6px }
 .s-docs-toc a { display: block; padding: 4px 0; color: var(--ink-3); text-decoration: none; transition: color var(--dur-fast) var(--ease) }
 .s-docs-toc a:hover,
 .s-docs-toc a.is-active { color: var(--accent) }
-.s-docs-toc .s-toc-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 10.5px; line-height: 1.6; color: var(--ink-3) }
+.s-docs-toc .s-toc-foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--text-small); line-height: 1.6; color: var(--ink-3) }
 .s-docs-toc .s-toc-foot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2) }
 .s-docs-mobile {
   display: none;
@@ -1185,7 +1187,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface);
   margin: 18px 0 0;
 }
-.s-docs-mobile summary { list-style: none; cursor: pointer; padding: 10px 12px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2) }
+.s-docs-mobile summary { list-style: none; cursor: pointer; padding: 10px 12px; font-family: var(--mono); font-size: var(--text-micro); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2) }
 .s-docs-mobile summary::-webkit-details-marker { display: none }
 .s-docs-mobile summary::after { content: "+"; float: right; color: var(--ink-3) }
 .s-docs-mobile[open] summary::after { content: "−" }
@@ -1240,7 +1242,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .s-mobile-menu { top: 54px }
   .s-mobile-menu a { padding: 13px 0 }
   .s-console { display: grid; grid-template-columns: 1fr 1fr; width: 100% }
-  .s-console-cell { padding: 10px 10px 10px 0; margin-right: 0; font-size: 8.5px; border-right: 1px solid var(--i-line) }
+  .s-console-cell { padding: 10px 10px 10px 0; margin-right: 0; font-size: var(--text-micro); border-right: 1px solid var(--i-line) }
   .s-console-cell:nth-child(1) { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--i-line) }
   .s-console-cell:nth-child(2) { display: none }
   .s-console-cell:nth-child(4) { padding-left: 10px; border-right: 0 }
@@ -1251,7 +1253,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .s-actions { flex-direction: column; align-items: stretch; gap: 8px }
   .s-btn { width: 100% }
   .s-text-link { text-align: center; padding: 8px 0 }
-  .s-hero-meta { font-size: 8.5px; gap: 4px 10px }
+  .s-hero-meta { font-size: var(--text-micro); gap: 4px 10px }
   .s-readout { grid-template-columns: 1fr 1fr }
   .s-readout-cell { border-right: 0; margin-right: 0; padding: 12px 12px 14px 0 }
   .s-readout-cell:nth-child(odd) { border-right: 1px solid var(--i-line); padding-right: 12px }
@@ -1279,7 +1281,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     content: attr(data-label);
     display: block;
     font-family: var(--mono);
-    font-size: 8px;
+    font-size: var(--text-micro);
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-3);
@@ -1314,7 +1316,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .s-cell-v { font-size: 15px }
   .s-foot-grid { grid-template-columns: 1fr }
   .s-limit-list { grid-template-columns: 1fr }
-  .s-shot-chrome { font-size: 8px }
+  .s-shot-chrome { font-size: var(--text-micro) }
   .s-shot-chrome .s-shot-badge { display: none }
 }
 

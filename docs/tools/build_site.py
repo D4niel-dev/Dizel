@@ -27,6 +27,10 @@ PAGE_MAP: Dict[str, Tuple[str, str]] = {
     "guide/install.html": ("guide-install", "docs"),
     "guide/launch.html": ("guide-launch", "docs"),
     "guide/capabilities.html": ("guide-capabilities", "docs"),
+    "guide/modes.html": ("guide-modes", "docs"),
+    "guide/providers.html": ("guide-providers", "docs"),
+    "guide/sessions.html": ("guide-sessions", "docs"),
+    "guide/plugins.html": ("guide-plugins", "docs"),
 }
 
 META_RE = re.compile(r"<!--meta\s*(\{.*?\})\s*-->", re.S)

@@ -18,6 +18,10 @@ PAGES = {
     "guide/install.html",
     "guide/launch.html",
     "guide/capabilities.html",
+    "guide/modes.html",
+    "guide/providers.html",
+    "guide/sessions.html",
+    "guide/plugins.html",
 }
 
 
@@ -113,6 +117,11 @@ def test_model_card_has_no_invented_benchmark_table():
     assert "1.1236" in text and "3.3158" in text
 
 
+def test_model_card_install_link_opens_the_install_guide():
+    text = read("model.html")
+    assert '<a href="guide/install.html"><small>Next</small>Install Dizel →</a>' in text
+
+
 def test_docs_have_real_commands_and_no_dead_controls():
     install = read("guide/install.html")
     launch = read("guide/launch.html")
@@ -128,6 +137,54 @@ def test_docs_have_real_commands_and_no_dead_controls():
         assert "Was this page helpful?" not in text, name
         assert 'type="search"' not in text, name
         assert "Report a docs issue" in text, name
+
+
+def test_mode_guide_documents_current_controls():
+    assert (DOCS / "guide/modes.html").is_file()
+    text = read("guide/modes.html")
+    for value in (
+        "Fast",
+        "Planning",
+        "Coding",
+        "Thinking",
+        "Ultrafast",
+        "X-High",
+        "Max",
+        "/verbosity detailed",
+    ):
+        assert value in text, value
+    assert "/tier" not in text
+
+
+def test_provider_guide_documents_supported_setup_paths():
+    assert (DOCS / "guide/providers.html").is_file()
+    text = read("guide/providers.html")
+    for value in ("Ctrl+,", "/provider", "/model", "ollama serve", "DIZEL_CONFIG_DIR"):
+        assert value in text, value
+    assert "ProviderRegistry" not in text
+
+
+def test_session_guide_distinguishes_saved_sessions_and_context_resets():
+    assert (DOCS / "guide/sessions.html").is_file()
+    text = read("guide/sessions.html")
+    for value in ("/session", "/reset", "/clear", "/context", "DIZEL.md", "AGENTS.md"):
+        assert value in text, value
+    assert "12,000" in text and "6,000" in text
+
+
+def test_plugin_guide_separates_direct_calls_from_model_tools():
+    assert (DOCS / "guide/plugins.html").is_file()
+    text = read("guide/plugins.html")
+    for value in ("Settings → MCP", "/mcp", "/plugins run", "/plugins prompt", "/tools tools on"):
+        assert value in text, value
+    assert "/tools web_search on" not in text
+    assert "do not inherit" in text
+
+
+def test_task_guides_are_in_both_docs_navigations():
+    text = read("guide/index.html")
+    for name in ("modes.html", "providers.html", "sessions.html", "plugins.html"):
+        assert text.count(f'href="{name}"') >= 2, name
 
 
 def test_demo_is_untouched():
@@ -230,12 +287,28 @@ def test_edition_badge_never_wraps():
     )
 
 
-def test_releases_page_matches_the_current_app_version():
+def test_site_text_never_uses_pixel_sizes_below_eleven():
+    css = read("styles/site.css")
+    sizes = [float(value) for value in re.findall(r"font-size:\s*(\d+(?:\.\d+)?)px", css)]
+    assert sizes
+    assert min(sizes) >= 11, min(sizes)
+
+
+def test_guide_source_sections_are_explicitly_balanced():
+    for path in sorted((DOCS / "_site" / "pages").glob("guide-*.html")):
+        source = path.read_text(encoding="utf-8")
+        assert source.count("<section") == source.count("</section>"), path.name
+
+
+def test_release_body_and_downloads_match_the_current_app_version():
     from dizel_core.version import __version__
 
     text = read("releases.html")
-    assert f"v{__version__}" in text
-    assert "v2.0.1" not in text
+    main = text.split('<main id="main"', 1)[1].split("</main>", 1)[0]
+    assert f"v{__version__} is live." in main
+    assert f"Dizel-TUI-{__version__}.zip" in main
+    assert main.count(f"releases/tag/v{__version__}") == 2
+    assert "v2.0.3" not in main
 
 
 def test_docs_chrome_and_demo_match_the_current_app_version():

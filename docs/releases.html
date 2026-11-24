@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Releases — Dizel</title>
-<meta name="description" content="Dizel releases: v2.0.3 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
+<meta name="description" content="Dizel releases: v2.0.4 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 
 <link rel="canonical" href="https://d4niel-dev.github.io/Dizel/releases.html">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://d4niel-dev.github.io/Dizel/releases.html">
 <meta property="og:title" content="Releases — Dizel">
-<meta property="og:description" content="Dizel releases: v2.0.3 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
+<meta property="og:description" content="Dizel releases: v2.0.4 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 <meta property="og:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta property="og:image:width" content="1475">
 <meta property="og:image:height" content="975">
 <meta property="og:image:alt" content="The Dizel desktop app with a chat sidebar, a session chip and a composer.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Releases — Dizel">
-<meta name="twitter:description" content="Dizel releases: v2.0.3 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
+<meta name="twitter:description" content="Dizel releases: v2.0.4 app, v1.5 model, v1.6 Flash Preview training, known limits, and release policy.">
 <meta name="twitter:image" content="https://d4niel-dev.github.io/Dizel/assets/site/app-desktop.png">
 <meta name="theme-color" content="#E8EAED">
 <link rel="icon" type="image/x-icon" href="assets/app/Dizel.ico">
@@ -100,7 +100,7 @@
   <header class="s-doc-head">
     <div class="s-crumb"><a href="index.html">Dizel</a><span>/</span><span>Releases</span></div>
     <h1>Releases</h1>
-    <div class="s-doc-meta"><span>Record 2026-11</span><span>v2.0.3 app</span><span>v1.5 model</span><span>v1.6 preview</span></div>
+    <div class="s-doc-meta"><span>Record 2026-11</span><span>v2.0.4 app</span><span>v1.5 model</span><span>v1.6 preview</span></div>
   </header>
 </div>
 
@@ -108,8 +108,8 @@
   <div class="s-shell">
     <div class="s-section-head">
       <p class="s-rail">App release</p>
-      <h2>v2.0.3 is live.</h2>
-      <p class="s-section-copy">The Electron app, terminal client, and npm launcher ship together. This release gives every model provider its own usage window, remembers loaded checkpoints in the composer, calms the write-approval gates with a second confirmation, and fixes the desktop reply bug that affected every local checkpoint. The model is still v1.5; v1.6 remains a preview.</p>
+      <h2>v2.0.4 is live.</h2>
+      <p class="s-section-copy">The Electron app, terminal client, and npm launcher ship together. This release adds a tokenizer-backed context panel, a “Where you left off” session digest, Fast reply speeds, and a System colour theme. Response length now changes both the prompt and the reply budget; v1.5 remains the published model and v1.6 remains a preview.</p>
     </div>
     <table class="s-matrix">
       <thead>
@@ -118,19 +118,19 @@
       <tbody>
         <tr>
           <th scope="row"><b>Desktop app</b><small>Windows installer</small></th>
-          <td data-label="Version">v2.0.3</td>
+          <td data-label="Version">v2.0.4</td>
           <td data-label="What ships">NSIS installer, blockmap, auto-update manifest</td>
-          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.3" target="_blank" rel="noopener">Download ↗</a></td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.4" target="_blank" rel="noopener">Download ↗</a></td>
         </tr>
         <tr>
           <th scope="row"><b>Terminal client</b><small>Portable archive</small></th>
-          <td data-label="Version">v2.0.3</td>
-          <td data-label="What ships"><code>Dizel-TUI-2.0.3.zip</code> and its <code>.cmd</code> launcher</td>
-          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.3" target="_blank" rel="noopener">Download ↗</a></td>
+          <td data-label="Version">v2.0.4</td>
+          <td data-label="What ships"><code>Dizel-TUI-2.0.4.zip</code> and its <code>.cmd</code> launcher</td>
+          <td><a href="https://github.com/D4niel-dev/Dizel/releases/tag/v2.0.4" target="_blank" rel="noopener">Download ↗</a></td>
         </tr>
         <tr>
           <th scope="row"><b>npm launcher</b><small><code>@d4niel-dev/dizel</code></small></th>
-          <td data-label="Version">v2.0.3</td>
+          <td data-label="Version">v2.0.4</td>
           <td data-label="What ships">Downloads and SHA-256 verifies the matching release</td>
           <td><a href="https://www.npmjs.com/package/@d4niel-dev/dizel" target="_blank" rel="noopener">npm ↗</a></td>
         </tr>
@@ -144,8 +144,8 @@
   <div class="s-shell">
     <div class="s-section-head">
       <p class="s-rail">Changelog</p>
-      <h2>What changed in 2.0.3.</h2>
-      <p class="s-section-copy">Per-provider usage windows, a model switcher that remembers checkpoints, calmer approval gates, and the desktop reply fix.</p>
+      <h2>What changed in 2.0.4.</h2>
+      <p class="s-section-copy">Real context accounting, a useful long-chat digest, Fast reply speeds, effective response length, and a modernized evaluation framework.</p>
     </div>
     <table class="s-matrix is-log">
       <thead>
@@ -153,28 +153,32 @@
       </thead>
       <tbody>
         <tr>
-          <th scope="row"><b>Usage limits</b><small>Both clients</small></th>
-          <td>Every API provider gets its own context window and its own 12-hour usage counter, reset time, and compaction count. Provider defaults (128k to 1M) can be overridden in Settings; local checkpoints keep their own window. The terminal now enforces the window exactly like the desktop.</td>
+          <th scope="row"><b>Context panel</b><small>Added</small></th>
+          <td>The status-bar panel counts the base prompt, mode instructions, response-length clause, project rules, and conversation with the real tokenizer. It no longer estimates tokens by dividing characters by four.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Model switcher</b><small>Desktop</small></th>
-          <td>The composer's model menu lists "Recently loaded" checkpoints for one-click reloading, with a collapsible "All checkpoints" list beneath it. History is shared with the terminal.</td>
+          <th scope="row"><b>Where you left off</b><small>Added</small></th>
+          <td>Long chats open with a local digest of where the conversation started, the last question, and the last reply. It makes no model call, caches nothing, hides during streaming, and can be dismissed per session.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Tool rows</b><small>Both clients</small></th>
-          <td>Running tool names sweep a highlight across their letters; the terminal also shows elapsed seconds on each running row.</td>
+          <th scope="row"><b>Fast reply speeds</b><small>Added</small></th>
+          <td>Fast, Turbo, and Ultrafast sit under Fast mode with their own prompt clause, colour, and reply budget. The slider supports dragging as well as clicks and arrow keys.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Approvals</b><small>Both clients</small></th>
-          <td>"Always this session" and "Always allow" now ask a second time, with an amber warning that persistent trust applies to every project until revoked. Escape backs out of the warning.</td>
+          <th scope="row"><b>System theme</b><small>Added</small></th>
+          <td>The desktop and web settings can follow the operating system's light or dark preference and update live when it changes.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Fixes</b><small>Desktop</small></th>
-          <td>Replies from local checkpoints could end as "Generation ended without a reply."; the Ctrl+K palette is centered again; the Windows taskbar icon no longer starts blank; the usage meter reports the real provider window instead of a frozen 1,024.</td>
+          <th scope="row"><b>Response length</b><small>Changed</small></th>
+          <td>Short and Detailed now add explicit prompt instructions and apply their 0.6× and 1.5× budget multipliers; Normal stays silent at 1.0×. The composer's + → Reply menu and Settings → Chat stay in sync, and a saved choice applies at startup.</td>
         </tr>
         <tr>
-          <th scope="row"><b>Docs</b><small>Website</small></th>
-          <td>This page now tracks 2.0.3, the app screenshot was recaptured, and hover motion stays inside its element at every width.</td>
+          <th scope="row"><b>Evaluation</b><small>Changed</small></th>
+          <td>Benchmark cases are versioned, custom scorers can be registered, weights affect the score, manual cases fail loudly, and timestamps are timezone-aware. The app's scorecard shape is unchanged.</td>
+        </tr>
+        <tr>
+          <th scope="row"><b>Fixes</b><small>Both clients</small></th>
+          <td>The context panel refreshes after mode, effort, speed, or length changes; response-length budgets and saved values now work; the Fast slider no longer throws on synthetic pointer events; and a fresh checkout includes the benchmark cases and suite runner.</td>
         </tr>
       </tbody>
     </table>

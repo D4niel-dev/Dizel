@@ -1,0 +1,114 @@
+<!--meta
+{
+  "title": "Modes & replies — Dizel Docs",
+  "description": "Choose Fast, Planning, Coding, or Thinking; set Fast reply speed, Thinking effort, and response length in the desktop app or terminal UI.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "modes"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Controls</span><span>/</span><span>Modes &amp; replies</span></div>
+<h1>Modes &amp; replies</h1>
+<p class="s-docs-lede">Choose the job first, then tune how much the model reasons or writes. These controls change the prompt and generation budget; they do not switch to a different model.</p>
+
+<div class="s-callout"><b>Four modes, no tier selector.</b> Fast, Planning, Coding, and Thinking work across the Dizel model families. Fast has three reply speeds; Thinking has five effort levels.</div>
+
+<section class="s-docs-section">
+  <h2 id="choose-a-mode">Choose a mode</h2>
+  <p>In the desktop app, open the mode picker from the composer. In the terminal, run <code>/mode</code> for the picker or pass a mode directly. The mode applies to the next reply.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Mode</th><th scope="col">Use it for</th><th scope="col">What changes</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Fast</strong></td><td>Direct questions, summaries, and small edits</td><td>Leads with the result and removes preamble, filler, and closing summaries. A nested speed control tunes the Fast clause and budget.</td></tr>
+        <tr><td><strong>Planning</strong></td><td>Multi-step work with constraints or tradeoffs</td><td>Asks for a compact goal, steps, and main risk, then carries out the plan. <code>/plan</code> selects Planning automatically.</td></tr>
+        <tr><td><strong>Coding</strong></td><td>Runnable implementations and debugging</td><td>Puts working code first, with imports and no placeholders, then explains only important decisions and checks.</td></tr>
+        <tr><td><strong>Thinking</strong></td><td>Ambiguous problems and careful analysis</td><td>Reasons inside a think block, then answers outside it. A nested effort control changes reasoning depth, sampling temperature, and budget.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/mode fast
+/mode planning
+/mode coding
+/mode thinking high</code></pre>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="fast-speeds">Fast reply speeds</h2>
+  <p>Fast mode contains <strong>Fast</strong>, <strong>Turbo</strong>, and <strong>Ultrafast</strong>. Higher settings carry a stronger brevity clause and a larger reply-budget multiplier, leaving room for the model to converge on a direct answer.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Speed</th><th scope="col">Budget factor</th><th scope="col">Prompt direction</th></tr></thead>
+      <tbody>
+        <tr><td>Fast</td><td class="num">1.00×</td><td>Lead with the result; skip preamble and filler.</td></tr>
+        <tr><td>Turbo</td><td class="num">1.15×</td><td>Answer promptly with short sentences and no recap.</td></tr>
+        <tr><td>Ultrafast</td><td class="num">1.30×</td><td>Return only the direct result in as few words as correctness allows.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="s-callout is-neutral"><b>Speed is a response style, not a latency benchmark.</b> These settings do not change temperature or decoding parameters, and Dizel publishes no measured wall-clock speedup for them.</div>
+  <p>Desktop: open Fast mode, then use its nested <strong>Reply speed</strong> slider. Terminal: pass the speed after the mode.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/mode fast turbo
+/mode fast ultrafast</code></pre>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="thinking-effort">Thinking effort</h2>
+  <p>Thinking mode has five effort levels. Higher levels ask for more decomposition and checking, adjust the mode's sampling temperature, and increase its budget multiplier.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Label</th><th scope="col">Command value</th><th scope="col">Budget factor</th><th scope="col">Reasoning direction</th></tr></thead>
+      <tbody>
+        <tr><td>Low</td><td><code>low</code></td><td class="num">0.75×</td><td>Think briefly, then answer directly.</td></tr>
+        <tr><td>Medium</td><td><code>medium</code></td><td class="num">1.00×</td><td>Check assumptions and edge cases.</td></tr>
+        <tr><td>High</td><td><code>high</code></td><td class="num">1.15×</td><td>Compare approaches and verify the answer.</td></tr>
+        <tr><td>X-High</td><td><code>xhigh</code></td><td class="num">1.30×</td><td>Decompose, weigh alternatives, and review failure modes.</td></tr>
+        <tr><td>Max</td><td><code>deep</code></td><td class="num">1.40×</td><td>Explore several routes and stress-test the answer.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Max</strong> is the current label for the <code>deep</code> effort; it is not a fifth mode. <code>/mode deep</code> remains a shortcut for Thinking at Max.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/mode thinking low
+/mode thinking xhigh
+/mode deep</code></pre>
+  </div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="response-length">Response length</h2>
+  <p>Response length is independent of mode. It scales the task budget and, for Short and Detailed, adds an explicit clause to the prompt. Normal adds no clause.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Length</th><th scope="col">Budget factor</th><th scope="col">Prompt clause</th></tr></thead>
+      <tbody>
+        <tr><td>Short</td><td class="num">0.60×</td><td>Answer in the fewest useful words; no examples or recap unless asked.</td></tr>
+        <tr><td>Normal</td><td class="num">1.00×</td><td>None — the default prompt stays unchanged.</td></tr>
+        <tr><td>Detailed</td><td class="num">1.50×</td><td>Explain reasoning and edge cases, with examples and structure where useful.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Desktop: open the composer's <code>+</code> menu → <strong>Reply</strong>, or use <strong>Settings → Chat</strong>. Terminal: use <code>/verbosity</code>; <code>/length</code> is an alias. The choice is saved and restored on the next launch.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/verbosity
+/verbosity short
+/verbosity detailed
+/verbosity normal</code></pre>
+  </div>
+  <div class="s-callout is-neutral"><b>Factors are not final token counts.</b> The allocator also considers the task, input length, remaining context, and any hard output limit before clamping the reply budget.</div>
+</section>
+
+<div class="s-next">
+  <a href="launch.html"><small>Previous</small>Launch a client</a>
+  <a href="providers.html"><small>Next</small>Choose a provider →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>

@@ -1,0 +1,97 @@
+<!--meta
+{
+  "title": "MCP plugins — Dizel Docs",
+  "description": "Connect stdio or Streamable HTTP MCP servers, inspect their tools, run a tool directly, or let the model call it with Dizel's tools switch.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "plugins"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Controls</span><span>/</span><span>MCP plugins</span></div>
+<h1>MCP plugins</h1>
+<p class="s-docs-lede">Connect tools from other programs through the Model Context Protocol. A server can expose data lookups, actions, or both; Dizel keeps direct calls separate from model-driven calls.</p>
+
+<div class="s-callout"><b>MCP tools are a separate trust boundary.</b> Direct MCP calls and model MCP tools <strong>do not inherit</strong> Dizel's built-in write, edit, or delete approval rules. Connect only servers you trust and start with read-only tools.</div>
+
+<section class="s-docs-section">
+  <h2 id="add-a-server">Add a server</h2>
+  <p>Desktop: open the composer's <code>+</code> menu → <strong>Plugins</strong>, or go to <strong>Settings → MCP</strong>. Choose <strong>Add server</strong>, configure one of the two supported transports, then save it.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Transport</th><th scope="col">Configuration</th><th scope="col">Use it for</th></tr></thead>
+      <tbody>
+        <tr><td><code>stdio</code></td><td>Command, one argument per line, optional environment variables</td><td>A local MCP process started by Dizel</td></tr>
+        <tr><td><code>http</code></td><td>HTTP or HTTPS URL, optional headers</td><td>A remote Streamable HTTP MCP server</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Choose <strong>Test</strong> before enabling a new server. A ready connection lists the tools it exposes. Malformed server entries are skipped rather than preventing the app from starting; legacy SSE transport is not accepted.</p>
+  <p>Terminal: run <code>/mcp</code>. Use <code>Space</code> to toggle a server, <code>T</code> to test, <code>A</code> to add, <code>E</code> to edit, <code>D</code> to delete, and <code>Esc</code> to close.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="connection-limits">Connection and output limits</h2>
+  <p>The desktop's <strong>Connection &amp; limits</strong> section applies one set of preferences to every MCP server.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Preference</th><th scope="col">Range</th><th scope="col">Default</th></tr></thead>
+      <tbody>
+        <tr><td>Connect timeout</td><td>5–60 seconds</td><td>15 seconds</td></tr>
+        <tr><td>Call timeout</td><td>10–300 seconds</td><td>60 seconds</td></tr>
+        <tr><td>Tool output cap</td><td>1,000–32,000 characters</td><td>6,000 characters</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Retry failed calls</strong> reconnects once and retries a failed call. <strong>Auto-connect on launch</strong> starts enabled servers when the desktop app opens. The terminal applies enabled servers when it starts; use <code>/mcp</code> to inspect their current state.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="discover-tools">Discover tools</h2>
+  <p>Run <code>/plugins</code> to list configured servers, connection state, and namespaced tools such as <code>server__tool</code>. Server and tool selectors accept IDs or display names. A server must be connected before its tools can run.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/mcp
+/plugins</code></pre>
+  </div>
+  <p>The desktop Plugins runner uses the same catalog and shows each tool's arguments and result. Discovery does not enable model access: the model's tools switch is separate.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="call-paths">Choose a call path</h2>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Command</th><th scope="col">What happens</th><th scope="col">Model tools required?</th></tr></thead>
+      <tbody>
+        <tr><td><code>/plugins run &lt;server&gt; &lt;tool&gt; [json]</code></td><td>Runs once now and prints the result.</td><td>No</td></tr>
+        <tr><td><code>/plugins prompt &lt;server&gt; &lt;tool&gt; [json]</code></td><td>Inserts a namespaced tool call into the composer for you to review and send.</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Optional arguments must be a JSON object. Before a model-driven call, turn on the registry with <code>/tools tools on</code>. Turning it off prevents model tool calls but does not prevent you from running a direct command yourself.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/plugins run &lt;server&gt; &lt;tool&gt; {"query": "release notes"}
+/plugins prompt &lt;server&gt; &lt;tool&gt; {"query": "release notes"}
+/tools tools on</code></pre>
+  </div>
+  <p>Review inserted calls before sending: the model may follow the tool result with another request or action. The tools switch has no separate web-search toggle.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="security">Secrets and safe use</h2>
+  <ul>
+    <li>Give each server only the environment variables and headers it needs. Those values stay in the local settings file and are redacted from configuration HTTP responses and exports.</li>
+    <li>The output cap limits how much text reaches the model; it is not a sandbox and does not make a server safe.</li>
+    <li>Use a dedicated, least-privilege account for servers that can change remote state. Test with a read-only operation first.</li>
+    <li>Do not assume Dizel's file-write approvals protect an MCP server's own mutations. Inspect the server's documentation and confirm consequential actions in its own system.</li>
+    <li>Settings imports leave MCP server definitions unchanged, so review existing servers separately when moving to a new machine.</li>
+  </ul>
+  <p>See <a href="capabilities.html">Capabilities</a> for the current GUI/TUI parity record and <a href="modes.html">Modes &amp; replies</a> for generation controls.</p>
+</section>
+
+<div class="s-next">
+  <a href="sessions.html"><small>Previous</small>Sessions &amp; context</a>
+  <a href="capabilities.html"><small>Next</small>Capabilities →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>

@@ -1,0 +1,85 @@
+<!--meta
+{
+  "title": "Providers — Dizel Docs",
+  "description": "Choose a local checkpoint, Ollama, a hosted API, or an OpenAI-compatible endpoint; select models and understand Dizel's context and usage limits.",
+  "nav": "docs",
+  "layout": "docs",
+  "docs_active": "providers"
+}
+-->
+
+<div class="s-crumb"><a href="index.html">Docs</a><span>/</span><span>Controls</span><span>/</span><span>Providers</span></div>
+<h1>Providers</h1>
+<p class="s-docs-lede">Choose where replies come from: a local Dizel checkpoint, Ollama, a hosted API, or an OpenAI-compatible endpoint. One provider is active at a time.</p>
+
+<div class="s-callout"><b>Local needs no API key.</b> Dizel 1.5 checkpoints and Ollama run on your machine. Hosted and custom providers require their own key; Dizel does not provide one.</div>
+
+<section class="s-docs-section">
+  <h2 id="choose-a-provider">Choose a provider</h2>
+  <p>Desktop: press <code>Ctrl+,</code>, open <strong>Chat → Provider</strong>, choose a card, then follow its setup panel. Terminal: run <code>/provider</code> for the picker or pass a provider name directly.</p>
+  <div class="s-table-scroll">
+    <table class="s-paper-table">
+      <thead><tr><th scope="col">Path</th><th scope="col">Available providers</th><th scope="col">Key</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Local</strong></td><td>Published Dizel checkpoints</td><td>No</td></tr>
+        <tr><td><strong>Ollama</strong></td><td>Models installed in your Ollama server</td><td>No</td></tr>
+        <tr><td><strong>Hosted</strong></td><td>OpenAI, Anthropic, Google, Groq, Mistral, xAI, AI21, Azure, Cohere, and Meta</td><td>Yes</td></tr>
+        <tr><td><strong>Custom</strong></td><td>Any OpenAI-compatible base URL</td><td>Usually</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="s-callout is-neutral"><b>Azure is the OpenAI-compatible path.</b> The current Azure option targets the public OpenAI endpoint; it does not configure an Azure resource name, deployment, or API version.</div>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>/provider
+/provider ollama llama3.2
+/model</code></pre>
+  </div>
+  <p><code>/model</code> opens the checkpoint picker for Local and the model picker for an API provider. You can also pass a model name, for example <code>/model Dizel 1.5 Distill</code>.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="hosted-and-custom">Hosted and custom APIs</h2>
+  <p>For a hosted provider, enter its API key and an optional model ID, then choose <strong>Save key</strong>. In the terminal, the picker asks for a missing key. Prefer that prompt over putting a key directly on the command line, where shell history may retain it.</p>
+  <p>For a custom provider, enter a display name, an OpenAI-compatible base URL, the key, and an optional model ID. The base URL usually ends in <code>/v1</code>. Choose <strong>Save &amp; connect</strong>; Dizel attempts to discover the endpoint's models.</p>
+  <p>In the terminal, set the custom base URL under <code>/settings</code> → <strong>API</strong> before selecting <code>custom</code> with <code>/provider</code>.</p>
+  <div class="s-warn"><b>Protect the settings file.</b> Keys are stored in <code>settings.json</code>. When the <code>cryptography</code> package is available, Dizel uses a machine-derived Fernet key; without it, storage falls back to reversible <code>b64:</code> encoding. This is not portable secret management, so do not share the file or paste key values into issues, logs, or notebooks.</div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="ollama">Use Ollama</h2>
+  <p>Start Ollama in its own terminal, then install or choose a model. The default server URL is <code>http://localhost:11434</code>.</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>ollama serve
+ollama pull llama3.2</code></pre>
+  </div>
+  <p>Desktop: select <strong>Ollama</strong>, adjust the URL if needed, choose <strong>Refresh</strong>, select a model, then choose <strong>Use Ollama</strong>. Terminal: use <code>/provider ollama</code> and select a model, or pass one as shown above.</p>
+  <p>Ollama uses its native chat API. A connection error usually means the server is not running, the URL is wrong, or the selected model is not installed.</p>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="local-checkpoints">Use a local checkpoint</h2>
+  <p>Dizel 1.5 is the published, runnable model. Choose a checkpoint in the desktop model picker, or start the terminal with one explicitly:</p>
+  <div class="s-code">
+    <button class="copy" type="button" data-copy>Copy</button>
+    <pre><code>python -m inference.tui.main \
+  --checkpoint checkpoints/dizel15/dizel-v15-distill-best.pt \
+  --device cuda</code></pre>
+  </div>
+  <p>Use <code>--device cpu</code> when no compatible GPU is available. Inside the TUI, <code>/provider local</code> selects the local backend and <code>/model</code> opens checkpoint history. The checkpoint supplies the local context-window size.</p>
+  <div class="s-callout is-neutral"><b>Preview weights are not published.</b> Dizel 1.6 Flash Preview and the planned 1.6 Pro track are not alternatives you can download and select today.</div>
+</section>
+
+<section class="s-docs-section">
+  <h2 id="limits-and-storage">Context, usage, and settings</h2>
+  <p>Each provider has its own context-window setting and 12-hour usage bucket, including Local. The bucket drives Dizel's usage meter and compaction policy; it is not a report of your vendor's billing or quota. For Local, the default capacity comes from the loaded checkpoint.</p>
+  <p>Settings live in <code>inference/.dizel/settings.json</code> by default. Set <code>DIZEL_CONFIG_DIR</code> to use another settings directory; chat history has a separate <code>DIZEL_DATA_DIR</code> setting. Changing the config directory does not move saved chats.</p>
+  <p>See <a href="sessions.html#context">Sessions &amp; context</a> for the difference between exact tokenizer-backed context counts and the usage meter's policy estimate.</p>
+</section>
+
+<div class="s-next">
+  <a href="modes.html"><small>Previous</small>Modes &amp; replies</a>
+  <a href="sessions.html"><small>Next</small>Sessions &amp; context →</a>
+</div>
+<p class="s-docs-report"><a class="s-text-link" href="https://github.com/D4niel-dev/Dizel/issues" target="_blank" rel="noopener">Report a docs issue ↗</a></p>
